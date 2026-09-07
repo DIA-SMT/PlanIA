@@ -1,0 +1,84 @@
+name: Corte trimestral del POA
+
+# Corre todos los días y el endpoint decide: solo toma la foto si ese día es el
+# último del trimestre.
+#
+# Por qué así y no un cron por trimestre: GitHub Actions no sabe expresar "el
+# último día del trimestre" (30 o 31 según el mes), y un cron con las cuatro
+# fechas escritas a mano se rompe callado el día que cambie el calendario del
+# POA. Corriendo todos los días, el filtro lo hace el endpoint con la fecha real.
+#
+# Horario: 23:30 UTC = 20:30 en Tucumán (UTC-3). El día laboral ya cerró y la
+# fecha UTC sigue siendo la misma que la local, que es lo que importa: el
+# endpoint compara contra la fecha UTC. Así, la corrida del 30 de septiembre a
+# las 23:30 UTC ve `2026-09-30` y toma la foto del cierre del tercer trimestre.
+# (Si se corriera después de medianoche UTC, la fecha ya sería del trimestre
+# siguiente y el corte se perdería.)
+
+on:
+  schedule:
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+    inputs:
+      fecha_corte:
+        description: 'Fecha del corte (YYYY-MM-DD). Vacío = hoy.'
+        required: false
+      forzar:
+        description: 'Tomar la foto aunque hoy no sea fin de trimestre'
+        type: boolean
+        default: false
+
+jobs:
+  corte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tomar la foto del corte
+        env:
+          PLANIA_URL: ${{ secrets.PLANIA_URL }}
+          CORTE_SECRET: ${{ secrets.CORTE_TRIMESTRAL_SECRET }}
+          FECHA: ${{ github.event.inputs.fecha_corte }}
+          FORZAR: ${{ github.event.inputs.forzar }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${PLANIA_URL:-}" ] || [ -z "${CORTE_SECRET:-}" ]; then
+            echo "::error::Faltan los secrets PLANIA_URL o CORTE_TRIMESTRAL_SECRET"
+            exit 1
+          fi
+
+          # En la corrida programada no hay inputs: el endpoint filtra por fin
+          # de trimestre. En la manual, `forzar` puede saltear ese filtro.
+          SOLO_FIN=true
+          if [ "${FORZAR:-false}" = "true" ]; then SOLO_FIN=false; fi
+
+          if [ -n "${FECHA:-}" ]; then
+            BODY="{\"fecha_corte\":\"${FECHA}\",\"solo_fin_de_trimestre\":${SOLO_FIN}}"
+          else
+            BODY="{\"solo_fin_de_trimestre\":${SOLO_FIN}}"
+          fi
+
+          echo "POST ${PLANIA_URL}/api/corte-trimestral"
+          echo "cuerpo: ${BODY}"
+
+          RESP=$(mktemp)
+          STATUS=$(curl -sS -o "$RESP" -w '%{http_code}' -X POST \
+            "${PLANIA_URL}/api/corte-trimestral" \
+            -H "Authorization: Bearer ${CORTE_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 120 \
+            -d "$BODY")
+
+          echo "HTTP ${STATUS}"
+          cat "$RESP"
+          echo ""
+
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::El corte falló (HTTP ${STATUS})"
+            exit 2
+          fi
+
+          if grep -q '"omitido":true' "$RESP"; then
+            echo "Hoy no es fin de trimestre: no se tomó ninguna foto."
+          else
+            echo "::notice::Foto del corte tomada."
+          fi
