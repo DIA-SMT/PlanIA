@@ -498,6 +498,33 @@ async function guardarFotoCorte(
       .eq("id", corteId);
   }
 
+  // El detalle ya está entero. Faltan dos pasos y el ORDEN IMPORTA: primero se
+  // borra la vieja, después se marca completa la nueva.
+  //
+  // Al revés no funciona, y el test de la 046 lo agarró: `uq_corte_completo` es
+  // un índice único sobre las fotos COMPLETAS de una misma fecha, así que
+  // marcar la nueva mientras la vieja sigue completa choca con el índice. No es
+  // un detalle del índice: son dos fotos completas del mismo cierre, que es
+  // justamente lo que no puede existir.
+  //
+  // Queda una ventana de un statement en la que ninguna está marcada completa.
+  // Es la mejor de las opciones malas sin una transacción: el detalle de la
+  // nueva ya está escrito entero, así que si falla acá no se perdió nada — la
+  // fila queda sin marcar, los lectores la ignoran, y volver a tomar la foto
+  // (o un UPDATE a mano) la recupera. La ventana anterior era mucho peor:
+  // se borraba la vieja antes de escribir el detalle de la nueva.
+  if (previo) {
+    const { error } = await sb.from("corte_trimestral").delete().eq("id", (previo as any).id);
+    if (error) {
+      // Si no se puede borrar la vieja, no se marca la nueva: dos fotos
+      // completas del mismo cierre son peores que una nueva sin marcar.
+      throw new Error(
+        `No se pudo reemplazar la foto anterior del ${fechaCorte}: ${error.message}. ` +
+          "La foto nueva quedó guardada sin marcar como completa; volvé a tomarla."
+      );
+    }
+  }
+
   // Recién ahora la foto es válida para los lectores.
   const { error: eCompleto } = await sb
     .from("corte_trimestral")
@@ -509,18 +536,13 @@ async function guardarFotoCorte(
       // foto está entera. Se sigue: el lector viejo no filtra por completo.
       console.warn("corte-trimestral: falta la columna `completo` (migración 046)");
     } else {
-      await sb.from("corte_trimestral").delete().eq("id", corteId);
-      throw eCompleto;
+      // No se borra la nueva: el detalle está completo y perderlo sería peor
+      // que dejarla sin marcar. Los lectores la ignoran hasta que se marque.
+      throw new Error(
+        `La foto del ${fechaCorte} se escribió entera pero no se pudo marcar como ` +
+          `completa: ${eCompleto.message}. Volvé a tomarla.`
+      );
     }
-  }
-
-  // Y solo con la nueva ya completa se borra la anterior. El detalle se va por
-  // CASCADE.
-  if (previo) {
-    const { error } = await sb.from("corte_trimestral").delete().eq("id", (previo as any).id);
-    // Si esto falla quedan dos fotos completas de la misma fecha. Es molesto,
-    // pero no se pierde nada: el lector toma la más reciente. No se tira.
-    if (error) console.warn("corte-trimestral: no se pudo borrar la foto anterior:", error.message);
   }
 
   return {
