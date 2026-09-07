@@ -215,25 +215,37 @@ export async function calcularFotoCorte(
   function ubicar(unidadId: string) {
     const propia = unidadPorId.get(unidadId);
     if (!propia) {
-      return { secretaria: null, subsecretaria: null, esPropioDeSecretaria: false, propia: null };
+      return {
+        secretaria: null, subsecretaria: null, direccion: null,
+        esPropioDeSecretaria: false, propia: null,
+      };
     }
     if (propia.nivel === 0) {
       // El proyecto está cargado en la secretaría misma: es la "fila de
       // proyectos propios" que pidió Planificación.
-      return { secretaria: propia, subsecretaria: null, esPropioDeSecretaria: true, propia };
+      return {
+        secretaria: propia, subsecretaria: null, direccion: null,
+        esPropioDeSecretaria: true, propia,
+      };
     }
     let secretaria: any = null;
     let subsecretaria: any = null;
+    // La dirección es el ancestro de nivel 2, o la unidad misma si ya es de
+    // nivel 2. Hace falta para los 9 proyectos que cuelgan de departamentos
+    // (nivel 3, los cuatro museos): sin esto no se pueden anidar en la tabla
+    // del reporte, que va subsecretaría > dirección.
+    let direccion: any = propia.nivel === 2 ? propia : null;
     let cur: any = propia;
     const vistos = new Set<string>([propia.id]);
     while (cur) {
+      if (cur.nivel === 2 && !direccion) direccion = cur;
       if (cur.nivel === 1) subsecretaria = cur;
       if (cur.nivel === 0) { secretaria = cur; break; }
       if (!cur.parent_id || vistos.has(cur.parent_id)) break;
       vistos.add(cur.parent_id);
       cur = unidadPorId.get(cur.parent_id) ?? null;
     }
-    return { secretaria, subsecretaria, esPropioDeSecretaria: false, propia };
+    return { secretaria, subsecretaria, direccion, esPropioDeSecretaria: false, propia };
   }
 
   // ---- La cascada, igual que /avance-direcciones y el panel ----
@@ -279,6 +291,8 @@ export async function calcularFotoCorte(
       secretaria_nombre: pos.secretaria?.nombre_corto ?? pos.secretaria?.nombre ?? null,
       subsecretaria_id: pos.subsecretaria?.id ?? null,
       subsecretaria_nombre: pos.subsecretaria?.nombre_corto ?? pos.subsecretaria?.nombre ?? null,
+      direccion_id: pos.direccion?.id ?? null,
+      direccion_nombre: pos.direccion?.nombre_corto ?? pos.direccion?.nombre ?? null,
       es_propio_de_secretaria: pos.esPropioDeSecretaria,
       estado,
       pct: agg.pct,
