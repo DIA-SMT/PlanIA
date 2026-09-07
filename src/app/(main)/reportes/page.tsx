@@ -3,10 +3,11 @@ import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { perfilVeTodo, hoyLocal } from "@/lib/utils";
 import { trimestreDe, ultimoCierrePasado } from "@/lib/corte-trimestral";
 import {
-  getReporteSecretaria,
-  getSecretarias,
+  getReporteUnidad,
+  getUnidadesParaReporte,
   getCortesParaReporte,
   getAnalisisReporte,
+  type UnidadReporte,
 } from "@/lib/reporte-trimestral";
 import { ReporteDocumento } from "@/components/reportes/reporte-documento";
 import { AnalisisForm } from "@/components/reportes/analisis-form";
@@ -16,21 +17,28 @@ import { BotonImprimir } from "@/components/reportes/boton-imprimir";
 
 export const revalidate = 0;
 
+const NIVELES = [
+  { nivel: 0, etiqueta: "Secretarías" },
+  { nivel: 1, etiqueta: "Subsecretarías" },
+  { nivel: 2, etiqueta: "Direcciones" },
+  { nivel: 3, etiqueta: "Departamentos" },
+];
+
 /**
- * Reporte trimestral de cumplimiento — etapa 4.
+ * Reporte trimestral de cumplimiento — etapas 4 y 7.
  *
- * Se elige secretaría y corte por querystring, como el resto del sistema
- * (`?sec=`, `?corte=`). Sin corte elegido calcula con los datos de hoy, que es
- * lo único posible mientras no exista la foto del cierre.
+ * Se elige área y corte por querystring, como el resto del sistema (`?u=`,
+ * `?corte=`). El mismo informe sirve para secretaría, subsecretaría y dirección,
+ * que es lo que pidieron: 66 áreas con proyectos sobre las 79 activas.
  *
- * El control de acceso NO está acá: vive en getReporteSecretaria, que valida el
+ * El control de acceso NO está acá: vive en getReporteUnidad, que valida el
  * alcance del perfil antes de leer. Poner la puerta en la pantalla dejaría el
- * agujero abierto para cualquier otra pantalla que consuma la misma capa.
+ * agujero abierto para cualquier otra que consuma la misma capa.
  */
 export default async function ReportesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sec?: string; corte?: string; t?: string }>;
+  searchParams: Promise<{ u?: string; corte?: string; t?: string }>;
 }) {
   const params = await searchParams;
   const perfil = await getPerfilActual();
@@ -46,19 +54,19 @@ export default async function ReportesPage({
   const esAdmin = perfil.rol === "admin_funcional";
   const hoy = hoyLocal();
 
-  // Secretarías que este usuario puede pedir. La capa de datos lo valida igual;
-  // esto es para no ofrecerle opciones que va a rechazar.
-  const todas = await getSecretarias();
+  // Áreas que este usuario puede pedir. La capa de datos lo valida igual; esto
+  // es para no ofrecerle opciones que va a rechazar.
+  const todas = await getUnidadesParaReporte();
   const scope = perfilVeTodo(perfil) ? null : new Set(await getScopeUnidades(perfil));
-  const secretarias = scope ? todas.filter((s) => scope.has(s.id)) : todas;
+  const unidades = scope ? todas.filter((u) => scope.has(u.id)) : todas;
 
-  if (secretarias.length === 0) {
+  if (unidades.length === 0) {
     return (
       <div className="space-y-6 max-w-3xl">
         <BackButton fallback="/dashboard" />
         <EmptyState
           title="No hay reportes disponibles para tu área"
-          description="El reporte trimestral se emite por secretaría. Si creés que deberías verlo, escribile a Planificación Estratégica."
+          description="Si creés que deberías ver alguno, escribile a Planificación Estratégica."
           icon="◫"
         />
       </div>
@@ -73,9 +81,7 @@ export default async function ReportesPage({
     errorCortes = e instanceof Error ? e.message : String(e);
   }
 
-  const secretariaId = params.sec && secretarias.some((s) => s.id === params.sec)
-    ? params.sec
-    : secretarias[0].id;
+  const unidadId = params.u && unidades.some((u) => u.id === params.u) ? params.u : unidades[0].id;
   const corteId = params.corte && cortes.some((c) => c.id === params.corte) ? params.corte : undefined;
   const corteElegido = cortes.find((c) => c.id === corteId);
 
@@ -86,24 +92,27 @@ export default async function ReportesPage({
   const trimestre = corteElegido?.trimestre ?? (Number(params.t) || trimestreDe(cierre));
   const anio = corteElegido?.anio ?? Number(cierre.slice(0, 4));
 
-  let reporte: Awaited<ReturnType<typeof getReporteSecretaria>> | null = null;
+  let reporte: Awaited<ReturnType<typeof getReporteUnidad>> | null = null;
   let errorReporte: string | null = null;
   try {
-    reporte = await getReporteSecretaria({ secretariaId, corteId });
+    reporte = await getReporteUnidad({ unidadId, corteId });
   } catch (e) {
     errorReporte = e instanceof Error ? e.message : String(e);
   }
 
-  const analisis = await getAnalisisReporte({ anio, trimestre, unidadId: secretariaId }).catch(
-    () => null
-  );
+  const analisis = await getAnalisisReporte({ anio, trimestre, unidadId }).catch(() => null);
 
   const conQuery = (extra: Record<string, string | undefined>) => {
     const q = new URLSearchParams();
-    const base = { sec: secretariaId, corte: corteId, t: String(trimestre), ...extra };
+    const base = { u: unidadId, corte: corteId, t: String(trimestre), ...extra };
     for (const [k, v] of Object.entries(base)) if (v) q.set(k, v);
     return `/reportes?${q.toString()}`;
   };
+
+  const porNivel = NIVELES.map((n) => ({
+    ...n,
+    opciones: unidades.filter((u) => u.nivel === n.nivel),
+  })).filter((n) => n.opciones.length > 0);
 
   return (
     <div className="space-y-6">
@@ -113,77 +122,81 @@ export default async function ReportesPage({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reporte trimestral</h1>
           <p className="text-sm text-muted mt-1">
-            Cumplimiento de metas operativas por secretaría. Para descargarlo, usá Imprimir →
+            Cumplimiento de metas operativas por área. Para descargarlo, usá Imprimir →
             Guardar como PDF.
           </p>
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
-          <div className="flex flex-wrap gap-4">
-            <div className="min-w-[16rem] flex-1">
-              <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">Secretaría</p>
-              <div className="flex flex-wrap gap-1.5">
-                {secretarias.map((s) => (
-                  <Link
-                    key={s.id}
-                    href={conQuery({ sec: s.id })}
-                    className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                      s.id === secretariaId
-                        ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                        : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                    }`}
-                  >
-                    {s.nombre}
-                  </Link>
-                ))}
+        <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
+          <div className="space-y-3">
+            {porNivel.map((n) => (
+              <div key={n.nivel}>
+                <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
+                  {n.etiqueta}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {n.opciones.map((u: UnidadReporte) => (
+                    <Link
+                      key={u.id}
+                      href={conQuery({ u: u.id })}
+                      className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
+                        u.id === unidadId
+                          ? "bg-primary/10 text-primary border-primary/30 font-medium"
+                          : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
+                      }`}
+                    >
+                      {u.nombre}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="min-w-[14rem]">
-              <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
-                Corte del que salen los datos
-              </p>
-              <div className="flex flex-wrap gap-1.5">
+          <div className="border-t border-border pt-3">
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
+              Corte del que salen los datos
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <Link
+                href={conQuery({ corte: undefined })}
+                className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
+                  !corteId
+                    ? "bg-warning/10 text-warning border-warning/30 font-medium"
+                    : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
+                }`}
+              >
+                Hoy (vista previa)
+              </Link>
+              {cortes.map((c) => (
                 <Link
-                  href={conQuery({ corte: undefined })}
+                  key={c.id}
+                  href={conQuery({ corte: c.id })}
                   className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                    !corteId
-                      ? "bg-warning/10 text-warning border-warning/30 font-medium"
+                    c.id === corteId
+                      ? "bg-primary/10 text-primary border-primary/30 font-medium"
                       : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
                   }`}
                 >
-                  Hoy (vista previa)
+                  {c.anio} · T{c.trimestre} · {c.fecha_corte}
                 </Link>
-                {cortes.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={conQuery({ corte: c.id })}
-                    className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                      c.id === corteId
-                        ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                        : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                    }`}
-                  >
-                    {c.anio} · T{c.trimestre} · {c.fecha_corte}
-                  </Link>
-                ))}
-              </div>
-              {cortes.length === 0 && !errorCortes && (
-                <p className="text-[11px] text-muted mt-1.5">
-                  Todavía no hay ninguna foto de corte guardada.{" "}
-                  {esAdmin && (
-                    <Link href="/admin/cortes" className="text-primary hover:underline">
-                      Tomar una
-                    </Link>
-                  )}
-                </p>
-              )}
-              {errorCortes && (
-                <p className="text-[11px] text-danger mt-1.5">
-                  No se pudieron leer los cortes: {errorCortes}
-                </p>
-              )}
+              ))}
             </div>
+            {cortes.length === 0 && !errorCortes && (
+              <p className="text-[11px] text-muted mt-1.5">
+                Todavía no hay ninguna foto de corte guardada.{" "}
+                {esAdmin && (
+                  <Link href="/admin/cortes" className="text-primary hover:underline">
+                    Tomar una
+                  </Link>
+                )}
+              </p>
+            )}
+            {errorCortes && (
+              <p className="text-[11px] text-danger mt-1.5">
+                No se pudieron leer los cortes: {errorCortes}
+              </p>
+            )}
           </div>
 
           {reporte && <BotonImprimir />}
@@ -201,8 +214,8 @@ export default async function ReportesPage({
             <AnalisisForm
               anio={anio}
               trimestre={trimestre}
-              unidadId={secretariaId}
-              unidadNombre={reporte.secretaria?.nombre ?? "el área"}
+              unidadId={unidadId}
+              unidadNombre={reporte.unidad?.nombre ?? "el área"}
               analisis={analisis}
               puedeEditar={esAdmin}
             />

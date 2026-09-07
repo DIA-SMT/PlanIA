@@ -46,6 +46,19 @@ export interface ConteoEstados {
 
 export type TipoFila = "subsecretaria" | "direccion" | "departamento" | "propios_secretaria";
 
+/** Un proyecto en el reporte de una dirección. */
+export interface FilaProyecto {
+  nombre: string;
+  codigo: string | null;
+  unidad_nombre: string | null;
+  estado: "verde" | "amarillo" | "rojo" | "sin_datos";
+  pct: number | null;
+  metas: number;
+  metas_con_datos: number;
+  indicadores: number;
+  indicadores_con_datos: number;
+}
+
 export interface FilaReporte extends ConteoEstados {
   tipo: TipoFila;
   nombre: string;
@@ -53,7 +66,7 @@ export interface FilaReporte extends ConteoEstados {
   hijos: FilaReporte[];
 }
 
-export interface ReporteSecretaria {
+export interface ReporteUnidad {
   origen: "corte" | "vivo";
   /** Datos del corte, cuando el origen es 'corte'. */
   corte: {
@@ -63,11 +76,14 @@ export interface ReporteSecretaria {
     fecha_corte: string;
     tomado_at: string;
   } | null;
-  secretaria: { id: string; nombre: string } | null;
-  /** Bloque 2 de la plantilla: el estado general de la secretaría. */
-  totalSecretaria: ConteoEstados;
-  /** Bloque 4: las filas de la tabla, anidadas. */
+  /** El área que reporta. null = solo los totales del municipio. */
+  unidad: { id: string; nombre: string; nivel: number; tipo: string } | null;
+  /** Bloque 2 de la plantilla: el estado general del área. */
+  totalUnidad: ConteoEstados;
+  /** Bloque 4 para secretaría y subsecretaría: el árbol de la estructura. */
   filas: FilaReporte[];
+  /** Bloque 4 para dirección y departamento: la lista de proyectos. */
+  proyectos: FilaProyecto[];
   /** Totales del municipio, para el bloque 1. */
   totalMunicipio: ConteoEstados;
   /** true mientras el cliente no defina el Índice de Carga. */
@@ -192,36 +208,70 @@ export async function getCortesParaReporte() {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("corte_trimestral")
-    .select("id, anio, trimestre, fecha_corte, origen, tomado_at, proyectos")
+    .select("id, anio, trimestre, fecha_corte, origen, tomado_at, proyectos, completo")
     .order("fecha_corte", { ascending: false })
     .limit(24);
   if (error) throw error;
-  return data ?? [];
+  // Una foto a medias no se ofrece: el reporte saldría con menos proyectos de
+  // los que hay y nada lo delataría.
+  return (data ?? []).filter((c: any) => c.completo !== false);
 }
 
-/** Secretarías (nivel 0) activas, para el selector. */
-export async function getSecretarias() {
+export interface UnidadReporte {
+  id: string;
+  nombre: string;
+  nombre_largo: string;
+  nivel: number;
+  tipo: string;
+  parent_id: string | null;
+  codigo: string | null;
+}
+
+/**
+ * Todas las unidades activas, para el selector del reporte.
+ *
+ * El mismo informe se emite para secretaría, subsecretaría y dirección: son 9,
+ * 7 y 46 unidades con proyectos (66 reportes con contenido sobre 79 unidades).
+ */
+export async function getUnidadesParaReporte(): Promise<UnidadReporte[]> {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("unidad_organizacional")
-    .select("id, nombre, nombre_corto, codigo")
-    .eq("nivel", 0)
+    .select("id, nombre, nombre_corto, nivel, tipo, parent_id, codigo")
     .eq("activa", true)
+    .order("nivel")
     .order("orden");
   if (error) throw error;
   return (data ?? []).map((u: any) => ({
     id: u.id,
     nombre: u.nombre_corto ?? u.nombre,
     nombre_largo: u.nombre,
+    nivel: u.nivel,
+    tipo: u.tipo,
+    parent_id: u.parent_id,
     codigo: u.codigo,
   }));
+}
+
+/**
+ * Las filas de la foto que le corresponden a una unidad.
+ *
+ * Cada nivel se filtra por su propia columna denormalizada, que es justo para
+ * lo que están: no hay que recorrer el árbol vivo, así que un informe viejo
+ * sigue diciendo lo mismo aunque después muevan la unidad.
+ */
+function filasDeUnidad(filas: any[], unidad: { id: string; nivel: number }): any[] {
+  if (unidad.nivel === 0) return filas.filter((f) => f.secretaria_id === unidad.id);
+  if (unidad.nivel === 1) return filas.filter((f) => f.subsecretaria_id === unidad.id);
+  if (unidad.nivel === 2) return filas.filter((f) => f.direccion_id === unidad.id);
+  return filas.filter((f) => f.unidad_id === unidad.id);
 }
 
 /** Trae las filas de la foto: de un corte guardado, o calculadas al vuelo. */
 async function traerFilas(opciones: {
   corteId?: string;
   fechaCorte?: string;
-}): Promise<{ filas: any[]; corte: ReporteSecretaria["corte"]; origen: "corte" | "vivo" }> {
+}): Promise<{ filas: any[]; corte: ReporteUnidad["corte"]; origen: "corte" | "vivo" }> {
   if (!opciones.corteId) {
     const foto = await calcularFotoCorte(opciones.fechaCorte);
     return { filas: foto.filas, corte: null, origen: "vivo" };
@@ -236,30 +286,29 @@ async function traerFilas(opciones: {
   if (eCab || !cab) throw eCab ?? new Error("Ese corte no existe");
 
   // Una foto a medias da un informe con menos proyectos de los que hay, y los
-  // totales cierran igual entre si porque salen de las mismas filas: nada la
-  // delata. Mejor no servirla.  la agrega la 046; si no existe la
-  // columna, viene undefined y no se bloquea nada.
+  // totales cierran igual entre sí porque salen de las mismas filas: nada la
+  // delata. Mejor no servirla.
   const c = cab as any;
   if (c.completo === false) {
     throw new Error(
       `La foto del ${c.fecha_corte} quedó incompleta (se escribieron algunas de ` +
-      `las ${c.proyectos} filas). Volvé a tomarla antes de emitir el reporte.`
+        `las ${c.proyectos} filas). Volvé a tomarla antes de emitir el reporte.`
     );
   }
 
-  // Paginado: son 441 filas hoy y PostgREST corta en 1000, pero el POA crece.
   const filas: any[] = [];
   const TAM = 1000;
   for (let desde = 0; ; desde += TAM) {
     const { data, error } = await sb
       .from("corte_trimestral_proyecto")
       .select(
-        "proyecto_nombre, unidad_id, unidad_nombre, unidad_nivel, secretaria_id, secretaria_nombre, " +
-          "subsecretaria_id, subsecretaria_nombre, direccion_id, direccion_nombre, " +
-          "es_propio_de_secretaria, estado, pct, metas, metas_con_datos, indicadores, indicadores_con_datos"
+        "id, proyecto_nombre, proyecto_codigo, unidad_id, unidad_nombre, unidad_nivel, " +
+          "secretaria_id, secretaria_nombre, subsecretaria_id, subsecretaria_nombre, " +
+          "direccion_id, direccion_nombre, es_propio_de_secretaria, estado, pct, " +
+          "metas, metas_con_datos, indicadores, indicadores_con_datos"
       )
       .eq("corte_id", opciones.corteId)
-      // Sin orden estable, dos paginas con OFFSET distinto pueden repetir o
+      // Sin orden estable, dos páginas con OFFSET distinto pueden repetir o
       // perder filas: un proyecto contado dos veces o ninguna, en silencio.
       .order("id")
       .range(desde, desde + TAM - 1);
@@ -273,105 +322,122 @@ async function traerFilas(opciones: {
 }
 
 /**
- * El reporte de una secretaría.
+ * El reporte de una unidad: secretaría, subsecretaría o dirección.
  *
- * @param secretariaId  null = solo los totales del municipio (bloque 1).
- * @param corteId       null = calcular con los datos de hoy, sin guardar.
+ * @param unidadId  null = solo los totales del municipio.
+ * @param corteId   null = calcular con los datos de hoy, sin guardar.
  */
-export async function getReporteSecretaria(opciones: {
-  secretariaId: string | null;
+export async function getReporteUnidad(opciones: {
+  unidadId: string | null;
   corteId?: string;
   fechaCorte?: string;
-}): Promise<ReporteSecretaria> {
+}): Promise<ReporteUnidad> {
   // La puerta va acá y no en la pantalla. El detalle del corte se lee con el
   // cliente admin —hace falta para que el total del municipio sea el mismo
-  // número para todos los lectores—, y eso saltea la RLS. Sin este control, la
-  // pantalla del reporte con el patrón habitual del repo (?sec=<uuid>) dejaría
-  // que un director pida el id de otra secretaría y reciba los nombres, estados
-  // y avances de sus proyectos.
+  // número para todos los lectores—, y eso saltea la RLS. Sin este control,
+  // cualquier pantalla que consuma esta capa con `?u=<uuid>` dejaría que un
+  // director pida el id de otra área y reciba sus proyectos.
   const { getPerfilActual, getScopeUnidades } = await import("@/lib/auth");
   const { perfilVeTodo } = await import("@/lib/utils");
   const perfil = await getPerfilActual();
   if (!perfil) throw new Error("No autenticado");
 
-  if (opciones.secretariaId && !perfilVeTodo(perfil)) {
+  if (opciones.unidadId && !perfilVeTodo(perfil)) {
     const scope = await getScopeUnidades(perfil);
-    if (!scope.includes(opciones.secretariaId)) {
-      throw new Error("No tenés acceso al reporte de esa secretaría");
+    if (!scope.includes(opciones.unidadId)) {
+      throw new Error("No tenés acceso al reporte de esa área");
     }
   }
 
+  const unidades = await getUnidadesParaReporte();
+  const unidad = opciones.unidadId
+    ? unidades.find((u) => u.id === opciones.unidadId) ?? null
+    : null;
+  if (opciones.unidadId && !unidad) throw new Error("Esa área no existe o está inactiva");
+
   const { filas, corte, origen } = await traerFilas(opciones);
-
-  // El nombre para el caso en que la secretaría no tenga ni un proyecto en el
-  // corte: Movilidad Urbana tiene 0 y aun así entra al selector.
-  let nombre: string | null = null;
-  if (opciones.secretariaId && !filas.some((f) => f.secretaria_id === opciones.secretariaId)) {
-    const todas = await getSecretarias();
-    nombre = todas.find((s) => s.id === opciones.secretariaId)?.nombre ?? null;
-  }
-
-  return armarReporte(filas, corte, origen, opciones.secretariaId, nombre);
+  return armarReporte(filas, corte, origen, unidad);
 }
 
 /**
  * Arma el reporte a partir de las filas de una foto. PURO: no lee la base ni
  * pregunta permisos.
  *
- * Va separado de `getReporteSecretaria` para poder verificarlo. La puerta de
+ * Va separado de `getReporteUnidad` para poder verificarlo. La puerta de
  * permisos que esa función tiene —correcta y necesaria— usa `getPerfilActual()`,
  * que lee cookies y por lo tanto solo funciona dentro de un request: un script
- * de verificación no puede llamarla. Con el armado aparte, se puede controlar
- * contra los datos de producción que los cuadres cierren, que no haya filas
- * fantasma y que el árbol quede bien, sin sesión y sin escribir nada.
+ * de verificación no puede llamarla. Con el armado aparte se controla contra los
+ * datos de producción que los cuadres cierren, que no haya filas fantasma y que
+ * el árbol quede bien, sin sesión y sin escribir nada.
  */
 export function armarReporte(
   filas: any[],
-  corte: ReporteSecretaria["corte"],
+  corte: ReporteUnidad["corte"],
   origen: "corte" | "vivo",
-  secretariaIdEntrada: string | null,
-  /** Nombre de la secretaría, para el caso en que no tenga ninguna fila. */
-  nombreSiVacia?: string | null
-): ReporteSecretaria {
-  const opciones = { secretariaId: secretariaIdEntrada };
-
-  // ---- Totales del municipio (bloque 1) ----
+  unidad: UnidadReporte | null
+): ReporteUnidad {
+  // ---- Totales del municipio ----
   const accMun = VACIO();
   const pctsMun: (number | null)[] = [];
   for (const f of filas) sumar(accMun, f, pctsMun);
   cerrar(accMun, pctsMun);
 
-  if (!opciones.secretariaId) {
+  if (!unidad) {
     return {
-      origen, corte, secretaria: null,
-      totalSecretaria: VACIO(),
+      origen,
+      corte,
+      unidad: null,
+      totalUnidad: VACIO(),
       filas: [],
+      proyectos: [],
       totalMunicipio: accMun,
       indiceCargaProvisorio: true,
     };
   }
 
-  const deLaSec = filas.filter((f) => f.secretaria_id === opciones.secretariaId);
+  const propias = filasDeUnidad(filas, unidad);
 
-  // El nombre sale de la unidad, no de la primera fila del detalle. Antes, una
-  // secretaría sin proyectos —Movilidad Urbana tiene 0— quedaba encabezada con
-  // el literal "(secretaría sin proyectos en este corte)", o sea un mensaje de
-  // estado metido en el campo de identidad de un documento oficial. El vacío se
-  // comunica con la tabla vacía y el cartel, no con el nombre.
-  const nombreSec = deLaSec[0]?.secretaria_nombre ?? nombreSiVacia ?? null;
+  // ---- Totales de la unidad (bloque 2) ----
+  const accU = VACIO();
+  const pctsU: (number | null)[] = [];
+  for (const f of propias) sumar(accU, f, pctsU);
+  cerrar(accU, pctsU);
 
-  // ---- Totales de la secretaría (bloque 2) ----
-  const accSec = VACIO();
-  const pctsSec: (number | null)[] = [];
-  for (const f of deLaSec) sumar(accSec, f, pctsSec);
-  cerrar(accSec, pctsSec);
+  const base = {
+    origen,
+    corte,
+    unidad: { id: unidad.id, nombre: unidad.nombre, nivel: unidad.nivel, tipo: unidad.tipo },
+    totalUnidad: accU,
+    totalMunicipio: accMun,
+    indiceCargaProvisorio: true,
+  };
 
-  // ---- La tabla (bloque 4) ----
-  // Estructura: subsecretaría > dirección > departamento, más una fila aparte
-  // para los proyectos cargados en la secretaría misma. 6 de las 10
-  // secretarías no tienen ninguna subsecretaría, así que el caso "dirección
-  // directa" no es la excepción sino la mayoría: las direcciones sin
-  // subsecretaría van al primer nivel de la tabla.
+  // ---- De nivel 2 para abajo: la lista de proyectos ----
+  // Para una dirección un árbol de unidades no dice nada: 55 de las 56 no
+  // tienen sub-unidades, así que la tabla tendría una sola fila igual al total.
+  // Lo que le sirve a un director es ver sus proyectos, que promedian 7.
+  if (unidad.nivel >= 2) {
+    const proyectos: FilaProyecto[] = propias
+      .map((f) => ({
+        nombre: f.proyecto_nombre as string,
+        codigo: (f.proyecto_codigo ?? null) as string | null,
+        unidad_nombre: (f.unidad_nombre ?? null) as string | null,
+        estado: f.estado as FilaProyecto["estado"],
+        pct: (f.pct ?? null) as number | null,
+        metas: Number(f.metas ?? 0),
+        metas_con_datos: Number(f.metas_con_datos ?? 0),
+        indicadores: Number(f.indicadores ?? 0),
+        indicadores_con_datos: Number(f.indicadores_con_datos ?? 0),
+      }))
+      // Primero lo que tiene datos y más avance, después por nombre: lo que hay
+      // que mirar queda arriba.
+      .sort(
+        (a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.nombre.localeCompare(b.nombre, "es")
+      );
+    return { ...base, filas: [], proyectos };
+  }
+
+  // ---- Nivel 0 y 1: el árbol de la estructura ----
   type Nodo = { fila: FilaReporte; pcts: (number | null)[]; hijos: Map<string, Nodo> };
   const nuevoNodo = (tipo: TipoFila, nombre: string, unidad_id: string | null): Nodo => ({
     fila: { ...VACIO(), tipo, nombre, unidad_id, hijos: [] },
@@ -382,40 +448,60 @@ export function armarReporte(
   const raiz = new Map<string, Nodo>();
   let propios: Nodo | null = null;
 
-  for (const f of deLaSec) {
-    if (f.es_propio_de_secretaria) {
-      propios ??= nuevoNodo("propios_secretaria", "Proyectos propios de la Secretaría", f.secretaria_id);
+  for (const f of propias) {
+    // La fila de "proyectos propios" solo aplica en el reporte de secretaría:
+    // es la que pidió Planificación para los proyectos cargados en la
+    // secretaría misma en vez de en una dirección (19 en Ambiente, 9 en
+    // Contaduría). En el de subsecretaría no hay equivalente: no hay ni un
+    // proyecto cargado a nivel 1.
+    if (unidad.nivel === 0 && f.es_propio_de_secretaria) {
+      propios ??= nuevoNodo(
+        "propios_secretaria",
+        "Proyectos propios de la Secretaría",
+        unidad.id
+      );
       sumar(propios.fila, f, propios.pcts);
       continue;
     }
 
-    // Nivel 1 de la tabla: la subsecretaría si la hay, si no la dirección.
-    const claveTope = f.subsecretaria_id ?? f.direccion_id ?? f.unidad_id ?? "sin-unidad";
-    const nombreTope = f.subsecretaria_id
-      ? f.subsecretaria_nombre
-      : f.direccion_nombre ?? f.unidad_nombre;
-    const tipoTope: TipoFila = f.subsecretaria_id ? "subsecretaria" : "direccion";
+    // El primer nivel de la tabla depende de qué unidad se reporta.
+    //   secretaría    → su subsecretaría si la hay, si no la dirección
+    //                   (6 de 10 secretarías no tienen ninguna subsecretaría,
+    //                    así que la dirección directa es la mayoría)
+    //   subsecretaría → la dirección
+    const claveTope =
+      unidad.nivel === 0
+        ? f.subsecretaria_id ?? f.direccion_id ?? f.unidad_id ?? "sin-unidad"
+        : f.direccion_id ?? f.unidad_id ?? "sin-unidad";
+    const nombreTope =
+      unidad.nivel === 0 && f.subsecretaria_id
+        ? f.subsecretaria_nombre
+        : f.direccion_nombre ?? f.unidad_nombre;
+    const tipoTope: TipoFila =
+      unidad.nivel === 0 && f.subsecretaria_id ? "subsecretaria" : "direccion";
 
     if (!raiz.has(claveTope)) raiz.set(claveTope, nuevoNodo(tipoTope, nombreTope, claveTope));
     const tope = raiz.get(claveTope)!;
     sumar(tope.fila, f, tope.pcts);
 
-    // Nivel 2: la dirección, solo si arriba hay una subsecretaría.
+    // Segundo nivel: la dirección, solo cuando arriba hay una subsecretaría.
     let padre = tope;
-    if (f.subsecretaria_id && f.direccion_id) {
+    if (unidad.nivel === 0 && f.subsecretaria_id && f.direccion_id) {
       if (!padre.hijos.has(f.direccion_id)) {
-        padre.hijos.set(f.direccion_id, nuevoNodo("direccion", f.direccion_nombre ?? f.unidad_nombre, f.direccion_id));
+        padre.hijos.set(
+          f.direccion_id,
+          nuevoNodo("direccion", f.direccion_nombre ?? f.unidad_nombre, f.direccion_id)
+        );
       }
       const dir = padre.hijos.get(f.direccion_id)!;
       sumar(dir.fila, f, dir.pcts);
       padre = dir;
     }
 
-    // Nivel 3: el departamento, cuando el proyecto no está en la dirección
-    // misma. Son 9 proyectos en 4 museos, todos bajo Dirección de Museos.
-    // El !== contra el padre y no contra direccion_id: con direccion_id en
-    // NULL (foto vieja, o 046 sin aplicar) la unidad ya es el tope y se estaria
-    // colgando de si misma, contandose dos veces.
+    // Tercer nivel: el departamento, cuando el proyecto no está en la dirección
+    // misma. El !== va contra el padre y no contra direccion_id: con
+    // direccion_id en NULL la unidad ya es el tope y se estaría colgando de sí
+    // misma, contándose dos veces.
     if (f.unidad_nivel === 3 && f.unidad_id && padre.fila.unidad_id !== f.unidad_id) {
       if (!padre.hijos.has(f.unidad_id)) {
         padre.hijos.set(f.unidad_id, nuevoNodo("departamento", f.unidad_nombre, f.unidad_id));
@@ -446,15 +532,5 @@ export function armarReporte(
   // agregado y no una parte de la estructura.
   if (propios) filasTabla.push(materializar(propios));
 
-  return {
-    origen,
-    corte,
-    secretaria: opciones.secretariaId
-      ? { id: opciones.secretariaId, nombre: nombreSec ?? "Secretaría" }
-      : null,
-    totalSecretaria: accSec,
-    filas: filasTabla,
-    totalMunicipio: accMun,
-    indiceCargaProvisorio: true,
-  };
+  return { ...base, filas: filasTabla, proyectos: [] };
 }

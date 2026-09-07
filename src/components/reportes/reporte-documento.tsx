@@ -1,20 +1,34 @@
-import { faseInstitucional, type FilaReporte, type ReporteSecretaria } from "@/lib/reporte-trimestral";
+import {
+  faseInstitucional,
+  type FilaProyecto,
+  type FilaReporte,
+  type ReporteUnidad,
+} from "@/lib/reporte-trimestral";
 import { formatFecha } from "@/lib/utils";
 import { AnexoMetodologico } from "./anexo-metodologico";
+
+const ORDINAL = ["", "Primer", "Segundo", "Tercer", "Cuarto"];
+
+/** Cómo se llama el área según su nivel, para los rótulos del documento. */
+function etiquetaNivel(nivel: number): string {
+  if (nivel === 0) return "Secretaría";
+  if (nivel === 1) return "Subsecretaría";
+  if (nivel === 2) return "Dirección";
+  return "Área";
+}
 
 /**
  * El documento del reporte trimestral, con los bloques en el orden de la
  * plantilla del cliente.
  *
- * Está pensado para imprimirse: la hoja es A4 y el CSS de impresión (globals.css)
- * saca la barra lateral, la barra de arriba y los controles. El usuario hace
- * Imprimir → Guardar como PDF y el navegador genera el archivo. Es el mismo
- * resultado que armar el PDF en el servidor, sin meter Chromium en Vercel a tres
- * semanas de la fecha comprometida.
+ * Sirve para los tres niveles que pidieron: secretaría, subsecretaría y
+ * dirección. La diferencia está en el bloque 4 — con estructura debajo se
+ * muestra el árbol de áreas; una dirección muestra sus proyectos, porque 55 de
+ * las 56 no tienen sub-unidades y un árbol tendría una sola fila igual al total.
  *
- * El bloque 1 queda como hueco declarado: necesita la fórmula del aporte, que el
- * cliente todavía no definió, y el 17,1 % de su propio ejemplo es imposible con
- * el modelo del 12,5 % que su texto describe.
+ * Está pensado para imprimirse: la hoja es A4 y el CSS de impresión saca la
+ * barra lateral, la de arriba y los controles. El usuario hace Imprimir →
+ * Guardar como PDF y el navegador genera el archivo.
  */
 export function ReporteDocumento({
   reporte,
@@ -22,14 +36,18 @@ export function ReporteDocumento({
   anio,
   children,
 }: {
-  reporte: ReporteSecretaria;
+  reporte: ReporteUnidad;
   trimestre: number;
   anio: number;
   /** El bloque 3 (el análisis), que es interactivo y viene de afuera. */
   children?: React.ReactNode;
 }) {
-  const { totalSecretaria: t, secretaria } = reporte;
+  const { totalUnidad: t, unidad } = reporte;
   const fase = faseInstitucional(t.pct);
+  const nivel = unidad?.nivel ?? 0;
+  const etiqueta = etiquetaNivel(nivel);
+  const conArbol = reporte.filas.length > 0;
+  const conProyectos = reporte.proyectos.length > 0;
 
   return (
     <article className="hoja space-y-6">
@@ -40,8 +58,7 @@ export function ReporteDocumento({
             Reporte de cumplimiento de metas operativas
           </h1>
           <p className="text-sm font-semibold text-primary mt-0.5">
-            {trimestre === 1 ? "Primer" : trimestre === 2 ? "Segundo" : trimestre === 3 ? "Tercer" : "Cuarto"}{" "}
-            trimestre {anio}
+            {ORDINAL[trimestre] ?? ""} trimestre {anio}
           </p>
         </div>
 
@@ -52,7 +69,7 @@ export function ReporteDocumento({
           </div>
           <div className="flex gap-2">
             <dt className="text-muted shrink-0">Para:</dt>
-            <dd className="text-foreground font-medium">{secretaria?.nombre ?? "—"}</dd>
+            <dd className="text-foreground font-medium">{unidad?.nombre ?? "—"}</dd>
           </div>
           <div className="flex gap-2">
             <dt className="text-muted shrink-0">Plataforma de origen:</dt>
@@ -79,28 +96,29 @@ export function ReporteDocumento({
       {/* ---------- Bloque 1: bloqueado ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          1. Desempeño de la Secretaría en el contexto municipal
+          1. Desempeño de la {etiqueta} en el contexto municipal
         </h2>
         <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-4 space-y-2">
           <p className="text-sm font-semibold text-warning">
             Falta una definición de Planificación Estratégica
           </p>
           <p className="text-xs text-foreground/90 leading-relaxed">
-            Este bloque necesita la fórmula del <strong>aporte real</strong> de la secretaría
-            al consolidado municipal. La plantilla dice que las 8 secretarías del Gabinete
-            tienen 12,5 % cada una, pero el gráfico de ejemplo le asigna a Ambiente un aporte
-            del 17,1 %, que con ese modelo es imposible: el techo por secretaría es 12,5.
+            Este bloque necesita la fórmula del <strong>aporte real</strong> al consolidado
+            municipal. La plantilla dice que las 8 secretarías del Gabinete tienen 12,5 % cada
+            una, pero el gráfico de ejemplo le asigna a Ambiente un aporte del 17,1 %, que con
+            ese modelo es imposible: el techo por secretaría es 12,5.
           </p>
           <p className="text-xs text-foreground/90 leading-relaxed">
             También hace falta saber cuáles son esas 8 secretarías: PlanIA tiene 10 unidades de
-            primer nivel.
+            primer nivel. Y si el modelo aplica igual a subsecretarías y direcciones, que no
+            tienen un reparto definido entre sí.
           </p>
           <p className="text-[11px] text-muted">
             Mientras tanto, lo que sí se puede afirmar: el municipio tiene{" "}
             <strong className="text-foreground tabular-nums">
               {reporte.totalMunicipio.proyectos}
             </strong>{" "}
-            proyectos activos, y esta secretaría{" "}
+            proyectos activos, y esta área{" "}
             <strong className="text-foreground tabular-nums">{t.proyectos}</strong>
             {reporte.totalMunicipio.proyectos > 0 && (
               <>
@@ -116,7 +134,7 @@ export function ReporteDocumento({
       {/* ---------- Bloque 2: estado general ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          2. Estado general de proyectos de la Secretaría
+          2. Estado general de proyectos de la {etiqueta}
         </h2>
         <p className="text-xs text-muted">
           Distribución cuantitativa absoluta del estado de los proyectos vigentes de la
@@ -166,17 +184,20 @@ export function ReporteDocumento({
       {/* ---------- Bloque 4 (así numerado en la plantilla) ---------- */}
       <section className="space-y-2 rompe-pagina">
         <h2 className="text-base font-bold text-foreground">
-          4. Desempeño operativo por áreas
+          4. {conProyectos ? "Detalle de proyectos" : "Desempeño operativo por áreas"}
         </h2>
         <p className="text-xs text-muted">
-          Volumen de gestión y nivel de actualización de la información por cada dependencia
-          de la estructura orgánica de esta Secretaría.
+          {conProyectos
+            ? "Estado de cada proyecto del área y nivel de actualización de su información en el sistema."
+            : "Volumen de gestión y nivel de actualización de la información por cada dependencia de la estructura orgánica."}
         </p>
 
-        {reporte.filas.length === 0 ? (
+        {!conArbol && !conProyectos ? (
           <p className="text-sm text-muted border border-border rounded-lg px-3 py-4 text-center">
-            Esta secretaría no tiene proyectos cargados en el POA al momento del corte.
+            Esta área no tiene proyectos cargados en el POA al momento del corte.
           </p>
+        ) : conProyectos ? (
+          <TablaProyectos proyectos={reporte.proyectos} total={t} />
         ) : (
           <div className="tabla-envoltorio">
             <table className="tabla-reporte">
@@ -202,7 +223,7 @@ export function ReporteDocumento({
                   <FilasAnidadas key={(f.unidad_id ?? f.nombre) + f.tipo} fila={f} nivel={0} />
                 ))}
                 <tr className="total">
-                  <td className="izq">TOTAL SECRETARÍA</td>
+                  <td className="izq">TOTAL {etiqueta.toUpperCase()}</td>
                   <td className="num">{t.proyectos}</td>
                   <td className="num">{t.finalizados}</td>
                   <td className="num">{t.en_ejecucion}</td>
@@ -215,7 +236,7 @@ export function ReporteDocumento({
           </div>
         )}
 
-        {reporte.indiceCargaProvisorio && (
+        {reporte.indiceCargaProvisorio && !conProyectos && (
           <p className="text-[11px] text-warning">
             * <strong>Índice de carga: definición provisoria.</strong> La plantilla incluye la
             columna pero no la define. Acá se calcula como la proporción de proyectos del área
@@ -244,7 +265,85 @@ export function ReporteDocumento({
   );
 }
 
-/** Una fila de la tabla y sus hijas, con sangría por nivel. */
+const ICONO_ESTADO: Record<FilaProyecto["estado"], string> = {
+  verde: "🟢",
+  amarillo: "🟡",
+  rojo: "🔵",
+  sin_datos: "⚪",
+};
+
+/**
+ * La tabla del bloque 4 en el reporte de una dirección: un proyecto por fila.
+ *
+ * Los rótulos salen del anexo metodológico del cliente y no de semaforoLabel del
+ * sistema: para el mismo estado el sistema dice "No iniciado" y el documento
+ * dice "No Iniciados", y en el informe manda el documento.
+ */
+function TablaProyectos({
+  proyectos,
+  total,
+}: {
+  proyectos: FilaProyecto[];
+  total: { proyectos: number; indice_carga: number | null };
+}) {
+  const rotulo: Record<FilaProyecto["estado"], string> = {
+    verde: "Finalizado",
+    amarillo: "En Ejecución",
+    rojo: "No Iniciado",
+    sin_datos: "Sin Datos",
+  };
+  return (
+    <div className="tabla-envoltorio">
+      <table className="tabla-reporte">
+        <thead>
+          <tr>
+            <th className="izq">Proyecto</th>
+            <th className="izq">Estado</th>
+            <th>Avance</th>
+            <th>Metas</th>
+            <th>Indicadores</th>
+          </tr>
+        </thead>
+        <tbody>
+          {proyectos.map((p, i) => (
+            <tr key={`${p.codigo ?? ""}-${p.nombre}-${i}`}>
+              <td className="izq">
+                {p.nombre}
+                {p.unidad_nombre && (
+                  <span className="text-muted"> · {p.unidad_nombre}</span>
+                )}
+              </td>
+              <td className="izq whitespace-nowrap">
+                <span aria-hidden="true">{ICONO_ESTADO[p.estado]}</span> {rotulo[p.estado]}
+              </td>
+              <td className="num">{p.pct != null ? `${p.pct} %` : "—"}</td>
+              <td className="num">
+                {p.metas_con_datos}/{p.metas}
+              </td>
+              <td className="num">
+                {p.indicadores_con_datos}/{p.indicadores}
+              </td>
+            </tr>
+          ))}
+          <tr className="total">
+            <td className="izq">TOTAL ÁREA</td>
+            <td className="izq" />
+            <td className="num" />
+            <td className="num" />
+            <td className="num">
+              {total.indice_carga != null ? `${total.indice_carga} % carga` : "—"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="text-[11px] text-muted mt-1.5">
+        Metas e indicadores: cuántos tienen datos cargados sobre el total del proyecto.
+      </p>
+    </div>
+  );
+}
+
+/** Una fila del árbol de áreas y sus hijas, con sangría por nivel. */
 function FilasAnidadas({ fila, nivel }: { fila: FilaReporte; nivel: number }) {
   const esTope = nivel === 0;
   const prefijo = nivel === 0 ? "" : "└─ ";
