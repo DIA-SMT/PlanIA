@@ -109,6 +109,65 @@ function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
   return acc;
 }
 
+export interface AnalisisReporte {
+  balance: string | null;
+  desvios: string | null;
+  oportunidades: string | null;
+  estado: "borrador" | "publicado";
+  publicado_at: string | null;
+  actualizado_at: string | null;
+  actualizado_por_email: string | null;
+}
+
+/**
+ * El análisis (bloque 3) de un área para un trimestre, o null si nadie lo
+ * escribió todavía.
+ *
+ * Va con el cliente de sesión y NO con el admin, a propósito: la RLS de la
+ * migración 047 es la que decide que un borrador lo vea solo Planificación.
+ * Leerlo con el admin saltearía eso y un secretario podría ver un texto sobre
+ * su gestión a medio redactar.
+ */
+export async function getAnalisisReporte(opciones: {
+  anio: number;
+  trimestre: number;
+  unidadId: string;
+}): Promise<AnalisisReporte | null> {
+  const { getSupabaseServer } = await import("@/lib/supabase/server");
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb
+    .from("reporte_analisis")
+    .select("balance, desvios, oportunidades, estado, publicado_at, updated_at, actualizado_por_email")
+    .eq("anio", opciones.anio)
+    .eq("trimestre", opciones.trimestre)
+    .eq("unidad_id", opciones.unidadId)
+    .maybeSingle();
+
+  // Si la 047 no está aplicada todavía, el reporte se muestra sin el bloque 3
+  // en vez de romperse: el código se despliega solo y las migraciones las
+  // aplica una persona.
+  if (error) {
+    const e = error as { code?: string; message?: string };
+    if (e.code === "42P01" || e.code === "PGRST205" ||
+        /relation .* does not exist|could not find the table/i.test(e.message ?? "")) {
+      return null;
+    }
+    throw error;
+  }
+  if (!data) return null;
+
+  const d = data as any;
+  return {
+    balance: d.balance,
+    desvios: d.desvios,
+    oportunidades: d.oportunidades,
+    estado: d.estado,
+    publicado_at: d.publicado_at,
+    actualizado_at: d.updated_at,
+    actualizado_por_email: d.actualizado_por_email,
+  };
+}
+
 /** Cortes disponibles para elegir en la pantalla. */
 export async function getCortesParaReporte() {
   const sb = getSupabaseAdmin();
