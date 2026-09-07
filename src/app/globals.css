@@ -59,3 +59,93 @@ body {
 html:not(.light) .logo-auto {
   filter: brightness(0) invert(1);
 }
+
+/* ===========================================================================
+   Reporte trimestral: hoja A4 y estilos de impresión.
+   =========================================================================== */
+/* La hoja se ve en pantalla con el ancho de un A4 para que lo que se ve sea lo
+   que sale impreso. Al imprimir, el navegador genera el PDF: mismo resultado
+   que armarlo en el servidor, sin meter Chromium en el despliegue. */
+.hoja {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: var(--srf);
+  border: 1px solid var(--brd);
+  border-radius: 12px;
+  padding: 16mm 14mm;
+}
+
+.tabla-envoltorio { overflow-x: auto; }
+
+.tabla-reporte {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tabla-reporte th,
+.tabla-reporte td {
+  border: 1px solid var(--brd);
+  padding: 5px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+.tabla-reporte th {
+  background: var(--srf-h);
+  font-weight: 600;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+.tabla-reporte .izq { text-align: left; }
+.tabla-reporte .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabla-reporte tr.tope > td { background: var(--srf-h); font-weight: 600; }
+.tabla-reporte tr.total > td {
+  background: var(--srf-h);
+  font-weight: 700;
+  border-top: 2px solid var(--mt);
+}
+
+@media print {
+  /* Fuera todo lo que no es el documento. El reporte se imprime solo. */
+  aside,
+  header.sticky,
+  nav,
+  .no-imprimir {
+    display: none !important;
+  }
+
+  /* Papel blanco y tinta negra, sin importar el tema de la pantalla. */
+  :root, html.light {
+    --bg: #FFFFFF;
+    --srf: #FFFFFF;
+    --srf-h: #F2F2F2;
+    --brd: #999999;
+    --fg: #000000;
+    --mt: #444444;
+  }
+  body { background: #FFFFFF; color: #000000; }
+
+  .hoja {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* El contenedor de la página no debe recortar ni scrollear al imprimir. */
+  main { padding: 0 !important; overflow: visible !important; }
+  .tabla-envoltorio { overflow: visible !important; }
+
+  /* Los bloques largos arrancan en hoja nueva; las tablas no se parten al
+     medio de una fila y el encabezado se repite en cada página. */
+  .rompe-pagina { break-before: page; }
+  table { break-inside: auto; }
+  thead { display: table-header-group; }
+  tr, li { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm 14mm;
+  }
+}

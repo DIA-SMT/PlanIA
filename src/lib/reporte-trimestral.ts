@@ -109,6 +109,25 @@ function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
   return acc;
 }
 
+/**
+ * La "fase institucional" del anexo metodológico que escribió Planificación:
+ * Consolidación 80-100, Desarrollo 50-79, Inicio 1-49, Pendiente de Registro 0
+ * o sin carga.
+ *
+ * Ojo: son umbrales de ROTULADO del promedio de un área, y no tienen nada que
+ * ver con los del estado de un proyecto (verde a 100 en la cascada). Son dos
+ * escalas distintas sobre cosas distintas, las dos definidas por el cliente.
+ */
+export function faseInstitucional(pct: number | null): {
+  icono: string;
+  nombre: string;
+} {
+  if (pct == null || pct === 0) return { icono: "🔎", nombre: "Pendiente de Registro" };
+  if (pct >= 80) return { icono: "🎯", nombre: "Fase de Consolidación" };
+  if (pct >= 50) return { icono: "📋", nombre: "Fase de Desarrollo" };
+  return { icono: "📌", nombre: "Fase de Inicio" };
+}
+
 export interface AnalisisReporte {
   balance: string | null;
   desvios: string | null;
@@ -284,6 +303,38 @@ export async function getReporteSecretaria(opciones: {
 
   const { filas, corte, origen } = await traerFilas(opciones);
 
+  // El nombre para el caso en que la secretaría no tenga ni un proyecto en el
+  // corte: Movilidad Urbana tiene 0 y aun así entra al selector.
+  let nombre: string | null = null;
+  if (opciones.secretariaId && !filas.some((f) => f.secretaria_id === opciones.secretariaId)) {
+    const todas = await getSecretarias();
+    nombre = todas.find((s) => s.id === opciones.secretariaId)?.nombre ?? null;
+  }
+
+  return armarReporte(filas, corte, origen, opciones.secretariaId, nombre);
+}
+
+/**
+ * Arma el reporte a partir de las filas de una foto. PURO: no lee la base ni
+ * pregunta permisos.
+ *
+ * Va separado de `getReporteSecretaria` para poder verificarlo. La puerta de
+ * permisos que esa función tiene —correcta y necesaria— usa `getPerfilActual()`,
+ * que lee cookies y por lo tanto solo funciona dentro de un request: un script
+ * de verificación no puede llamarla. Con el armado aparte, se puede controlar
+ * contra los datos de producción que los cuadres cierren, que no haya filas
+ * fantasma y que el árbol quede bien, sin sesión y sin escribir nada.
+ */
+export function armarReporte(
+  filas: any[],
+  corte: ReporteSecretaria["corte"],
+  origen: "corte" | "vivo",
+  secretariaIdEntrada: string | null,
+  /** Nombre de la secretaría, para el caso en que no tenga ninguna fila. */
+  nombreSiVacia?: string | null
+): ReporteSecretaria {
+  const opciones = { secretariaId: secretariaIdEntrada };
+
   // ---- Totales del municipio (bloque 1) ----
   const accMun = VACIO();
   const pctsMun: (number | null)[] = [];
@@ -307,11 +358,7 @@ export async function getReporteSecretaria(opciones: {
   // el literal "(secretaría sin proyectos en este corte)", o sea un mensaje de
   // estado metido en el campo de identidad de un documento oficial. El vacío se
   // comunica con la tabla vacía y el cartel, no con el nombre.
-  let nombreSec = deLaSec[0]?.secretaria_nombre ?? null;
-  if (!nombreSec) {
-    const todas = await getSecretarias();
-    nombreSec = todas.find((s) => s.id === opciones.secretariaId)?.nombre ?? null;
-  }
+  const nombreSec = deLaSec[0]?.secretaria_nombre ?? nombreSiVacia ?? null;
 
   // ---- Totales de la secretaría (bloque 2) ----
   const accSec = VACIO();
