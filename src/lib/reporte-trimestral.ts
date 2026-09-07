@@ -211,10 +211,22 @@ async function traerFilas(opciones: {
   const sb = getSupabaseAdmin();
   const { data: cab, error: eCab } = await sb
     .from("corte_trimestral")
-    .select("id, anio, trimestre, fecha_corte, tomado_at")
+    .select("id, anio, trimestre, fecha_corte, tomado_at, proyectos, completo")
     .eq("id", opciones.corteId)
     .single();
   if (eCab || !cab) throw eCab ?? new Error("Ese corte no existe");
+
+  // Una foto a medias da un informe con menos proyectos de los que hay, y los
+  // totales cierran igual entre si porque salen de las mismas filas: nada la
+  // delata. Mejor no servirla.  la agrega la 046; si no existe la
+  // columna, viene undefined y no se bloquea nada.
+  const c = cab as any;
+  if (c.completo === false) {
+    throw new Error(
+      `La foto del ${c.fecha_corte} quedó incompleta (se escribieron algunas de ` +
+      `las ${c.proyectos} filas). Volvé a tomarla antes de emitir el reporte.`
+    );
+  }
 
   // Paginado: son 441 filas hoy y PostgREST corta en 1000, pero el POA crece.
   const filas: any[] = [];
@@ -228,6 +240,9 @@ async function traerFilas(opciones: {
           "es_propio_de_secretaria, estado, pct, metas, metas_con_datos, indicadores, indicadores_con_datos"
       )
       .eq("corte_id", opciones.corteId)
+      // Sin orden estable, dos paginas con OFFSET distinto pueden repetir o
+      // perder filas: un proyecto contado dos veces o ninguna, en silencio.
+      .order("id")
       .range(desde, desde + TAM - 1);
     if (error) throw error;
     const lote = data ?? [];
@@ -249,6 +264,24 @@ export async function getReporteSecretaria(opciones: {
   corteId?: string;
   fechaCorte?: string;
 }): Promise<ReporteSecretaria> {
+  // La puerta va acá y no en la pantalla. El detalle del corte se lee con el
+  // cliente admin —hace falta para que el total del municipio sea el mismo
+  // número para todos los lectores—, y eso saltea la RLS. Sin este control, la
+  // pantalla del reporte con el patrón habitual del repo (?sec=<uuid>) dejaría
+  // que un director pida el id de otra secretaría y reciba los nombres, estados
+  // y avances de sus proyectos.
+  const { getPerfilActual, getScopeUnidades } = await import("@/lib/auth");
+  const { perfilVeTodo } = await import("@/lib/utils");
+  const perfil = await getPerfilActual();
+  if (!perfil) throw new Error("No autenticado");
+
+  if (opciones.secretariaId && !perfilVeTodo(perfil)) {
+    const scope = await getScopeUnidades(perfil);
+    if (!scope.includes(opciones.secretariaId)) {
+      throw new Error("No tenés acceso al reporte de esa secretaría");
+    }
+  }
+
   const { filas, corte, origen } = await traerFilas(opciones);
 
   // ---- Totales del municipio (bloque 1) ----
@@ -268,7 +301,17 @@ export async function getReporteSecretaria(opciones: {
   }
 
   const deLaSec = filas.filter((f) => f.secretaria_id === opciones.secretariaId);
-  const nombreSec = deLaSec[0]?.secretaria_nombre ?? null;
+
+  // El nombre sale de la unidad, no de la primera fila del detalle. Antes, una
+  // secretaría sin proyectos —Movilidad Urbana tiene 0— quedaba encabezada con
+  // el literal "(secretaría sin proyectos en este corte)", o sea un mensaje de
+  // estado metido en el campo de identidad de un documento oficial. El vacío se
+  // comunica con la tabla vacía y el cartel, no con el nombre.
+  let nombreSec = deLaSec[0]?.secretaria_nombre ?? null;
+  if (!nombreSec) {
+    const todas = await getSecretarias();
+    nombreSec = todas.find((s) => s.id === opciones.secretariaId)?.nombre ?? null;
+  }
 
   // ---- Totales de la secretaría (bloque 2) ----
   const accSec = VACIO();
@@ -323,7 +366,10 @@ export async function getReporteSecretaria(opciones: {
 
     // Nivel 3: el departamento, cuando el proyecto no está en la dirección
     // misma. Son 9 proyectos en 4 museos, todos bajo Dirección de Museos.
-    if (f.unidad_nivel === 3 && f.unidad_id && f.unidad_id !== f.direccion_id) {
+    // El !== contra el padre y no contra direccion_id: con direccion_id en
+    // NULL (foto vieja, o 046 sin aplicar) la unidad ya es el tope y se estaria
+    // colgando de si misma, contandose dos veces.
+    if (f.unidad_nivel === 3 && f.unidad_id && padre.fila.unidad_id !== f.unidad_id) {
       if (!padre.hijos.has(f.unidad_id)) {
         padre.hijos.set(f.unidad_id, nuevoNodo("departamento", f.unidad_nombre, f.unidad_id));
       }
@@ -356,10 +402,8 @@ export async function getReporteSecretaria(opciones: {
   return {
     origen,
     corte,
-    secretaria: opciones.secretariaId && nombreSec
-      ? { id: opciones.secretariaId, nombre: nombreSec }
-      : opciones.secretariaId
-      ? { id: opciones.secretariaId, nombre: "(secretaría sin proyectos en este corte)" }
+    secretaria: opciones.secretariaId
+      ? { id: opciones.secretariaId, nombre: nombreSec ?? "Secretaría" }
       : null,
     totalSecretaria: accSec,
     filas: filasTabla,

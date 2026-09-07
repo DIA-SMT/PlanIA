@@ -11,7 +11,17 @@ import { tomarCorteAhora } from "@/lib/actions-corte";
  * cada trimestre. Esto es la red por si ese día falla, o para cerrar el
  * trimestre unos días después.
  */
-export function TomarCorteBoton({ finDeTrimestre }: { finDeTrimestre: string }) {
+export function TomarCorteBoton({
+  ultimoCierre,
+  proximoCierre,
+  hoy,
+}: {
+  /** El cierre de trimestre que ya pasó: la fecha que sirve para rescatarlo. */
+  ultimoCierre: string;
+  /** El cierre que viene. Solo informativo: fechar ahí sería futuro. */
+  proximoCierre: string;
+  hoy: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +76,15 @@ export function TomarCorteBoton({ finDeTrimestre }: { finDeTrimestre: string }) 
               className="w-full text-sm bg-background border border-border rounded px-3 py-2 mt-0.5"
             />
             <p className="text-[11px] text-muted mt-1">
-              El cierre del trimestre en curso es el <strong>{finDeTrimestre}</strong>. Si ese
-              día ya pasó y el proceso automático no la tomó, fechala ahí.
+              El último cierre de trimestre fue el <strong>{ultimoCierre}</strong>
+              {ultimoCierre === hoy ? " (hoy)" : ""}. Si ese día ya pasó y el proceso
+              automático no tomó la foto, escribí <strong>{ultimoCierre}</strong> acá para
+              rescatarla. El próximo cierre es el {proximoCierre}, y no se puede fechar en
+              el futuro.
+            </p>
+            <p className="text-[11px] text-muted/70 mt-1">
+              Hacia atrás se puede fechar hasta 10 días: la foto se arma con los datos de
+              hoy, así que a más distancia sería inventar historia.
             </p>
           </div>
           <div className="flex gap-3">

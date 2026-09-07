@@ -25,6 +25,7 @@
  */
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  hoyLocal,
   calcularPorcentajeMeta,
   avanceMetaEnPlazo,
   avanceAgregado,
@@ -35,6 +36,31 @@ import type { EstadoSemaforo } from "@/types/database";
 const TAMANO_PAGINA = 1000;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * true si el error es "esa columna no existe".
+ *
+ * Pasa cuando el código ya está desplegado y la migración todavía no se aplicó:
+ * el código sale solo por Vercel y las migraciones las aplica una persona. En
+ * vez de tirar un error de PostgREST en inglés sobre el schema cache, se
+ * degrada donde se puede.
+ *
+ * 42703 es `undefined_column` de Postgres; PGRST204 es lo que devuelve
+ * PostgREST cuando la columna no está en su cache.
+ */
+function esColumnaInexistente(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  if (!err) return false;
+  return (
+    err.code === "42703" ||
+    err.code === "PGRST204" ||
+    /column .* does not exist|could not find the '.*' column/i.test(err.message ?? "")
+  );
+}
+
+const FALTA_046 =
+  "Falta aplicar la migración 046_corte_direccion.sql: la tabla del corte no " +
+  "tiene todavía las columnas que el código escribe.";
 
 /**
  * Trae todas las filas paginando. PostgREST corta en 1000 y hay 1404
@@ -89,6 +115,51 @@ export function finDeTrimestre(fechaIso: string): string {
 }
 
 /**
+ * El último cierre de trimestre que YA pasó (o hoy, si hoy es el cierre).
+ *
+ * Es la fecha que hay que usar para rescatar un corte que no se tomó. No
+ * confundir con `finDeTrimestre(hoy)`, que del 1 al 30 de octubre devuelve el
+ * 31 de diciembre: una fecha futura, que no sirve ni para tomar la foto ni para
+ * mostrarla en pantalla.
+ */
+export function ultimoCierrePasado(fechaIso: string): string {
+  const fin = finDeTrimestre(fechaIso);
+  if (fin <= fechaIso) return fin;
+  // Estamos en la mitad del trimestre: el cierre anterior es el fin del
+  // trimestre previo, o sea el día antes de que empiece este.
+  const anio = Number(fechaIso.slice(0, 4));
+  const t = trimestreDe(fechaIso);
+  const primerMesDeEste = (t - 1) * 3; // índice de mes base 0
+  const d = new Date(Date.UTC(anio, primerMesDeEste, 0)); // día 0 = último del mes anterior
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * ¿Falta la foto de un cierre que ya pasó?
+ *
+ * Devuelve la fecha del cierre pendiente, o null si ya está tomada. Es lo que
+ * usa el proceso programado: en vez de exigir que HOY sea el último día del
+ * trimestre —lo que hacía que un atraso en la cola de GitHub Actions perdiera
+ * el cierre para siempre, informando éxito— el cron pregunta si quedó algún
+ * cierre sin foto y lo rescata. Como corre todos los días, el reintento sale
+ * gratis.
+ */
+export async function cierrePendiente(fechaIso: string): Promise<string | null> {
+  const cierre = ultimoCierrePasado(fechaIso);
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("corte_trimestral")
+    .select("id, completo")
+    .eq("fecha_corte", cierre)
+    .limit(5);
+  if (error) throw error;
+  const filas = (data ?? []) as { completo?: boolean }[];
+  // `completo` no existe hasta la 046: si viene undefined, la foto cuenta.
+  const hayCompleta = filas.some((f) => f.completo !== false);
+  return hayCompleta ? null : cierre;
+}
+
+/**
  * Toma la foto y la guarda.
  *
  * @param fechaCorte  Día al que corresponde la foto (ISO). Por defecto, hoy.
@@ -106,7 +177,7 @@ export async function tomarCorteTrimestral(opciones?: {
   origen?: "automatico" | "manual";
   quien?: { user_id: string; email: string | null };
 }): Promise<ResultadoCorte> {
-  const fechaCorte = opciones?.fechaCorte ?? new Date().toISOString().slice(0, 10);
+  const fechaCorte = opciones?.fechaCorte ?? hoyLocal();
   const origen = opciones?.origen ?? "manual";
   const anio = Number(fechaCorte.slice(0, 4));
   const trimestre = trimestreDe(fechaCorte);
@@ -138,7 +209,7 @@ export async function calcularFotoCorte(
   fechaCorteEntrada?: string
 ): Promise<FotoCorte> {
   const sb = getSupabaseAdmin();
-  const fechaCorte = fechaCorteEntrada ?? new Date().toISOString().slice(0, 10);
+  const fechaCorte = fechaCorteEntrada ?? hoyLocal();
 
   // ---- Período activo ----
   const { data: periodo, error: ePeriodo } = await sb
@@ -154,6 +225,7 @@ export async function calcularFotoCorte(
     traerTodo<any>((d, h) =>
       sb.from("unidad_organizacional")
         .select("id, parent_id, nombre, nombre_corto, nivel", { count: "exact" })
+        .order("id") // desempate: sin orden estable el paginado se corre
         .range(d, h) as any
     ),
     traerTodo<any>((d, h) =>
@@ -331,6 +403,7 @@ async function guardarFotoCorte(
   const { fechaCorte, anio, trimestre, origen, quien } = ctx;
   const { periodoId, filas, totales, pctPromedio } = foto;
 
+  // La foto anterior de esta misma fecha, si existe. NO se borra todavía.
   const { data: previo } = await sb
     .from("corte_trimestral")
     .select("id")
@@ -338,57 +411,116 @@ async function guardarFotoCorte(
     .eq("anio", anio)
     .eq("trimestre", trimestre)
     .eq("fecha_corte", fechaCorte)
+    .eq("completo", true)
     .maybeSingle();
-
   const reemplazo = !!previo;
-  if (previo) {
-    // El detalle se va por CASCADE.
-    const { error } = await sb.from("corte_trimestral").delete().eq("id", (previo as any).id);
-    if (error) throw error;
-  }
+
+  // Antes se borraba la anterior acá, antes de escribir la nueva. Si el detalle
+  // fallaba a mitad de camino quedaba sin ninguna foto, y es el único dato del
+  // sistema que no se puede reconstruir. Ahora se escribe primero la nueva como
+  // incompleta —los lectores la ignoran—, se llena, se marca completa y recién
+  // entonces se borra la vieja. El índice único de la 046 es parcial sobre las
+  // completas justamente para que las dos puedan convivir ese rato.
+  const cabecera = {
+    periodo_id: periodoId,
+    anio,
+    trimestre,
+    fecha_corte: fechaCorte,
+    origen,
+    tomado_por: quien?.user_id ?? null,
+    tomado_por_email: quien?.email ?? null,
+    proyectos: filas.length,
+    finalizados: totales.verde,
+    en_ejecucion: totales.amarillo,
+    no_iniciados: totales.rojo,
+    sin_datos: totales.sin_datos,
+    pct_promedio: pctPromedio,
+    completo: false,
+    metadata: {
+      periodo: foto.periodoNombre,
+      // Queda anotado con qué se tomó, para poder explicar diferencias entre
+      // dos fotos si algún día el cálculo cambia.
+      cascada: "avanceMetaEnPlazo -> avanceAgregado -> estadoDeAvance",
+      plazo_indicador_activo: false,
+      reemplazo,
+    } as Record<string, unknown>,
+  };
 
   const { data: corte, error: eCorte } = await sb
     .from("corte_trimestral")
-    .insert({
-      periodo_id: periodoId,
-      anio,
-      trimestre,
-      fecha_corte: fechaCorte,
-      origen,
-      tomado_por: quien?.user_id ?? null,
-      tomado_por_email: quien?.email ?? null,
-      proyectos: filas.length,
-      finalizados: totales.verde,
-      en_ejecucion: totales.amarillo,
-      no_iniciados: totales.rojo,
-      sin_datos: totales.sin_datos,
-      pct_promedio: pctPromedio,
-      metadata: {
-        periodo: foto.periodoNombre,
-        // Queda anotado con qué se tomó, para poder explicar diferencias entre
-        // dos fotos si algún día el cálculo cambia.
-        cascada: "avanceMetaEnPlazo -> avanceAgregado -> estadoDeAvance",
-        plazo_indicador_activo: false,
-        reemplazo,
-      },
-    })
+    .insert(cabecera)
     .select("id")
     .single();
-  if (eCorte || !corte) throw eCorte ?? new Error("No se pudo crear el corte");
+  if (eCorte || !corte) {
+    if (esColumnaInexistente(eCorte)) throw new Error(FALTA_046);
+    throw eCorte ?? new Error("No se pudo crear el corte");
+  }
   const corteId = (corte as { id: string }).id;
 
   // Inserta el detalle por lotes: 441 filas de una sola vez es un payload
   // grande y PostgREST se pone quisquilloso.
   const LOTE = 200;
+  // Si la 046 no está aplicada, las columnas direccion_* no existen. Antes eso
+  // hacía fallar la foto entera con un error de PostgREST en inglés sobre el
+  // schema cache. Una foto sin la dirección intermedia es infinitamente mejor
+  // que ninguna: se reintenta sin esas claves y queda anotado en metadata.
+  let sinDireccion = false;
+  const lote = (desde: number) =>
+    filas.slice(desde, desde + LOTE).map((f) => {
+      const fila: Record<string, unknown> = { ...f, corte_id: corteId };
+      if (sinDireccion) {
+        delete fila.direccion_id;
+        delete fila.direccion_nombre;
+      }
+      return fila;
+    });
+
   for (let i = 0; i < filas.length; i += LOTE) {
-    const { error } = await sb
-      .from("corte_trimestral_proyecto")
-      .insert(filas.slice(i, i + LOTE).map((f) => ({ ...f, corte_id: corteId })));
-    if (error) {
-      // Si el detalle falla, la cabecera sin detalle es peor que nada: se borra.
-      await sb.from("corte_trimestral").delete().eq("id", corteId);
-      throw error;
+    let { error } = await sb.from("corte_trimestral_proyecto").insert(lote(i));
+    if (error && esColumnaInexistente(error) && !sinDireccion) {
+      sinDireccion = true;
+      ({ error } = await sb.from("corte_trimestral_proyecto").insert(lote(i)));
     }
+    if (error) {
+      // La cabecera quedó incompleta: los lectores ya la ignoran, pero se borra
+      // igual para no dejar basura. Si este borrado falla, no se tapa: se suma
+      // al mensaje, porque quedaría una fila incompleta suelta.
+      const { error: eLimpieza } = await sb.from("corte_trimestral").delete().eq("id", corteId);
+      const detalle = eLimpieza ? ` (además quedó una cabecera incompleta sin borrar: ${eLimpieza.message})` : "";
+      throw new Error(`${error.message}${detalle}`);
+    }
+  }
+
+  if (sinDireccion) {
+    await sb
+      .from("corte_trimestral")
+      .update({ metadata: { ...cabecera.metadata, sin_direccion: true, motivo: "falta aplicar la migración 046" } })
+      .eq("id", corteId);
+  }
+
+  // Recién ahora la foto es válida para los lectores.
+  const { error: eCompleto } = await sb
+    .from("corte_trimestral")
+    .update({ completo: true })
+    .eq("id", corteId);
+  if (eCompleto) {
+    if (esColumnaInexistente(eCompleto)) {
+      // Sin la columna `completo` (046 sin aplicar) no se puede marcar, pero la
+      // foto está entera. Se sigue: el lector viejo no filtra por completo.
+      console.warn("corte-trimestral: falta la columna `completo` (migración 046)");
+    } else {
+      await sb.from("corte_trimestral").delete().eq("id", corteId);
+      throw eCompleto;
+    }
+  }
+
+  // Y solo con la nueva ya completa se borra la anterior. El detalle se va por
+  // CASCADE.
+  if (previo) {
+    const { error } = await sb.from("corte_trimestral").delete().eq("id", (previo as any).id);
+    // Si esto falla quedan dos fotos completas de la misma fecha. Es molesto,
+    // pero no se pierde nada: el lector toma la más reciente. No se tira.
+    if (error) console.warn("corte-trimestral: no se pudo borrar la foto anterior:", error.message);
   }
 
   return {

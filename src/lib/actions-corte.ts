@@ -11,6 +11,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { getPerfilActual } from "./auth";
+import { hoyLocal } from "./utils";
 import { tomarCorteTrimestral, type ResultadoCorte } from "./corte-trimestral";
 
 export async function tomarCorteAhora(input?: { fecha_corte?: string }): Promise<
@@ -22,7 +23,7 @@ export async function tomarCorteAhora(input?: { fecha_corte?: string }): Promise
     return { success: false, error: "Solo Planificación Estratégica puede tomar el corte" };
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal();
   const fechaCorte = input?.fecha_corte?.trim() || hoy;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCorte)) {

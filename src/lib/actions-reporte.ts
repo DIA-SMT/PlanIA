@@ -92,7 +92,23 @@ export async function guardarAnalisisReporte(input: {
   if (!periodo) return { success: false, error: "No hay período activo" };
   const periodoId = (periodo as { id: string }).id;
 
-  const estado: "borrador" | "publicado" = input.publicar ? "publicado" : "borrador";
+  // Guardar NO despublica. Antes, "Guardar borrador" sobre un análisis ya
+  // publicado lo bajaba a borrador y avisaba "Borrador guardado": el bloque 3
+  // desaparecía de la vista del área sin que nadie lo pidiera, y se perdía la
+  // firma de publicación. Despublicar es una acción aparte y explícita.
+  const { data: previo } = await sb
+    .from("reporte_analisis")
+    .select("estado, publicado_at, publicado_por")
+    .eq("anio", input.anio)
+    .eq("trimestre", input.trimestre)
+    .eq("unidad_id", input.unidad_id)
+    .maybeSingle();
+  const yaPublicado = (previo as { estado?: string } | null)?.estado === "publicado";
+  const p = previo as { publicado_at?: string; publicado_por?: string } | null;
+
+  const estado: "borrador" | "publicado" =
+    input.publicar || yaPublicado ? "publicado" : "borrador";
+
   const fila = {
     periodo_id: periodoId,
     anio: input.anio,
@@ -102,17 +118,21 @@ export async function guardarAnalisisReporte(input: {
     desvios,
     oportunidades,
     estado,
-    // Al despublicar se limpia la firma: si vuelve a borrador, ya no está
-    // publicado por nadie.
-    publicado_at: input.publicar ? new Date().toISOString() : null,
-    publicado_por: input.publicar ? perfil.user_id : null,
+    // Si ya estaba publicado y esto es un guardado, se conserva la firma
+    // original. Si es una publicación nueva, se firma ahora.
+    publicado_at: input.publicar
+      ? new Date().toISOString()
+      : yaPublicado
+      ? p?.publicado_at ?? new Date().toISOString()
+      : null,
+    publicado_por: input.publicar ? perfil.user_id : yaPublicado ? p?.publicado_por ?? null : null,
     actualizado_por: perfil.user_id,
     actualizado_por_email: perfil.email ?? null,
   };
 
   const { data, error } = await sb
     .from("reporte_analisis")
-    .upsert(fila, { onConflict: "periodo_id,anio,trimestre,unidad_id" })
+    .upsert(fila, { onConflict: "anio,trimestre,unidad_id" })
     .select("id")
     .single();
 
@@ -125,7 +145,7 @@ export async function guardarAnalisisReporte(input: {
 
   await registrarHistorial(
     (data as { id: string }).id,
-    input.publicar ? "publicacion" : "guardado",
+    input.publicar ? "publicacion" : yaPublicado ? "guardado-publicado" : "guardado",
     { balance, desvios, oportunidades },
     estado
   );

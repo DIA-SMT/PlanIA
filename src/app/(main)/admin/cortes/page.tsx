@@ -1,9 +1,9 @@
 import { getPerfilActual } from "@/lib/auth";
-import { listarCortes, finDeTrimestre } from "@/lib/corte-trimestral";
+import { listarCortes, finDeTrimestre, ultimoCierrePasado } from "@/lib/corte-trimestral";
 import { TomarCorteBoton } from "@/components/admin/tomar-corte-boton";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatFecha } from "@/lib/utils";
+import { formatFecha, hoyLocal } from "@/lib/utils";
 
 export const revalidate = 0;
 
@@ -28,7 +28,7 @@ export default async function CortesPage() {
     );
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal();
   let cortes: Awaited<ReturnType<typeof listarCortes>> = [];
   let errorTabla: string | null = null;
   try {
@@ -62,7 +62,11 @@ export default async function CortesPage() {
             el último día de cada trimestre; el botón de acá abajo es la red.
           </p>
         </div>
-        <TomarCorteBoton finDeTrimestre={finDeTrimestre(hoy)} />
+        <TomarCorteBoton
+          ultimoCierre={ultimoCierrePasado(hoy)}
+          proximoCierre={finDeTrimestre(hoy)}
+          hoy={hoy}
+        />
       </section>
 
       {errorTabla ? (
@@ -77,7 +81,7 @@ export default async function CortesPage() {
       ) : cortes.length === 0 ? (
         <EmptyState
           title="Todavía no hay ningún corte"
-          description={`El próximo cierre de trimestre es el ${finDeTrimestre(hoy)}. Podés tomar una foto ahora para probar.`}
+          description={`El último cierre fue el ${ultimoCierrePasado(hoy)} y el próximo es el ${finDeTrimestre(hoy)}. Podés tomar una foto ahora para probar.`}
           icon="◷"
         />
       ) : (

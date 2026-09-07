@@ -17,7 +17,7 @@
 --
 -- TRES DECISIONES:
 --
--- 1. La clave es (periodo, anio, trimestre, unidad), NO el corte. Si estuviera
+-- 1. La clave es (anio, trimestre, unidad), NO el corte. Si estuviera
 --    atada al corte, volver a tomar la foto —que crea un corte nuevo— dejaria
 --    el texto huerfano y alguien perderia media hora de escritura sin entender
 --    por que. El analisis es del trimestre del area, no de la foto.
@@ -71,8 +71,14 @@ CREATE TABLE IF NOT EXISTS public.reporte_analisis (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
 
-  -- Un analisis por area y por trimestre.
-  CONSTRAINT uq_reporte_analisis UNIQUE (periodo_id, anio, trimestre, unidad_id),
+  -- Un analisis por area y por trimestre. periodo_id NO entra en la clave a
+  -- proposito: es dato informativo. Si entrara, un borrador empezado en
+  -- diciembre con el POA 2026 activo y terminado en enero con el POA 2027 ya
+  -- activo insertaria una SEGUNDA fila (mismo anio y trimestre, otro periodo),
+  -- y desde ahi la lectura con maybeSingle explota y el despublicar afecta las
+  -- dos. Como periodo.anio es UNIQUE, los dos ejes son independientes y el
+  -- trimestre + el area ya identifican el informe.
+  CONSTRAINT uq_reporte_analisis UNIQUE (anio, trimestre, unidad_id),
   -- Publicado exige fecha de publicacion, igual que el vinculo confirmado de la
   -- migracion 044.
   CONSTRAINT chk_ra_publicado CHECK (estado <> 'publicado' OR publicado_at IS NOT NULL),

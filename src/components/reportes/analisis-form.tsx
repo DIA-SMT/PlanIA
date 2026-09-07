@@ -79,7 +79,11 @@ export function AnalisisForm({
   const guardar = (publicar: boolean) =>
     correr(
       () => guardarAnalisisReporte({ anio, trimestre, unidad_id: unidadId, ...texto, publicar }),
-      publicar ? "Análisis publicado: ya lo puede ver el área." : "Borrador guardado."
+      publicar
+        ? "Análisis publicado: ya lo puede ver el área."
+        : publicado
+        ? "Cambios guardados. Sigue publicado."
+        : "Borrador guardado."
     );
 
   // Solo lectura: el área viendo su propio informe ya publicado.
@@ -160,7 +164,7 @@ export function AnalisisForm({
           disabled={isPending || (!sucio && !!analisis && !publicado)}
           className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover disabled:opacity-50"
         >
-          {isPending ? "Guardando…" : "Guardar borrador"}
+          {isPending ? "Guardando…" : publicado ? "Guardar cambios" : "Guardar borrador"}
         </button>
 
         {!publicado ? (
@@ -174,13 +178,6 @@ export function AnalisisForm({
           </button>
         ) : (
           <>
-            <button
-              onClick={() => guardar(true)}
-              disabled={isPending || !sucio}
-              className="text-sm bg-primary text-white rounded-lg px-4 py-2 hover:bg-primary/90 disabled:opacity-50"
-            >
-              Guardar y republicar
-            </button>
             <button
               onClick={() =>
                 correr(

@@ -1,30 +1,30 @@
 name: Corte trimestral del POA
 
-# Corre todos los días y el endpoint decide: solo toma la foto si ese día es el
-# último del trimestre.
+# Corre todos los días y el endpoint decide: toma la foto solo si quedó algún
+# cierre de trimestre sin ella.
 #
 # Por qué así y no un cron por trimestre: GitHub Actions no sabe expresar "el
 # último día del trimestre" (30 o 31 según el mes), y un cron con las cuatro
 # fechas escritas a mano se rompe callado el día que cambie el calendario del
 # POA. Corriendo todos los días, el filtro lo hace el endpoint con la fecha real.
 #
-# Horario: 23:30 UTC = 20:30 en Tucumán (UTC-3). El día laboral ya cerró y la
-# fecha UTC sigue siendo la misma que la local, que es lo que importa: el
-# endpoint compara contra la fecha UTC. Así, la corrida del 30 de septiembre a
-# las 23:30 UTC ve `2026-09-30` y toma la foto del cierre del tercer trimestre.
-# (Si se corriera después de medianoche UTC, la fecha ya sería del trimestre
-# siguiente y el corte se perdería.)
+# Horario: 12:00 UTC = 09:00 en Tucumán, con 12 horas de margen contra el
+# cambio de fecha. El horario NO es crítico porque el endpoint no pregunta "hoy
+# es el último día del trimestre" sino "quedó algún cierre sin foto": si una
+# corrida se atrasa o falla, la del día siguiente rescata el cierre y lo fecha
+# en el día correcto. Antes esto corría 23:30 UTC con media hora de margen, y un
+# atraso de la cola de Actions perdía el cierre para siempre informando éxito.
 
 on:
   schedule:
-    - cron: '30 23 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
       fecha_corte:
         description: 'Fecha del corte (YYYY-MM-DD). Vacío = hoy.'
         required: false
       forzar:
-        description: 'Tomar la foto aunque hoy no sea fin de trimestre'
+        description: 'Tomar la foto de hoy aunque no falte ningún cierre'
         type: boolean
         default: false
 
@@ -78,7 +78,9 @@ jobs:
           fi
 
           if grep -q '"omitido":true' "$RESP"; then
-            echo "Hoy no es fin de trimestre: no se tomó ninguna foto."
+            echo "No falta ninguna foto de cierre: nada que hacer."
+          elif grep -q '"rescatado":true' "$RESP"; then
+            echo "::warning::Se rescató un cierre que no se había tomado el día del cierre. Revisar por qué falló la corrida de ese día."
           else
             echo "::notice::Foto del corte tomada."
           fi

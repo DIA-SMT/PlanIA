@@ -1,6 +1,12 @@
 import type { NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { tomarCorteTrimestral, finDeTrimestre, trimestreDe } from "@/lib/corte-trimestral";
+import {
+  tomarCorteTrimestral,
+  finDeTrimestre,
+  ultimoCierrePasado,
+  cierrePendiente,
+} from "@/lib/corte-trimestral";
+import { hoyLocal } from "@/lib/utils";
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
@@ -10,8 +16,7 @@ export const maxDuration = 60;
 
 /**
  * Toma la foto del corte trimestral. La llama el proceso programado de GitHub
- * Actions (.github/workflows/corte-trimestral.yml) el último día de cada
- * trimestre.
+ * Actions (.github/workflows/corte-trimestral.yml), que corre todos los días.
  *
  *   POST /api/corte-trimestral
  *   Authorization: Bearer <CORTE_TRIMESTRAL_SECRET>
@@ -21,9 +26,10 @@ export const maxDuration = 60;
  *
  * Parámetros opcionales en el cuerpo:
  *   fecha_corte  ISO. Por defecto hoy.
- *   solo_fin_de_trimestre  si es true (el default para el cron), no hace nada
- *                          salvo que hoy SEA el último día del trimestre. Así
- *                          el cron puede correr todos los días sin ensuciar.
+ *   solo_fin_de_trimestre  si es true (lo que manda el cron), solo actúa cuando
+ *                          quedó un cierre de trimestre sin foto, y la fecha
+ *                          la pone en ese cierre. Así el cron corre todos los
+ *                          días sin ensuciar y rescata solo lo que falte.
  */
 function secretoValido(header: string | null): boolean {
   const esperado = process.env.CORTE_TRIMESTRAL_SECRET;
@@ -55,26 +61,52 @@ export async function POST(req: NextRequest) {
     // Sin cuerpo está bien: se usan los defaults.
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
-  const fechaCorte = cuerpo.fecha_corte ?? hoy;
+  const hoy = hoyLocal();
+  let fechaCorte = cuerpo.fecha_corte ?? hoy;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCorte)) {
     return Response.json({ error: "fecha_corte tiene que ser YYYY-MM-DD" }, { status: 400 });
   }
 
-  // El cron corre todos los días a la misma hora porque GitHub Actions no
-  // entiende "el último día del trimestre". El filtro se hace acá.
-  if (cuerpo.solo_fin_de_trimestre && fechaCorte !== finDeTrimestre(fechaCorte)) {
-    return Response.json({
-      omitido: true,
-      motivo: `hoy (${fechaCorte}) no es el último día del trimestre ${trimestreDe(fechaCorte)}`,
-      proximo_corte: finDeTrimestre(fechaCorte),
-    });
+  // El cron corre todos los días porque GitHub Actions no sabe expresar "el
+  // último día del trimestre". El filtro se hace acá, y NO es "hoy es el último
+  // día": es "quedó algún cierre sin foto".
+  //
+  // La diferencia importa. Con el filtro anterior, un atraso en la cola de
+  // Actions la noche del 30 de septiembre corría el job ya con fecha del 1 de
+  // octubre, el endpoint respondía "hoy no es fin de trimestre" con HTTP 200,
+  // el check salía verde y el cierre se perdía para siempre — justo lo que la
+  // foto existe para evitar. Preguntando por el pendiente, la corrida del 1, la
+  // del 2 o la del 3 lo rescata sola, y la fecha del corte queda en el cierre
+  // real, no en el día que corrió.
+  if (cuerpo.solo_fin_de_trimestre) {
+    let pendiente: string | null;
+    try {
+      pendiente = await cierrePendiente(hoy);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return Response.json({ error: `No se pudo consultar el cierre pendiente: ${msg}` }, { status: 500 });
+    }
+    if (!pendiente) {
+      return Response.json({
+        omitido: true,
+        motivo: `el cierre del ${ultimoCierrePasado(hoy)} ya tiene su foto`,
+        proximo_cierre: finDeTrimestre(hoy),
+      });
+    }
+    // Se fecha en el cierre, no en hoy.
+    fechaCorte = pendiente;
   }
 
   try {
     const r = await tomarCorteTrimestral({ fechaCorte, origen: "automatico" });
-    return Response.json({ ok: true, ...r });
+    return Response.json({
+      ok: true,
+      ...r,
+      // Para que el workflow pueda avisar cuando rescató un cierre atrasado.
+      rescatado: fechaCorte !== hoy,
+      corrido_el: hoy,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("corte-trimestral:", msg);
