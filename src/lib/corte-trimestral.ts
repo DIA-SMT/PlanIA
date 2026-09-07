@@ -106,11 +106,39 @@ export async function tomarCorteTrimestral(opciones?: {
   origen?: "automatico" | "manual";
   quien?: { user_id: string; email: string | null };
 }): Promise<ResultadoCorte> {
-  const sb = getSupabaseAdmin();
   const fechaCorte = opciones?.fechaCorte ?? new Date().toISOString().slice(0, 10);
   const origen = opciones?.origen ?? "manual";
   const anio = Number(fechaCorte.slice(0, 4));
   const trimestre = trimestreDe(fechaCorte);
+
+  const sb = getSupabaseAdmin();
+  const foto = await calcularFotoCorte(fechaCorte);
+  return guardarFotoCorte(sb, foto, { fechaCorte, anio, trimestre, origen, quien: opciones?.quien });
+}
+
+export interface FotoCorte {
+  periodoId: string;
+  periodoNombre: string | null;
+  /** Una fila por proyecto, lista para insertar (sin corte_id). */
+  filas: any[];
+  totales: { verde: number; amarillo: number; rojo: number; sin_datos: number };
+  pctPromedio: number | null;
+}
+
+/**
+ * Calcula la foto SIN escribir nada.
+ *
+ * Va separado de la escritura a propósito: así el cálculo se puede verificar
+ * contra la base de producción en seco, que es donde puede esconderse un error
+ * caro (un proyecto que no resuelve su secretaría, la cascada dando distinto
+ * que el panel, el paginado recortando filas). Escribir 441 filas para
+ * descubrir que la columna de secretaría vino en blanco es un mal orden.
+ */
+export async function calcularFotoCorte(
+  fechaCorteEntrada?: string
+): Promise<FotoCorte> {
+  const sb = getSupabaseAdmin();
+  const fechaCorte = fechaCorteEntrada ?? new Date().toISOString().slice(0, 10);
 
   // ---- Período activo ----
   const { data: periodo, error: ePeriodo } = await sb
@@ -263,7 +291,32 @@ export async function tomarCorteTrimestral(opciones?: {
 
   const pctPromedio = avanceAgregado(pctsMunicipio).pct;
 
-  // ---- Guardar. Reemplaza la foto de esa misma fecha, si existe. ----
+  return {
+    periodoId,
+    periodoNombre: (periodo as any).nombre ?? null,
+    filas,
+    totales,
+    pctPromedio,
+  };
+}
+
+/**
+ * Guarda una foto ya calculada. Reemplaza la de esa misma fecha si existe.
+ */
+async function guardarFotoCorte(
+  sb: ReturnType<typeof getSupabaseAdmin>,
+  foto: FotoCorte,
+  ctx: {
+    fechaCorte: string;
+    anio: number;
+    trimestre: number;
+    origen: "automatico" | "manual";
+    quien?: { user_id: string; email: string | null };
+  }
+): Promise<ResultadoCorte> {
+  const { fechaCorte, anio, trimestre, origen, quien } = ctx;
+  const { periodoId, filas, totales, pctPromedio } = foto;
+
   const { data: previo } = await sb
     .from("corte_trimestral")
     .select("id")
@@ -288,16 +341,16 @@ export async function tomarCorteTrimestral(opciones?: {
       trimestre,
       fecha_corte: fechaCorte,
       origen,
-      tomado_por: opciones?.quien?.user_id ?? null,
-      tomado_por_email: opciones?.quien?.email ?? null,
-      proyectos: proyectos.length,
+      tomado_por: quien?.user_id ?? null,
+      tomado_por_email: quien?.email ?? null,
+      proyectos: filas.length,
       finalizados: totales.verde,
       en_ejecucion: totales.amarillo,
       no_iniciados: totales.rojo,
       sin_datos: totales.sin_datos,
       pct_promedio: pctPromedio,
       metadata: {
-        periodo: (periodo as any).nombre,
+        periodo: foto.periodoNombre,
         // Queda anotado con qué se tomó, para poder explicar diferencias entre
         // dos fotos si algún día el cálculo cambia.
         cascada: "avanceMetaEnPlazo -> avanceAgregado -> estadoDeAvance",
@@ -330,7 +383,7 @@ export async function tomarCorteTrimestral(opciones?: {
     trimestre,
     fecha_corte: fechaCorte,
     reemplazo,
-    proyectos: proyectos.length,
+    proyectos: filas.length,
     finalizados: totales.verde,
     en_ejecucion: totales.amarillo,
     no_iniciados: totales.rojo,
