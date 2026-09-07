@@ -21,6 +21,9 @@ const navItems: NavItem[] = [
   // 24.08, página 36: "incorporar una herramienta para medir los avances del
   // Plan Rector", con la captura señalando este menú.
   { href: "/plan-rector", label: "Plan Rector", icon: "◇" },
+  // Reporte trimestral (pedido del 01.09). Lo ve cualquiera: cada uno accede
+  // solo al de su alcance, y eso lo controla la capa de datos.
+  { href: "/reportes", label: "Reportes", icon: "▢" },
   { href: "/agenda", label: "Agenda", icon: "📅" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   {

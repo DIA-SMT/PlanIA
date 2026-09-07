@@ -408,6 +408,29 @@ export function porcentajeDeEstado(
 export type EstadoPlazo = "sin_plazo" | "programado" | "vigente" | "vencido";
 
 // Comparación lexicográfica de fechas ISO "YYYY-MM-DD" (válida para ese formato).
+/** Zona del municipio. Vercel corre en UTC y Tucumán es UTC-3. */
+export const ZONA_MUNICIPIO = "America/Argentina/Tucuman";
+
+/**
+ * La fecha de HOY en Tucumán, en ISO (YYYY-MM-DD).
+ *
+ * Usar esto y no `new Date().toISOString().slice(0,10)`, que devuelve la fecha
+ * UTC: entre las 21:00 y la medianoche de Tucumán el servidor ya está en el día
+ * siguiente. Para el corte trimestral eso significaba que apretar "tomar la
+ * foto" el 30 de septiembre a las 21:30 guardaba el cierre del tercer trimestre
+ * fechado el 1 de octubre, o sea como cuarto trimestre.
+ *
+ * `en-CA` porque su formato corto ya es YYYY-MM-DD.
+ */
+export function hoyLocal(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_MUNICIPIO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export function estadoPlazo(
   inicio: string | null | undefined,
   fin: string | null | undefined,
