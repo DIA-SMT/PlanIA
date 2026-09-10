@@ -7,6 +7,38 @@
 
 ---
 
+## Estado de avance al 10.09
+
+| Etapa | Qué | Estado |
+|---|---|---|
+| 1 | El reporte deja de ver hacia arriba (A1) | **hecho** — `2a85a15` |
+| 2 | Una sola fórmula de semáforo (A2) | **hecho** — `0d73a44` + `3cfaff0` |
+| 2 | Los avisos leídos se van de la vista (A3) | **hecho** — `3e24e3f` |
+| 3 | Bloque D — las 7 correcciones del reporte | pendiente |
+| 4 | Bloque C — unificar Proyectos e Indicadores | pendiente |
+| 5 | Bloque B — Plan Rector | pendiente |
+| 6 | F (contraseñas) + H (fecha de carga) | pendiente |
+| 7 | E (avisos por correo) | pendiente |
+| 8 | G (POA 2027) | pendiente, y creció: ver abajo |
+
+Además salieron dos cosas que no estaban en el plan:
+
+- **Un bug del asistente, arreglado en el camino** (`3cfaff0`): preguntarle por
+  Secretaría General devolvía **0 proyectos** cuando tiene 217. Ver §13.1.
+- **El POA 2027 ya existe, y es el PRISMA.** El pedido #744 dice "esto
+  reemplazaría el PRISMA que no debe figurar en el PLANIA", y resulta que
+  `/poa-2027` son cinco pantallas ya construidas: la ficha PRISMA, con carga de
+  documento, instructivo y exportador. Así que "eliminar PRISMA" no es el ítem
+  corto que decía el plan: es sacar un subsistema entero. Y hay **2 fichas vivas,
+  una cargada el 10.09 a las 15:13**, o sea que alguien lo está usando. Antes de
+  tocarlo hay que preguntar qué se hace con lo ya cargado.
+
+Falta que alguien **entre a la campanita y al reporte con un usuario real** y
+confirme que se sienten bien: la app está detrás de login y desde acá no se puede
+comprobar la interacción, solo el cálculo y el render.
+
+---
+
 ## 0. Lo primero: nos contestaron una pregunta
 
 El párrafo 703 responde la **pregunta 4 del Plan Rector**, que era bloqueante:
