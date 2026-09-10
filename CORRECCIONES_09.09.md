@@ -198,10 +198,29 @@ Sobre B4: en la captura se ve el texto del objetivo dos veces —truncado en la
 fila y completo abajo—. Es de nuestra pantalla: la fila del objetivo muestra el
 nombre recortado y al abrirse lo repite entero. Se deja uno solo.
 
-Sobre B3: los íconos de los ODS son 14 imágenes de Naciones Unidas
-(`argentina.un.org/es/sdgs`). Habría que descargarlas y servirlas desde
-`public/`, no enlazarlas: si el sitio de la ONU cambia, el tablero queda con
-huecos.
+Sobre B3, los colores: **están en el archivo que nos mandaron y no hay que
+pedir nada.** El pedido dice "en el sheets del plan rector, cada ámbito esta con
+su color correspondiente", y efectivamente `Cumplimiento Plan Rector.xlsx` los
+trae como **relleno de celda**, no como texto — por eso no aparecieron al leer los
+valores. Extraídos del archivo el 10.09:
+
+| Ámbito | Color |
+|---|---|
+| A1: Ciudad ordenada y sustentable | `#CC4125` |
+| A2: Ciudad con bienestar para todas las familias | `#93C47D` |
+| A3: Ciudad cercana, accesible y segura | `#FFD966` |
+| A4: Ciudad centrada en las personas | `#6FA8DC` |
+| A5: Ciudad abierta y de oportunidades | `#C27BA0` |
+
+Son los cinco únicos rellenos de la planilla y cada uno pinta el bloque completo
+de su ámbito (16, 24, 17, 28 y 20 celdas), así que la correspondencia es
+inequívoca. Van como constante en el código, junto a la clave estable de cada
+ámbito.
+
+Sobre B3, los ODS: son 14 imágenes de Naciones Unidas
+(`argentina.un.org/es/sdgs`). Hay que descargarlas y servirlas desde `public/`,
+no enlazarlas: si el sitio de la ONU cambia, el tablero queda con huecos. Tampoco
+necesita nada del cliente.
 
 ---
 
@@ -422,7 +441,10 @@ lugar.
 **Para Planificación**, junto con las 8 preguntas del Plan Rector y las 6 del
 reporte que siguen sin respuesta:
 
-- Los **colores de cada ámbito**: dicen que están en el sheets, pero el archivo
-  que nos pasaron no los traía.
 - Si la **aclaración de que se trabaja con datos de 2026** va en la pantalla del
   Plan Rector o solo en el reporte.
+- Si la lista general de indicadores queda accesible desde la tarjeta del Panel
+  Ejecutivo o se va del todo (§11.3).
+
+Los **colores de cada ámbito ya no son una pregunta**: estaban en el archivo desde
+el principio, como relleno de celda. Ver §3/B3.
