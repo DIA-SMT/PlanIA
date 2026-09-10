@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { perfilVeTodo, hoyLocal } from "@/lib/utils";
+import { getPerfilActual, getScopeReporte } from "@/lib/auth";
+import { hoyLocal } from "@/lib/utils";
 import { trimestreDe, ultimoCierrePasado } from "@/lib/corte-trimestral";
 import {
   getReporteUnidad,
@@ -56,9 +56,14 @@ export default async function ReportesPage({
 
   // Áreas que este usuario puede pedir. La capa de datos lo valida igual; esto
   // es para no ofrecerle opciones que va a rechazar.
+  //
+  // 09.09: usa `getScopeReporte` (solo hacia abajo) y NO `getScopeUnidades`,
+  // que es el alcance de carga y al director le suma sus ancestros. Con el de
+  // carga, un director veía en el selector —y podía abrir— el reporte de toda
+  // su secretaría.
   const todas = await getUnidadesParaReporte();
-  const scope = perfilVeTodo(perfil) ? null : new Set(await getScopeUnidades(perfil));
-  const unidades = scope ? todas.filter((u) => scope.has(u.id)) : todas;
+  const scope = new Set(await getScopeReporte(perfil));
+  const unidades = todas.filter((u) => scope.has(u.id));
 
   if (unidades.length === 0) {
     return (

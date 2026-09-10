@@ -337,13 +337,17 @@ export async function getReporteUnidad(opciones: {
   // número para todos los lectores—, y eso saltea la RLS. Sin este control,
   // cualquier pantalla que consuma esta capa con `?u=<uuid>` dejaría que un
   // director pida el id de otra área y reciba sus proyectos.
-  const { getPerfilActual, getScopeUnidades } = await import("@/lib/auth");
-  const { perfilVeTodo } = await import("@/lib/utils");
+  const { getPerfilActual, getScopeReporte } = await import("@/lib/auth");
   const perfil = await getPerfilActual();
   if (!perfil) throw new Error("No autenticado");
 
-  if (opciones.unidadId && !perfilVeTodo(perfil)) {
-    const scope = await getScopeUnidades(perfil);
+  // El alcance es el de LECTURA de reportes (solo hacia abajo), no el de carga.
+  // Antes usaba `getScopeUnidades`, que al director le da también sus ancestros,
+  // y por eso pasaba el control para el reporte de toda su secretaría (09.09,
+  // párrafo 732). `getScopeReporte` ya resuelve solo el caso "ve todas", así que
+  // acá no hace falta el atajo de `perfilVeTodo`.
+  if (opciones.unidadId) {
+    const scope = await getScopeReporte(perfil);
     if (!scope.includes(opciones.unidadId)) {
       throw new Error("No tenés acceso al reporte de esa área");
     }
