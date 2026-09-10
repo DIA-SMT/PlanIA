@@ -196,6 +196,27 @@ export type UnidadResumen = Pick<
 
 export type ProyectoConUnidad = Proyecto & { unidad: UnidadResumen };
 
+/**
+ * Los proyectos del período: activos y no borrados. UN SOLO UNIVERSO.
+ *
+ * El filtro por `estado` se agregó el 09.09. Antes esta función traía también
+ * los pausados, y el filtro quedaba a criterio de cada pantalla: el Panel
+ * Ejecutivo y la TV filtraban (`dashboard/page.tsx:72`, `tv-panel.tsx:43`) y las
+ * otras cinco no, así que el Panel contaba 441 proyectos y /proyectos, /metas,
+ * /indicadores, /estructura y /avance-direcciones contaban 448. Al hacer clic en
+ * el KPI "Proyectos 441" del Panel se aterrizaba en una pantalla que encabezaba
+ * "448 de 448".
+ *
+ * Los 7 de diferencia son de la Dirección de Inteligencia Artificial, pausados
+ * directamente en la base a fines de junio: hoy la app no tiene ninguna pantalla
+ * para pausar ni reactivar un proyecto (`estado` solo se escribe como "activo" al
+ * crearlo, `actions.ts:1228`), y ninguno de los 7 tuvo nunca una carga de avance.
+ *
+ * "Activos y no borrados" es el criterio que ya usaban las fotos de corte
+ * (`corte-trimestral.ts:235`), el Plan Rector (`plan-rector.ts:233`), el
+ * asistente y el reporte trimestral, o sea el que produce los números oficiales
+ * que el cliente ya vio. Ahora lo usa todo el sistema desde un solo lugar.
+ */
 export const getProyectos = cache(async function getProyectos(
   periodoId: string
 ): Promise<ProyectoConUnidad[]> {
@@ -204,6 +225,7 @@ export const getProyectos = cache(async function getProyectos(
     .from("proyecto")
     .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto, nivel, parent_id)")
     .eq("periodo_id", periodoId)
+    .eq("estado", "activo")
     .is("deleted_at", null)
     .order("orden");
   if (error) throw error;

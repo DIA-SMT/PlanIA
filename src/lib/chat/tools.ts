@@ -11,6 +11,37 @@ import { coincideBusqueda, normalizarBusqueda } from "@/lib/utils";
 // Solo lectura. Sin escritura. Datos reales.
 // -------------------------------------------------------
 
+/**
+ * Los ids de un área y de TODO lo que cuelga de ella.
+ *
+ * Corrige un bug del 10.09 que estaba en las cinco herramientas que filtran por
+ * área: todas hacían `.eq("parent_id", unidad_id)`, o sea la unidad más sus
+ * hijos DIRECTOS. Pero en el municipio los proyectos cuelgan de las
+ * direcciones, que están a dos niveles de la secretaría
+ * (Secretaría → Subsecretaría → Dirección). Con un solo nivel la lista de
+ * proyectos quedaba vacía y todo lo que se filtraba después también.
+ *
+ * Medido sobre las 80 unidades, 4 daban mal, y son las peores posibles: el
+ * asistente contestaba **0 proyectos** para Secretaría General (tiene 217), 0
+ * para Gobierno (60) y 0 para Servicios Públicos (40) — las tres más grandes —,
+ * y 29 en vez de 38 para la Subsecretaría de Cultura, que además es una de las
+ * preguntas sugeridas del propio asistente.
+ *
+ * `unidades_descendientes` es recursiva, incluye la unidad propia y es la misma
+ * que usan la RLS y `getScopeReporte`.
+ */
+async function idsDelArbol(
+  sb: Awaited<ReturnType<typeof getSupabaseServer>>,
+  unidadId: string
+): Promise<string[]> {
+  const { data } = await sb.rpc("unidades_descendientes", { p_unidad_id: unidadId });
+  const ids = ((data ?? []) as { id: string }[]).map((u) => u.id);
+  // Si la RPC fallara, al menos filtrar por la unidad propia en vez de por nada:
+  // devolver [] dejaría un `.in()` vacío y la herramienta contestaría "no hay
+  // nada" en lugar de fallar.
+  return ids.length > 0 ? ids : [unidadId];
+}
+
 export async function buscarProyectos(params: {
   unidad_id?: string;
   texto?: string;
@@ -29,11 +60,7 @@ export async function buscarProyectos(params: {
 
   if (params.unidad_id) {
     // Include child units
-    const { data: hijos } = await supabase
-      .from("unidad_organizacional")
-      .select("id")
-      .eq("parent_id", params.unidad_id);
-    const ids = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
+    const ids = await idsDelArbol(supabase, params.unidad_id);
     query = query.in("unidad_id", ids);
   }
 
@@ -145,11 +172,7 @@ export async function listarMetasPendientes(params: {
     .is("deleted_at", null);
 
   if (params.unidad_id) {
-    const { data: hijos } = await supabase
-      .from("unidad_organizacional")
-      .select("id")
-      .eq("parent_id", params.unidad_id);
-    const ids = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
+    const ids = await idsDelArbol(supabase, params.unidad_id);
     pyQuery = pyQuery.in("unidad_id", ids);
   }
 
@@ -215,11 +238,7 @@ export async function listarHitosProximos(params: {
     .is("deleted_at", null);
 
   if (params.unidad_id) {
-    const { data: hijos } = await supabase
-      .from("unidad_organizacional")
-      .select("id")
-      .eq("parent_id", params.unidad_id);
-    const ids = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
+    const ids = await idsDelArbol(supabase, params.unidad_id);
     pyQuery = pyQuery.in("unidad_id", ids);
   }
 
@@ -267,12 +286,16 @@ export async function obtenerResumenArea(params: { unidad_id: string }) {
     .eq("id", params.unidad_id)
     .single();
 
+  // Para CONTAR, el árbol completo (ver `idsDelArbol`: con un solo nivel esta
+  // herramienta contestaba 0 proyectos para las tres secretarías más grandes).
+  const allIds = await idsDelArbol(supabase, params.unidad_id);
+
+  // Para LISTAR las áreas que dependen de ella, los hijos directos, que es lo
+  // que el campo `direcciones` quiere decir.
   const { data: hijos } = await supabase
     .from("unidad_organizacional")
     .select("id, nombre_corto")
     .eq("parent_id", params.unidad_id);
-
-  const allIds = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
 
   const { data: proyectos } = await supabase
     .from("proyecto")
@@ -782,11 +805,7 @@ export async function listarAvancesPendientesValidacion(params: {
     .is("deleted_at", null);
 
   if (params.unidad_id) {
-    const { data: hijos } = await supabase
-      .from("unidad_organizacional")
-      .select("id")
-      .eq("parent_id", params.unidad_id);
-    const ids = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
+    const ids = await idsDelArbol(supabase, params.unidad_id);
     pyQuery = pyQuery.in("unidad_id", ids);
   }
 

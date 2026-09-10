@@ -174,6 +174,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
             valor_objetivo_texto: i.valor_objetivo_texto,
             unidad_medida: i.unidad_medida,
             estado_semaforo: i.estado_semaforo,
+            // El árbol calcula el punto de color con `avanceIndicador`, que lee
+            // la marca `invertida` de acá.
+            metadata: i.metadata ?? null,
           })),
         }));
         // Avance del proyecto por la cascada del sistema (ver arriba)

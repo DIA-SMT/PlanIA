@@ -6,6 +6,7 @@ import type { EstadoSemaforo, UnidadOrganizacional } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { IndicadorCargaInline } from "./indicador-carga-inline";
+import { avanceIndicador, estadoDeAvance } from "@/lib/utils";
 
 // Tipos planos para el árbol
 export interface PoaIndicador {
@@ -18,6 +19,8 @@ export interface PoaIndicador {
   valor_objetivo_texto: string | null;
   unidad_medida: string | null;
   estado_semaforo: EstadoSemaforo;
+  /** Hace falta para `avanceIndicador`: ahí vive la marca `invertida`. */
+  metadata: Record<string, unknown> | null;
 }
 
 export interface PoaMeta {
@@ -337,19 +340,36 @@ function IndicadorRow({
   puedeCargar: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+
+  // El punto se calcula al mostrar, con la misma regla que la meta y el
+  // proyecto (verde = 100 %). Antes usaba `estado_semaforo` crudo, que se
+  // escribe con otro umbral (`actions.ts:219`, verde desde el 80 %): medido el
+  // 10.09, 45 de los 360 indicadores guardados en verde tienen su avance real
+  // por debajo del 100 %, 39 de ellos justo entre el 80 % y el 99 %. Desde que
+  // el proyecto pasó a exigir el 100 %, esos puntos quedaban verdes al lado de
+  // una meta "En ejecución", en la misma fila.
+  //
+  // Se arregla al mostrar y NO moviendo el umbral de escritura: `avanceIndicador`
+  // usa `estado_semaforo` como ENTRADA para el indicador de texto y para el
+  // numérico sin objetivo, así que cambiar cómo se guarda les movería el
+  // porcentaje a 178 indicadores. Acá no se toca ningún dato.
+  const pctIndicador = avanceIndicador(ind);
+  const estadoDelPunto = estadoDeAvance(pctIndicador);
+
   return (
     <div className="rounded bg-surface border border-border/40 p-2 text-xs">
       <div className="flex items-center gap-2">
         <span
           className={`h-2 w-2 rounded-full shrink-0 ${
-            ind.estado_semaforo === "verde"
+            estadoDelPunto === "verde"
               ? "bg-success"
-              : ind.estado_semaforo === "amarillo"
+              : estadoDelPunto === "amarillo"
               ? "bg-warning"
-              : ind.estado_semaforo === "rojo"
+              : estadoDelPunto === "rojo"
               ? "bg-info"
               : "bg-muted/40"
           }`}
+          title={pctIndicador == null ? "Sin dato cargado" : `${pctIndicador} % de avance`}
         />
         {ind.codigo && (
           <span className="text-[9px] font-mono text-muted bg-border/50 px-1 py-0.5 rounded shrink-0">{ind.codigo}</span>

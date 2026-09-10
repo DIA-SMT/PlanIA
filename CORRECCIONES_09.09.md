@@ -140,8 +140,11 @@ Los casos más graves son los que además discrepan fuerte entre pantallas:
 Avance por Dirección, las fotos de corte y el reporte trimestral
 (`avanceMetaEnPlazo` → `avanceAgregado` → `estadoDeAvance`), y borrar
 `calcularAvancePorIndicadores`, que es la tercera fórmula de semáforo del sistema
-y su único consumidor es esa pantalla. Esto también cierra el hallazgo §7.1 de
-`PLAN_RECTOR.md`.
+y su único consumidor es esa pantalla.
+
+  (Corrección del 10.09: acá decía que esto cerraba el hallazgo §7.1 de
+  `PLAN_RECTOR.md`. No lo cierra — el §7.1 es sobre `avanceGlobalPorConteo`, que
+  se conserva a propósito. Ver §13.2.)
 
 **Efecto visible:** en la lista, Finalizados baja de 132 a 73, No iniciados de 141
 a 90 y En ejecución sube de 99 a 211. Es un cambio grande y a la vista, pero hacia
@@ -448,3 +451,104 @@ reporte que siguen sin respuesta:
 
 Los **colores de cada ámbito ya no son una pregunta**: estaban en el archivo desde
 el principio, como relleno de celda. Ver §3/B3.
+
+---
+
+## 13. Lo que encontró la revisión del 10.09
+
+Después de hacer la etapa 1 y la unificación de la fórmula, los dos commits
+pasaron por una revisión adversarial (27 agentes: 5 dimensiones, cada hallazgo
+enviado a refutar, y un cierre). Salieron dos defectos reales y **tres
+afirmaciones mías que eran falsas**. Queda acá porque este documento es el
+registro que lee el cliente.
+
+### 13.1 Los defectos, ya arreglados
+
+**El universo no era el mismo.** Unifiqué la fórmula pero no la población.
+`getProyectos` no filtraba por estado, y el filtro quedaba a criterio de cada
+pantalla: el Panel Ejecutivo y la TV filtraban, y **/proyectos, /metas,
+/indicadores, /estructura y /avance-direcciones no**. Resultado: el Panel decía
+441 proyectos y esas cinco pantallas 448. Se hacía clic en el KPI "Proyectos
+441" y se aterrizaba en una pantalla que encabezaba "448 de 448".
+
+Los 7 de diferencia son de la Dirección de Inteligencia Artificial, pausados
+directamente en la base a fines de junio. La app no tiene ninguna pantalla para
+pausar ni reactivar un proyecto, y **ninguno de los 7 tuvo nunca una carga de
+avance**, así que esconderlos no le saca trabajo a nadie. El filtro ahora vive
+en `getProyectos`, o sea en un solo lugar para las siete pantallas, y usa el
+mismo criterio que ya usaban las fotos de corte, el Plan Rector, el asistente y
+el reporte trimestral: **activos y no borrados**.
+
+**El punto de color del indicador seguía con el umbral viejo.** El semáforo del
+indicador se guarda con verde desde el 80 % (`actions.ts:219`) y el árbol de
+/proyectos pintaba ese dato crudo. Mientras el proyecto también era verde desde
+el 70 % no se notaba; al bajar el proyecto al 100 % quedaba **un punto verde al
+lado de una meta "En ejecución", en la misma fila**. Medido: de 360 indicadores
+guardados en verde, 45 tenían su avance real por debajo del 100 %, y 39 de esos
+justo entre el 80 % y el 99 %.
+
+Se arregla **al mostrar** y no moviendo el umbral de escritura, a propósito:
+`avanceIndicador` usa el semáforo guardado como *entrada* para los indicadores
+de texto y para los numéricos sin objetivo, así que cambiar cómo se guarda les
+movería el porcentaje a 178 indicadores. Calculándolo al mostrar no se toca
+ningún dato: 41 puntos dejan de mentir y 4 que estaban en amarillo pasan
+correctamente a verde.
+
+**Y uno que no venía de estos cambios: el asistente contestaba 0.** Las cinco
+herramientas del chat que filtran por área buscaban la unidad más sus hijos
+**directos**. Pero los proyectos cuelgan de las direcciones, que están a dos
+niveles de la secretaría. Efecto: preguntarle al asistente por **Secretaría
+General devolvía 0 proyectos** cuando tiene 217; Gobierno 0 sobre 60; Servicios
+Públicos 0 sobre 40; y Cultura 29 sobre 38 — y "¿Cómo está Cultura?" es una de
+las preguntas que el propio asistente sugiere. Sobre 80 áreas, 4 daban mal, y
+son las tres más grandes del municipio. Ahora las cinco usan la función
+recursiva que ya existía.
+
+### 13.2 Tres cosas que había afirmado mal
+
+**"5 directores ahora ven el cartel de vacío" — no.** Ven un reporte con todo en
+cero. El selector del reporte ofrece las **79 áreas activas**, no las 66 que
+tienen proyectos, así que su propia dirección siempre aparece y el cartel de
+vacío nunca se muestra. Mi verificación filtró por "áreas con proyectos", que
+era mi supuesto y no lo que hace el código.
+
+No lo cambié, porque el documento ya dice lo correcto cuando el área está vacía
+("Esta área no tiene proyectos cargados en el POA al momento del corte"). Lo que
+sí hay que hacer es **avisarle a Planificación de esas 5 direcciones sin ningún
+proyecto en el POA**: Crédito Público, SUTRAPPA, Centro de Monitoreo de
+Movilidad Urbana, Transporte y Licencia de Conducir.
+
+Lo que la revisión **no** tumbó: la conclusión de seguridad. Volvió a medirlo
+por su cuenta y también le dio **0 perfiles con acceso nuevo**.
+
+**Los números del "efecto visible en la lista" eran los del Panel.** Había
+anunciado 132 → 73, 141 → 90 y 99 → 211, pero esos son sobre 441 proyectos. La
+lista, que corría sobre 448, mostraba 73 / 216 / 92. Con el arreglo del universo
+la afirmación ahora sí es cierta: las dos pantallas dicen **73 / 211 / 90 / 67**
+sobre 441.
+
+**"Cierra el hallazgo §7.1 de PLAN_RECTOR.md" — no lo cierra.** El §7.1 es sobre
+`avanceGlobalPorConteo`, la fórmula del número grande del Panel y de la TV, que
+estos cambios **conservan intacta a propósito** porque mide otra cosa (cuántos
+proyectos están en marcha, no cuánto avanzaron). Medido hoy: ese medidor marca
+**64 %** y el promedio de los porcentajes por proyecto **41 %**. Los 23 puntos
+de diferencia son exactamente la "reunión incómoda" que el §7.1 anticipa, y
+**sigue abierto**. Lo que estos cambios cerraron es la tercera fórmula, la de
+/proyectos.
+
+### 13.3 Lo que sigue sin unificar, dicho con nombre
+
+El commit afirmó "una sola fórmula de semáforo en todo el sistema". A nivel
+proyecto sí. Pero sobreviven, y conviene tenerlas anotadas:
+
+| Dónde | Qué hace | Por qué sigue ahí |
+|---|---|---|
+| `actions.ts:219` | Guarda el semáforo del indicador con verde desde el 80 % | Moverlo cambiaría el porcentaje de 178 indicadores de texto. El punto ya se corrige al mostrar |
+| `utils.ts:302` `avanceGlobalPorConteo` | (verde + amarillo) / total | Mide cuántos proyectos están en marcha. Es el §7.1, abierto |
+| `estructura/page.tsx:48` | Cuenta metas materializadas y las pinta sin rótulo | Sec. General muestra 91/136/101 donde el Panel muestra 43/103/61. Sin arreglar |
+| `chat/tools.ts:459` y `:481` | Umbral 80/50 sobre el color de la meta | Hoy inalcanzable (fuera de la lista blanca), pero presente |
+
+La de `/estructura` es la que más conviene mirar, porque es una pantalla que se
+usa y muestra tres números que no coinciden con el Panel. Y hay un pedido del
+09.09 (C4) que justamente saca Estructura del menú, así que las dos cosas se
+resuelven juntas.
