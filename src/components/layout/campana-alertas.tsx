@@ -21,10 +21,18 @@ interface Props {
 export function CampanaAlertas({ alertas, porVencer }: Props) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
+  const [verLeidos, setVerLeidos] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const sinLeer = alertas.filter((a) => !a.leida_at);
+  const leidos = alertas.filter((a) => a.leida_at);
   const total = sinLeer.length + porVencer.length;
+
+  // 09.09, párrafo 765: al marcar un aviso como leído tiene que DESAPARECER.
+  // Antes se mostraban todos y los leídos quedaban en la lista con opacidad
+  // reducida, así que el usuario tocaba el tilde y el aviso seguía ahí. Los
+  // leídos no se borran: se guardan detrás de "Ver leídos".
+  const visibles = verLeidos ? alertas : sinLeer;
 
   const marcarUna = (id: string) => {
     startTransition(async () => {
@@ -77,14 +85,16 @@ export function CampanaAlertas({ alertas, porVencer }: Props) {
               )}
             </div>
 
-            {total === 0 && alertas.length === 0 && (
+            {visibles.length === 0 && porVencer.length === 0 && (
               <p className="px-4 py-6 text-xs text-muted text-center">
-                No tenés avisos.
+                {leidos.length > 0 && !verLeidos
+                  ? "Estás al día. No te queda ningún aviso sin leer."
+                  : "No tenés avisos."}
               </p>
             )}
 
             {/* Mensajes */}
-            {alertas.map((a) => (
+            {visibles.map((a) => (
               <div
                 key={a.id}
                 className={`px-4 py-3 border-b border-border last:border-0 ${
@@ -158,6 +168,17 @@ export function CampanaAlertas({ alertas, porVencer }: Props) {
                   </Link>
                 ))}
               </>
+            )}
+
+            {leidos.length > 0 && (
+              <button
+                onClick={() => setVerLeidos((v) => !v)}
+                className="w-full px-4 py-2.5 border-t border-border text-[10px] text-muted hover:text-foreground hover:bg-surface-hover transition-colors text-center"
+              >
+                {verLeidos
+                  ? "Ocultar los leídos"
+                  : `Ver leídos (${leidos.length})`}
+              </button>
             )}
           </div>
         </>

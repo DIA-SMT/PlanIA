@@ -552,8 +552,25 @@ export const getResumenDashboard = cache(async function getResumenDashboard(peri
 // ---------------------------------------------------------------------------
 
 /**
- * Las alertas manuales que le llegaron al usuario y todavía están vigentes.
- * Ordenadas por fecha, las más nuevas primero. RLS ya acota a las propias.
+ * Las alertas manuales que le llegaron A ESTE usuario y todavía están vigentes.
+ * Ordenadas por fecha, las más nuevas primero.
+ *
+ * El `.eq("user_id", ...)` es imprescindible y se agregó el 09.09 (párrafo 765:
+ * "los avisos cuando uno toca el tilde o la opción de marcar todo como leído, no
+ * desaparece y dificulta la vista del buscador por área").
+ *
+ * Antes esta consulta no filtraba por usuario y confiaba en la RLS. Para un
+ * usuario común alcanzaba, pero la política de la migración 043 (líneas 103-108)
+ * le deja al admin leer las filas de TODOS los destinatarios. Y quien reportó el
+ * problema es admin: mandaba un aviso a los 72 y recibía 72 filas, 71 ajenas,
+ * todas sin leer. `marcarTodasLasAlertasLeidas` solo puede tocar las propias
+ * (`actions.ts:1553`, y la RLS de UPDATE también), así que esas 71 no se
+ * apagaban nunca: la campanita quedaba clavada en 9+ y `CartelAlertas` dibujaba
+ * un cartel por fila —hasta el tope de 50— que empujaba el título, el formulario
+ * y el buscador por área fuera de la pantalla.
+ *
+ * O sea que el problema no era que marcar como leído no guardara: era que la
+ * lista traía avisos de otra gente que el usuario no podía apagar.
  */
 export const getAlertasDelUsuario = cache(async function getAlertasDelUsuario(): Promise<
   AlertaConLectura[]
@@ -561,9 +578,13 @@ export const getAlertasDelUsuario = cache(async function getAlertasDelUsuario():
   const supabase = await getSupabaseServer();
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
   const { data, error } = await supabase
     .from("alerta_destinatario")
     .select("leida_at, alerta:alerta(*)")
+    .eq("user_id", userData.user.id)
     .order("created_at", { referencedTable: "alerta", ascending: false })
     .limit(50);
   if (error) throw error;
