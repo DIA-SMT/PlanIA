@@ -19,7 +19,7 @@ Piden además:
 
 - que se vea el **porcentaje de avance de cada ámbito**;
 - una opción para ver **qué proyectos contiene cada ámbito**;
-- que el porcentaje "varíe en función a la cantidad de proyectos activos con los que cuente, respecto a la cantidad de proyectos de cada área" (ver pregunta 1 más abajo: esta frase admite dos lecturas);
+- que el porcentaje "varíe en función a la cantidad de proyectos activos con los que cuente, respecto a la cantidad de proyectos de cada área" — frase ambigua, resuelta como promedio simple en §11.1;
 - una **aclaración metodológica** de que se trabaja con información de 2026.
 
 Las otras 8 preguntas del Plan Rector y las 6 del reporte trimestral **siguen sin respuesta**.
@@ -34,9 +34,9 @@ Las otras 8 preguntas del Plan Rector y las 6 del reporte trimestral **siguen si
 | B | Plan Rector | 6 | parcialmente |
 | C | Unificar Proyectos e Indicadores | 6 | no |
 | D | Reportes | 7 | no |
-| E | Avisos por correo o SMS | 1 | **sí** |
+| E | Avisos por correo | 1 | resuelto |
 | F | Contraseñas | 1 | no |
-| G | POA 2027 | 2 | **sí** |
+| G | POA 2027 | 2 | **sí, abierto** |
 | H | Menores | 1 | no |
 
 ---
@@ -102,7 +102,8 @@ Ejemplos reales: *Indumentaria institucional* dice 100 % y sin ese atajo da 75 %
 **Y hay un problema debajo del problema:** en **11 de los 13**, el único
 indicador no tiene objetivo, así que **no se puede saber su avance real**. No es
 que el sistema calcula mal: es que no tiene con qué calcular. Sacarlos de verde
-es correcto, pero hay que decidir a qué estado van. Ver pregunta 2.
+es correcto, pero hay que decidir a qué estado van. **Decidido en §11.2:** pasan a
+En ejecución, y cada director recibe la lista de sus indicadores sin objetivo.
 
 ### A3. Los avisos no se van al marcarlos como leídos (párrafo 765)
 
@@ -149,9 +150,10 @@ huecos.
 | C5 | Click en un indicador desde Proyectos lleva a su detalle | 768 |
 | C6 | Los directores ven: Panel Ejecutivo, Proyectos, Avance por Dirección, Reportes, Agenda, POA 2027 | 717 |
 
-Sobre C3 y C4: ver pregunta 3. Eliminar una herramienta puede ser sacarla del
-menú o borrar el código, y no es lo mismo — el chatbot tiene funciones que
-apuntan a indicadores, y `/indicadores/[id]` es a donde llevaría C5.
+Sobre C3 y C4: **decidido en §11.3, confirmado por el cliente**. Se sacan del
+menú y la pantalla de detalle del indicador queda viva, porque es a donde lleva el
+click que pide C5 y porque el asistente del sistema tiene funciones que consultan
+indicadores. Queda por contestarle al cliente desde dónde va a editar: ver §11.3.
 
 ---
 
@@ -175,8 +177,7 @@ iniciado" en rojo (`--color-info: #EF4444`, fijado el 30.07 por pedido suyo) y l
 plantilla usaba el círculo azul. Queda todo rojo.
 
 Sobre D7: hoy el botón de imprimir aparece para cualquiera que vea el reporte, y
-Planificación ve todos. Hay que revisar qué pasó en su prueba: puede ser que
-estuvieran mirando un reporte cuyo análisis está en borrador. Ver pregunta 6.
+Planificación ve todos, así que la falla no está donde parece. Sigue abierto: ver §12.
 
 ---
 
@@ -186,8 +187,8 @@ estuvieran mirando un reporte cuyo análisis está en borrador. Ver pregunta 6.
 > notificación al celular, al correo electrónico vinculado. […] Ustedes díganos
 > qué es más viable de hacer."
 
-Nos preguntan directamente, así que va con recomendación en la pregunta 4.
-Resumen: el correo es viable y barato; el SMS cuesta plata por mensaje y necesita
+Nos preguntaron directamente y **está decidido: correo ahora, SMS después** (§11.4).
+El correo es viable y barato; el SMS cuesta plata por mensaje y necesita
 una cuenta con un proveedor, más los teléfonos cargados: hoy hay **0 de 73**
 perfiles con teléfono, aunque el campo existe desde la migración 041. En cambio
 los **73 de 73 tienen correo cargado**, así que el correo funciona desde el día
@@ -200,8 +201,8 @@ uno y el SMS exige primero pedirle el celular a cada usuario.
 > "Agregar la función para modificar las contraseñas, desde el perfil de cada
 > usuario y también una herramienta para que nosotros podamos ayudarlos."
 
-Las dos cosas se pueden hacer con lo que Supabase ya provee, sin infraestructura
-nueva. Ver pregunta 5.
+Las dos cosas se resuelven con el reset por correo que la plataforma ya provee, sin
+infraestructura nueva ni manipular contraseñas de nadie. **Decidido en §11.5.**
 
 ---
 
@@ -216,7 +217,7 @@ nueva. Ver pregunta 5.
 Es el pedido más grande del lote: duplicar 441 proyectos con sus 789 metas y 1404
 indicadores a un período nuevo, que Planificación pode, y que después el director
 complete. **No entra antes del 25 de septiembre** sin arriesgar el reporte
-trimestral. Ver pregunta 7.
+trimestral, y ese es el default asumido mientras no haya definición: ver §12.
 
 El pedido de eliminar PRISMA sí es corto.
 
@@ -239,7 +240,7 @@ días".
 | **4** | Bloque C (unificar Proyectos e Indicadores) | Es el cambio de estructura más grande que sí podemos hacer sin esperar | ~2 días |
 | **5** | Bloque B (Plan Rector, ahora desbloqueado) | Ya tenemos la definición que faltaba | ~2 días |
 | **6** | F (contraseñas) + H (fecha de carga) | Chicos y sueltos | ~medio día |
-| **7** | E (avisos por correo) | Depende de la pregunta 4 | ~1 día |
+| **7** | E (avisos por correo) | Ya decidido el canal (§11.4) | ~1 día |
 | **8** | G (POA 2027) | Después del 25, es un proyecto en sí mismo | ~1 semana |
 
 Las etapas 1 a 3 primero porque son las que están mal a la vista de los usuarios
@@ -247,40 +248,82 @@ hoy. El bloque G queda para después del reporte trimestral a propósito.
 
 ---
 
-## 11. Preguntas
+## 11. Decisiones tomadas
 
-### Para Lucas
+Respondidas el 10.09. Las que quedan abiertas están al final.
 
-**1. Sobre "el porcentaje del ámbito debe variar en función a la cantidad de
-proyectos activos con los que cuente, respecto a la cantidad de proyectos de cada
-área".**
-Esa frase admite dos lecturas y dan números distintos:
-(a) el promedio de avance de los proyectos imputados al ámbito — lo que ya hace
-el resto del sistema; o
-(b) una ponderación, donde un ámbito con más proyectos pesa más en el total.
-Mi lectura es (a), que además es consistente con todo lo demás. Confirmame o lo
-consultamos.
+### 1. El porcentaje de cada ámbito → **promedio simple** ✔
 
-**2. Los 13 proyectos que dejan de ser "Finalizados": ¿a qué estado van?**
-En 11 de los 13 el único indicador no tiene objetivo cargado, así que no se puede
-saber su avance real. Las opciones están en la pregunta que te hago abajo.
+El porcentaje de un ámbito es el promedio de avance de los proyectos imputados a
+ese ámbito, sin ponderar por cantidad. Es lo que ya hace el resto del sistema, así
+que el número del Plan Rector va a coincidir con el del Panel Ejecutivo — que es
+la propiedad que más importa para que nadie pierda confianza en el tablero.
 
-**3. "Eliminar" Indicadores y Estructura: ¿sacar del menú o borrar el código?**
+### 2. Los 13 falsos "Finalizados" → **a En ejecución, y se ataca la causa** ✔
 
-**4. Avisos: correo, SMS, o los dos.**
+Dos cosas, no una:
 
-**5. Contraseñas: ¿alcanza el "olvidé mi contraseña" por correo de Supabase?**
+1. Los 13 dejan de figurar Finalizados y pasan a **En ejecución**. No se inventa
+   un estado nuevo: la lista de estados es la que el cliente conoce.
+2. Cada director recibe la **lista de sus indicadores sin objetivo cargado** para
+   que los complete. Son 357 de 1404 (25 %), así que esto no es un detalle de
+   estos 13 proyectos: es un cuarto del POA midiéndose sin vara.
 
-**6. Lo de imprimir reportes:** hoy el botón está para todos. Antes de tocarlo,
-¿podés preguntarle a Planificación qué vieron exactamente? Sospecho que estaban
-en un reporte cuyo análisis estaba en borrador, y lo que no aparecía era el
-bloque 3, no el botón.
+Sin el punto 2 el arreglo tapa el síntoma: los proyectos salen de verde pero su
+avance sigue siendo indeterminable.
 
-**7. ¿El POA 2027 va en este lote o queda para después del 25?**
+### 3. Indicadores y Estructura → **fuera del menú, la pantalla de detalle queda viva** ✔
 
-### Para Planificación (van con las que ya están pendientes)
+Confirmado por Planificación por WhatsApp el 10.09 a las 9:39:
 
-- Los **colores de cada ámbito**: están en el sheets, pero necesitamos el archivo
-  o los códigos, porque el que nos pasaron no los traía.
-- Confirmar que la **aclaración metodológica de 2026** va en la pantalla del Plan
-  Rector y no solo en el reporte.
+> "Dale, nos sirve. Habíamos pensado mover toda la función de la herramienta
+> indicadores a proyectos, porque desde proyectos se editan las metas también.
+> Pero me gusta tu propuesta."
+
+Y repreguntaron, con razón:
+
+> "Si lo sacás del menú y dejás la pantalla del detalle viva para que el click
+> funcione, ¿desde dónde lo editaremos?"
+
+**Respuesta pendiente de enviar.** Está en preparación con el mapa de qué ofrece
+hoy cada pantalla, porque la respuesta honesta depende de si hay alguna función de
+la herramienta actual que no tenga lugar natural dentro de Proyectos. Si hay
+alguna, se dice, no se tapa.
+
+### 4. Avisos → **correo ahora, SMS después** ✔
+
+Se implementa el correo. El SMS queda documentado como "se puede sumar después".
+Razón: los 73 usuarios tienen correo cargado y ninguno tiene celular, así que el
+correo funciona desde el día uno y el SMS arrancaría con una campaña de carga de
+datos más un costo por mensaje.
+
+### 5. Contraseñas → **reset por correo** ✔
+
+Cada usuario pide "olvidé mi contraseña", recibe un enlace y la cambia solo.
+Planificación tiene un botón para dispararle ese correo a quien lo necesite.
+Nadie —ni nosotros— ve ni escribe la contraseña de otro en el medio.
+
+---
+
+## 12. Lo que sigue abierto
+
+**Imprimir reportes (D7).** Hay que preguntarle a Planificación **qué vieron
+exactamente** cuando el botón no les apareció. Hoy el botón está para cualquiera
+que vea el reporte, y Planificación ve todos, así que la falla no está donde
+parece. Sospecha: estaban en un reporte cuyo análisis todavía era borrador y lo
+que faltaba era el bloque del análisis, no el botón. Mientras no haya respuesta,
+el arreglo se hace defensivo: se revisa el gate igual y se deja explícito que
+Planificación imprime borrador y publicación.
+
+**POA 2027 (bloque G).** Sin definir si entra en este lote. **Default asumido:
+queda para después del 25 de septiembre**, para no arriesgar el reporte
+trimestral. Si el cliente lo necesita antes, hay que decidir qué se corre de
+lugar.
+
+**Para Planificación**, junto con las 8 preguntas del Plan Rector y las 6 del
+reporte que siguen sin respuesta:
+
+- Los **colores de cada ámbito**: dicen que están en el sheets, pero el archivo
+  que nos pasaron no los traía.
+- Si la **aclaración de que se trabaja con datos de 2026** va en la pantalla del
+  Plan Rector o solo en el reporte.
