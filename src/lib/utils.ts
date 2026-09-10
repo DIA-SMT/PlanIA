@@ -170,91 +170,14 @@ export function proyectoTieneSeguimiento(metas: { ultima_actualizacion: string |
   return metas.some((m) => m.ultima_actualizacion != null);
 }
 
-// Calcula el estado de un proyecto a partir de sus metas
-export function calcularEstadoProyecto(metas: {
-  estado_semaforo: EstadoSemaforo;
-  ultima_actualizacion: string | null;
-  tipo_medicion: string;
-  valor_actual: number | null;
-  valor_meta: number | null;
-  valor_linea_base: number | null;
-  nivel_actual: string | null;
-  escala_cualitativa: { niveles: { clave: string; valor_numerico: number }[] } | null;
-  metadata: Record<string, unknown>;
-}[]): { porcentaje: number | null; estado: EstadoSemaforo; tieneSeguimiento: boolean } {
-  if (metas.length === 0) return { porcentaje: null, estado: "sin_datos", tieneSeguimiento: false };
-
-  const tieneSeguimiento = metas.some((m) => m.ultima_actualizacion != null);
-
-  if (!tieneSeguimiento) {
-    return { porcentaje: null, estado: "sin_datos", tieneSeguimiento: false };
-  }
-
-  const porcentajes = metas
-    .map((m) => calcularPorcentajeMeta(m))
-    .filter((p): p is number => p !== null);
-
-  if (porcentajes.length === 0) return { porcentaje: 0, estado: "sin_datos", tieneSeguimiento };
-
-  const avg = Math.round(porcentajes.reduce((a, b) => a + b, 0) / porcentajes.length);
-  const rojas = metas.filter((m) => m.estado_semaforo === "rojo").length;
-
-  let estado: EstadoSemaforo;
-  if (rojas > 0) estado = "rojo";
-  else if (avg >= 70) estado = "verde";
-  else if (avg >= 40) estado = "amarillo";
-  else estado = "rojo";
-
-  return { porcentaje: avg, estado, tieneSeguimiento };
-}
-
-// Calcula el grado de avance de un proyecto a partir de SUS INDICADORES.
-// Cada indicador aporta:
-//   - numérico con objetivo: min(100, valor/objetivo*100)
-//   - texto/cualitativo: según su estado_semaforo (verde=100, amarillo=50, rojo=10)
-//   - sin datos: no cuenta
-export function calcularAvancePorIndicadores(
-  indicadores: {
-    valor_actual: number | null;
-    valor_objetivo: number | null;
-    valor_actual_texto?: string | null;
-    estado_semaforo: EstadoSemaforo;
-  }[]
-): { porcentaje: number | null; conDatos: number; total: number; estado: EstadoSemaforo } {
-  const total = indicadores.length;
-  if (total === 0) return { porcentaje: null, conDatos: 0, total: 0, estado: "sin_datos" };
-
-  const porEstado = (e: EstadoSemaforo) =>
-    e === "verde" ? 100 : e === "rojo" ? 10 : 50; // amarillo/sin_datos → 50 (en ejecución)
-
-  let suma = 0;
-  let cnt = 0;
-  for (const i of indicadores) {
-    if (i.valor_actual != null && i.valor_objetivo != null) {
-      // Numérico con objetivo → porcentaje real
-      const pct = i.valor_objetivo === 0
-        ? (i.valor_actual >= i.valor_objetivo ? 100 : 0)
-        : Math.max(0, Math.min(100, (i.valor_actual / i.valor_objetivo) * 100));
-      suma += pct;
-      cnt++;
-    } else if (i.valor_actual != null) {
-      // Numérico SIN objetivo cargado: igual cuenta como avance reportado
-      suma += porEstado(i.estado_semaforo);
-      cnt++;
-    } else if (!textoEsVacio(i.valor_actual_texto)) {
-      // Texto (Sí/No, Realizado) → según su semáforo. Los placeholders ("-",
-      // "N/A", etc.) no cuentan como dato.
-      suma += porEstado(i.estado_semaforo);
-      cnt++;
-    }
-  }
-
-  if (cnt === 0) return { porcentaje: null, conDatos: 0, total, estado: "sin_datos" };
-
-  const avg = Math.round(suma / cnt);
-  const estado: EstadoSemaforo = avg >= 70 ? "verde" : avg >= 40 ? "amarillo" : "rojo";
-  return { porcentaje: avg, conDatos: cnt, total, estado };
-}
+// Las dos funciones que vivian aca —calcularEstadoProyecto y
+// calcularAvancePorIndicadores— se borraron el 09.09 (parrafo 721). Eran la
+// tercera y la cuarta regla de semaforo del sistema, con umbrales propios
+// (verde desde el 70 %) y criterios distintos de los de abajo. La de
+// indicadores la usaba la pantalla /proyectos, que por eso marcaba 132
+// proyectos "Finalizados" contra los 73 del Panel Ejecutivo, 60 de ellos por
+// debajo del 100 %. La de metas era el fallback de ProyectoCard y no se
+// disparaba nunca. Ahora todo el sistema mide con la cascada de abajo.
 
 // ---------------------------------------------------------------------------
 // Cascada de avance: indicador → meta → proyecto → dirección (correcciones

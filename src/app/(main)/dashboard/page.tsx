@@ -117,6 +117,17 @@ export default async function DashboardPage({ searchParams }: Props) {
     return av.estado as "verde" | "amarillo" | "rojo";
   };
 
+  // Lo que recibe cada ProyectoCard. Desde el 09.09 el avance es obligatorio:
+  // la tarjeta ya no calcula nada por su cuenta.
+  const avanceCard = (proyectoId: string) => {
+    const av = avancePorProyecto.get(proyectoId);
+    return {
+      porcentaje: av?.pct ?? null,
+      estado: estadoProyecto({ id: proyectoId }),
+      tieneSeguimiento: (av?.conDatos ?? 0) > 0,
+    };
+  };
+
   // Distribución (conteo) de proyectos por estado, para un conjunto dado
   const distribucion = (pys: typeof proyectosActivos) => {
     const d = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
@@ -334,9 +345,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {proyectosFiltrados.map((py) => {
               const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-              const av = avancePorProyecto.get(py.id);
-              return <ProyectoCard key={py.id} proyecto={py} metas={metas}
-                avance={av ? { porcentaje: av.pct, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
+              return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} />;
             })}
           </div>
         ) : (
@@ -365,9 +374,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     {pysSec.slice(0, 9).map((py) => {
                       const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-                      const av = avancePorProyecto.get(py.id);
-                      return <ProyectoCard key={py.id} proyecto={py} metas={metas}
-                        avance={av ? { porcentaje: av.pct, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
+                      return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} />;
                     })}
                   </div>
                   {pysSec.length > 9 && (

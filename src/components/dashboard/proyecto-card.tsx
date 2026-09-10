@@ -2,20 +2,28 @@ import Link from "next/link";
 import type { Proyecto, Meta, EstadoSemaforo } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { formatFechaRelativa, calcularEstadoProyecto } from "@/lib/utils";
+import { formatFechaRelativa } from "@/lib/utils";
 
 interface ProyectoCardProps {
   proyecto: Proyecto;
   metas: Meta[];
-  // Avance precalculado (a partir de indicadores). Si viene, prevalece sobre el cálculo por metas.
-  avance?: { porcentaje: number | null; estado: EstadoSemaforo; tieneSeguimiento: boolean };
+  /**
+   * Avance ya calculado por quien renderiza, con la cascada del sistema
+   * (`avanceMetaEnPlazo` → `avanceAgregado`).
+   *
+   * Es OBLIGATORIO desde el 09.09. Antes era opcional y, si no venía, la
+   * tarjeta calculaba por su cuenta con `calcularEstadoProyecto`, que tenía
+   * umbrales propios (verde desde el 70 %) y además pintaba rojo el proyecto
+   * entero si UNA meta estaba roja. En la práctica no se disparaba nunca
+   * —el Panel siempre pasa el avance—, pero era una regla de semáforo más
+   * esperando a que alguien montara la tarjeta sin el dato. Las reglas de
+   * cálculo viven en un solo lugar y los componentes solo muestran.
+   */
+  avance: { porcentaje: number | null; estado: EstadoSemaforo; tieneSeguimiento: boolean };
 }
 
 export function ProyectoCard({ proyecto, metas, avance }: ProyectoCardProps) {
-  const calc = calcularEstadoProyecto(metas);
-  const porcentaje = avance ? avance.porcentaje : calc.porcentaje;
-  const estado = avance ? avance.estado : calc.estado;
-  const tieneSeguimiento = avance ? avance.tieneSeguimiento : calc.tieneSeguimiento;
+  const { porcentaje, estado, tieneSeguimiento } = avance;
 
   const ultimaAct = metas
     .map((m) => m.ultima_actualizacion)

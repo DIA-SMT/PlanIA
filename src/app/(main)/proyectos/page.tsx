@@ -8,12 +8,15 @@ import {
 } from "@/lib/queries";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import {
-  calcularAvancePorIndicadores,
+  avanceAgregado,
+  avanceMetaEnPlazo,
+  calcularPorcentajeMeta,
   coincideBusqueda,
   perfilVeTodo,
   normalizarBusqueda,
   subtreeUnidades,
   unidadesQuePuedeCargar,
+  type AvanceNivel,
 } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional } from "@/types/database";
 import { ProyectosSearch } from "./search";
@@ -62,6 +65,52 @@ export default async function ProyectosPage({ searchParams }: Props) {
     (childrenByParent.get(key) ?? childrenByParent.set(key, []).get(key)!).push(u);
   }
 
+  // -------------------------------------------------------
+  // Avance del proyecto — 09.09, párrafo 721
+  // -------------------------------------------------------
+  // Esta pantalla usaba `calcularAvancePorIndicadores`, que era una TERCERA
+  // regla de semáforo, distinta de la del resto del sistema: verde desde el
+  // 70 %, rojo valuado en 10 en vez de 0, y promediando solo los indicadores
+  // con dato en vez de todos. Resultado medido el 10.09 sobre los 441 proyectos
+  // activos: acá salían 132 "Finalizados" contra 73 en el Panel Ejecutivo, 60 de
+  // ellos por debajo del 100 % y 55 entre el 70 % y el 99 %. Y 113 proyectos
+  // (26 %) mostraban un estado distinto según la pantalla en la que se los
+  // mirara, con casos de 99 % acá contra 8 % allá.
+  //
+  // Eso es exactamente lo que reportaron: "todavía hay proyectos marcados como
+  // Finalizados (en verde), cuando tienen un porcentaje de avance mayor al 80%".
+  //
+  // Ahora usa la misma cascada que el Panel Ejecutivo, la TV, Avance por
+  // Dirección, las fotos de corte y el reporte trimestral: cada meta se deriva
+  // de sus indicadores y el proyecto es el promedio de sus metas, contando
+  // todas. Un solo número por proyecto en todo el sistema.
+  //
+  // `hoy` se calcula igual que en el Panel (UTC) A PROPÓSITO: si acá usara
+  // `hoyLocal()` las dos pantallas volverían a discrepar entre las 21 y las 24
+  // de Tucumán, que es justo el problema que este cambio cierra. La zona horaria
+  // es un arreglo aparte y afecta a seis pantallas.
+  const hoy = new Date().toISOString().slice(0, 10);
+  const avancePorProyecto = new Map<string, AvanceNivel>();
+  for (const py of proyectos) {
+    const metaPcts = (metasPorPy.get(py.id) ?? []).map(
+      (m) =>
+        avanceMetaEnPlazo(
+          indPorMeta.get(m.id) ?? [],
+          calcularPorcentajeMeta(m),
+          { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+          hoy
+        ).pct
+    );
+    avancePorProyecto.set(py.id, avanceAgregado(metaPcts));
+  }
+
+  /** Semáforo del proyecto, con el mismo criterio que el Panel Ejecutivo. */
+  const estadoProyecto = (proyectoId: string) => {
+    const av = avancePorProyecto.get(proyectoId);
+    if (!av || av.conDatos === 0) return "sin_datos" as const;
+    return av.estado;
+  };
+
   // Filtrado
   let proyectosFiltrados = proyectos;
   if (params.q) {
@@ -84,12 +133,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
     proyectosFiltrados = proyectosFiltrados.filter((p) => dirIds.has(p.unidad_id));
   }
   if (params.estado && params.estado !== "todos") {
-    proyectosFiltrados = proyectosFiltrados.filter((p) => {
-      const metas = metasPorPy.get(p.id) ?? [];
-      const inds = metas.flatMap((m) => indPorMeta.get(m.id) ?? []);
-      const { estado } = calcularAvancePorIndicadores(inds);
-      return estado === params.estado;
-    });
+    proyectosFiltrados = proyectosFiltrados.filter((p) => estadoProyecto(p.id) === params.estado);
   }
 
   // Construir el árbol Sec → (Sub) → Dir → Proyectos
@@ -132,9 +176,8 @@ export default async function ProyectosPage({ searchParams }: Props) {
             estado_semaforo: i.estado_semaforo,
           })),
         }));
-        // Avance del proyecto basado en SUS indicadores
-        const todosIndPy = metas.flatMap((m) => m.indicadores);
-        const avInd = calcularAvancePorIndicadores(todosIndPy);
+        // Avance del proyecto por la cascada del sistema (ver arriba)
+        const av = avancePorProyecto.get(py.id);
         result.push({
           id: py.id,
           codigo: py.codigo,
@@ -142,9 +185,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
           unidad_id: py.unidad_id,
           unidad_nombre: unidadById.get(py.unidad_id)?.nombre_corto ?? unidadById.get(py.unidad_id)?.nombre ?? null,
           metas,
-          porcentaje: avInd.porcentaje ?? 0,
-          estado: avInd.estado,
-          tieneSeguimiento: avInd.conDatos > 0,
+          porcentaje: av?.pct ?? 0,
+          estado: estadoProyecto(py.id),
+          tieneSeguimiento: (av?.conDatos ?? 0) > 0,
           puedeCargar: !!scopeUnidadesUsuario && scopeUnidadesUsuario.has(py.unidad_id),
         });
       }
