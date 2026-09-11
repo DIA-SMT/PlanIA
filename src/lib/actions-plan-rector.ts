@@ -171,6 +171,87 @@ export async function confirmarImputacion(input: {
   return { success: true };
 }
 
+/**
+ * Confirma varias propuestas de una. Solo admin_funcional.
+ *
+ * 11.09, pedido de Planificación: "faltaría asociar los proyectos a los ejes del
+ * plan rector; los que se pueda, el resto lo hacemos a mano". Son 441 proyectos:
+ * confirmar de a uno desde la ficha de cada uno son 441 pantallas, y eso no lo
+ * hace nadie. Con esto, un eje entero se confirma de un click.
+ *
+ * Todas se marcan como principal: un proyecto sin imputación previa no tiene con
+ * qué competir, y esta pantalla solo ofrece los que no tienen ninguna confirmada.
+ * Si alguno llegara a tener otra, `uq_ppr_principal` lo rechaza y esa fila vuelve
+ * en `fallidos` en vez de romper el lote entero — el resto se confirma igual.
+ */
+export async function confirmarImputacionesEnLote(input: {
+  vinculo_ids: string[];
+}): Promise<{ success: boolean; confirmados: number; fallidos: string[]; error?: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, confirmados: 0, fallidos: [], error: "No autenticado" };
+  if (perfil.rol !== "admin_funcional") {
+    return {
+      success: false,
+      confirmados: 0,
+      fallidos: [],
+      error: "Solo Planificación Estratégica confirma imputaciones",
+    };
+  }
+
+  const ids = [...new Set(input.vinculo_ids)].filter(Boolean);
+  if (ids.length === 0) {
+    return { success: false, confirmados: 0, fallidos: [], error: "No llegó ninguna imputación" };
+  }
+  // Tope por llamada: 441 de una sola vez es una transacción larga y un botón
+  // que parece colgado. La pantalla manda de a un eje.
+  if (ids.length > 200) {
+    return {
+      success: false,
+      confirmados: 0,
+      fallidos: [],
+      error: "Son demasiadas de una vez: confirmá por eje.",
+    };
+  }
+
+  const sb = await getSupabaseServer();
+  const { data, error: eLectura } = await sb
+    .from("proyecto_plan_rector")
+    .select("id, proyecto_id, nodo_id, estado")
+    .in("id", ids);
+  if (eLectura) return { success: false, confirmados: 0, fallidos: [], error: eLectura.message };
+
+  const filas = (data ?? []) as { id: string; proyecto_id: string; nodo_id: string; estado: string }[];
+  const pendientes = filas.filter((f) => f.estado === "propuesto");
+
+  const ahora = new Date().toISOString();
+  const fallidos: string[] = [];
+  let confirmados = 0;
+
+  for (const f of pendientes) {
+    const { error } = await sb
+      .from("proyecto_plan_rector")
+      .update({
+        estado: "confirmado",
+        principal: true,
+        confirmado_por: perfil.user_id,
+        confirmado_at: ahora,
+      })
+      .eq("id", f.id)
+      .eq("estado", "propuesto"); // si otro la tocó mientras tanto, no se pisa
+    if (error) {
+      fallidos.push(f.id);
+      continue;
+    }
+    confirmados++;
+    await registrarHistorial(f.proyecto_id, f.nodo_id, "confirmacion", "confirmado", true);
+    revalidar(f.proyecto_id);
+  }
+
+  revalidatePath("/plan-rector");
+  revalidatePath("/plan-rector/imputar");
+  return { success: true, confirmados, fallidos };
+}
+
 /** Rechaza una propuesta, con motivo obligatorio. Solo admin_funcional. */
 export async function rechazarImputacion(input: {
   vinculo_id: string;

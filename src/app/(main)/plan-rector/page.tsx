@@ -114,10 +114,20 @@ export default async function PlanRectorPage() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
           <span>{cobertura.imputados} imputados</span>
           <span>{cobertura.excluidos} declarados fuera del plan</span>
           <span className="font-medium text-foreground">{cobertura.pendientes} sin clasificar</span>
+          {/* 11.09: la pantalla de revisión en lote. Solo Planificación confirma,
+              así que solo ella la ve ofrecida — la página lo valida igual. */}
+          {perfil.rol === "admin_funcional" && cobertura.pendientes > 0 && (
+            <Link
+              href="/plan-rector/imputar"
+              className="text-primary hover:underline font-medium"
+            >
+              Asociar proyectos →
+            </Link>
+          )}
         </div>
 
         {/* 09.09, párrafo 703: la aclaración metodológica de que se trabaja con

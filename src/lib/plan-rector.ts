@@ -27,6 +27,7 @@ import {
   type NodoRectorArbol,
   type ImputacionProyecto,
   type ProyectoImputado,
+  type PropuestaPendiente,
 } from "./plan-rector-comun";
 import {
   avanceAgregado,
@@ -40,7 +41,7 @@ import {
 // (que usa getSupabaseServer) al bundle del browser.
 export type {
   TipoNodoRector, EstadoVinculoRector, NodoRector, NodoRectorArbol, ImputacionProyecto,
-  ProyectoImputado,
+  ProyectoImputado, PropuestaPendiente,
 } from "./plan-rector-comun";
 export { recortar, rotuloCorto, rotuloCobertura, colorAmbito } from "./plan-rector-comun";
 
@@ -300,6 +301,109 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
 
   return { arbol: raices, totalNodos: nodos.length };
 });
+
+/**
+ * Las propuestas sin confirmar, agrupadas por eje.
+ *
+ * 11.09: Planificación pidió asociar los proyectos a los ejes, "los que se pueda,
+ * el resto lo hacemos a mano". Son 441 proyectos y hasta ahora la única forma de
+ * confirmar era abrir la ficha de cada uno. Esta es la lectura que alimenta la
+ * pantalla de revisión en lote.
+ *
+ * Solo trae proyectos que NO tienen ya una imputación confirmada: lo que falta
+ * decidir, no lo ya decidido.
+ */
+export async function getPropuestasPendientes(): Promise<{
+  porEje: { eje_id: string; eje_nombre: string; eje_codigo: string | null; ambito_codigo: string | null; ambito_nombre: string; propuestas: PropuestaPendiente[] }[];
+  total: number;
+  sinPropuesta: number;
+}> {
+  const sb = await getSupabaseServer();
+  const { arbol } = await getPlanRectorArbol();
+
+  // Índice nodo -> eje y eje -> ámbito, para poder agrupar aunque la propuesta
+  // apunte a un objetivo o a una línea.
+  const ejeDe = new Map<string, { eje: NodoRectorArbol; ambito: NodoRectorArbol }>();
+  for (const amb of arbol) {
+    for (const eje of amb.hijos) {
+      const marcar = (n: NodoRectorArbol) => {
+        ejeDe.set(n.id, { eje, ambito: amb });
+        for (const h of n.hijos) marcar(h);
+      };
+      marcar(eje);
+    }
+  }
+
+  const { data, error } = await sb
+    .from("proyecto_plan_rector")
+    .select("id, proyecto_id, nodo_id, estado, justificacion");
+  if (error) {
+    if (tablaInexistente(error)) return { porEje: [], total: 0, sinPropuesta: 0 };
+    throw error;
+  }
+  const vinculos = (data ?? []) as { id: string; proyecto_id: string; nodo_id: string; estado: string; justificacion: string | null }[];
+
+  const yaConfirmado = new Set(vinculos.filter((v) => v.estado === "confirmado").map((v) => v.proyecto_id));
+  const propuestos = vinculos.filter((v) => v.estado === "propuesto" && !yaConfirmado.has(v.proyecto_id));
+
+  const { data: per } = await sb.from("periodo").select("id").eq("activo", true).maybeSingle();
+  if (!per) return { porEje: [], total: 0, sinPropuesta: 0 };
+
+  const { data: pys } = await sb
+    .from("proyecto")
+    .select("id, codigo, nombre, unidad:unidad_organizacional(nombre_corto, nombre)")
+    .eq("periodo_id", (per as { id: string }).id)
+    .eq("estado", "activo")
+    .is("deleted_at", null);
+  const proy = new Map((pys ?? []).map((p: any) => [p.id as string, p]));
+
+  const grupos = new Map<string, PropuestaPendiente[]>();
+  for (const v of propuestos) {
+    const p = proy.get(v.proyecto_id);
+    const ubic = ejeDe.get(v.nodo_id);
+    // Un vínculo a un proyecto que salió del POA o a un nodo dado de baja no se
+    // ofrece: no hay nada que confirmar ahí.
+    if (!p || !ubic) continue;
+    const fila: PropuestaPendiente = {
+      vinculo_id: v.id,
+      proyecto_id: v.proyecto_id,
+      proyecto_codigo: p.codigo ?? null,
+      proyecto_nombre: p.nombre,
+      area: p.unidad?.nombre_corto ?? p.unidad?.nombre ?? null,
+      justificacion: v.justificacion,
+      eje_id: ubic.eje.id,
+      eje_nombre: ubic.eje.nombre_corto ?? ubic.eje.nombre,
+      eje_codigo: ubic.eje.codigo_cliente,
+      ambito_codigo: ubic.ambito.codigo_cliente,
+      ambito_nombre: ubic.ambito.nombre_corto ?? ubic.ambito.nombre,
+    };
+    if (!grupos.has(fila.eje_id)) grupos.set(fila.eje_id, []);
+    grupos.get(fila.eje_id)!.push(fila);
+  }
+
+  const porEje = [...grupos.values()]
+    .map((propuestas) => {
+      propuestas.sort((a, b) => a.proyecto_nombre.localeCompare(b.proyecto_nombre, "es"));
+      const p0 = propuestas[0];
+      return {
+        eje_id: p0.eje_id,
+        eje_nombre: p0.eje_nombre,
+        eje_codigo: p0.eje_codigo,
+        ambito_codigo: p0.ambito_codigo,
+        ambito_nombre: p0.ambito_nombre,
+        propuestas,
+      };
+    })
+    .sort(
+      (a, b) =>
+        (a.ambito_codigo ?? "").localeCompare(b.ambito_codigo ?? "") ||
+        Number(a.eje_codigo ?? 0) - Number(b.eje_codigo ?? 0)
+    );
+
+  const total = porEje.reduce((n, g) => n + g.propuestas.length, 0);
+  const activos = (pys ?? []).length;
+  return { porEje, total, sinPropuesta: activos - yaConfirmado.size - total };
+}
 
 /** Lista plana de nodos imputables (eje, objetivo o línea) con su ruta legible. */
 export const getNodosImputables = cache(async function getNodosImputables(): Promise<

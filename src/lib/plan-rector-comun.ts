@@ -83,6 +83,28 @@ export function colorAmbito(codigo: string | null): string | null {
   return COLOR_AMBITO[codigo.trim().toUpperCase()] ?? null;
 }
 
+/**
+ * Una propuesta de imputación esperando confirmación, ya ubicada en su eje.
+ *
+ * Vive acá y no en plan-rector.ts porque la pantalla de revisión en lote es un
+ * componente de cliente: importar el tipo desde el módulo de servidor arrastra
+ * getSupabaseServer al bundle del browser y el build falla.
+ */
+export interface PropuestaPendiente {
+  vinculo_id: string;
+  proyecto_id: string;
+  proyecto_codigo: string | null;
+  proyecto_nombre: string;
+  area: string | null;
+  justificacion: string | null;
+  /** El eje al que se propone imputarlo (subiendo desde el nodo si hace falta). */
+  eje_id: string;
+  eje_nombre: string;
+  eje_codigo: string | null;
+  ambito_codigo: string | null;
+  ambito_nombre: string;
+}
+
 export interface ImputacionProyecto {
   id: string;
   nodo_id: string;
