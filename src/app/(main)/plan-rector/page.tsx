@@ -1,4 +1,5 @@
 import { getPeriodoActivo } from "@/lib/queries";
+import { getPerfilActual } from "@/lib/auth";
 import { getPlanRectorArbol, getCoberturaPlanRector } from "@/lib/plan-rector";
 import { NodoRector } from "@/components/plan-rector/nodo-rector";
 import { BackButton } from "@/components/layout/back-button";
@@ -6,6 +7,23 @@ import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 
 export const revalidate = 0;
+
+/**
+ * Quién entra al Plan Rector — 09.09, párrafo 715: "solo para Intendenta,
+ * Secretarios y Subsecretarios".
+ *
+ * Va acá y no solo en el menú: esconder un link no es un permiso, la URL sigue
+ * andando. Los dos roles de administración entran porque son los que mantienen
+ * la herramienta (Planificación es la que imputa los proyectos al plan); el
+ * pedido apuntaba al menú del director.
+ */
+const ROLES_PLAN_RECTOR = [
+  "intendenta",
+  "secretario",
+  "subsecretario",
+  "admin_funcional",
+  "admin_tecnico",
+];
 
 /**
  * Plan Rector — etapa 2: el árbol, en solo lectura.
@@ -20,6 +38,20 @@ export const revalidate = 0;
  * imputados. Es el dato que importa mientras se clasifica.
  */
 export default async function PlanRectorPage() {
+  const perfil = await getPerfilActual();
+  if (!perfil || !ROLES_PLAN_RECTOR.includes(perfil.rol)) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <BackButton fallback="/dashboard" />
+        <EmptyState
+          title="El Plan Rector no está disponible para tu perfil"
+          description="Lo consultan la Intendenta, las Secretarías y las Subsecretarías. Si necesitás ver el avance de tu área, usá Avance por Dirección o el Reporte trimestral."
+          icon="◇"
+        />
+      </div>
+    );
+  }
+
   const periodo = await getPeriodoActivo();
   const [{ arbol, totalNodos }, cobertura] = await Promise.all([
     getPlanRectorArbol(),

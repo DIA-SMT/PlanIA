@@ -226,13 +226,31 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
               <span className="text-xs text-muted/50">—</span>
             )}
           </div>
-          {/* Boton cargar avance — solo Director o admin */}
+          {/* Botón de avance de la meta — solo Director o admin.
+              09.09, párrafo 711: pidieron borrarlo porque "no hace nada". No es
+              así, y borrarlo habría sacado algo que se usa: escribe en la tabla
+              `avance`, que alimenta "Últimos avances" y la pantalla de
+              Validaciones, y tiene 231 registros, 202 de ellos de metas CON
+              indicadores y el último de ayer.
+              Lo que pasa es otra cosa: cuando la meta tiene indicadores, su
+              porcentaje sale de ellos, así que cargar acá no mueve el número — y
+              la etiqueta "Cargar avance" prometía justamente eso. Ahora el
+              botón dice qué hace en cada caso y el cartel de abajo lo explica. */}
           {puedeCargar && (meta.tipo_medicion !== "hito_unico" || meta.valor_actual !== 1) ? (
             <button
               onClick={() => setShowForm(!showForm)}
+              title={
+                indicadores.length > 0
+                  ? "Queda registrado y va a Validaciones. El porcentaje de esta meta sale de sus indicadores."
+                  : "Esta meta no tiene indicadores: su porcentaje sale de este valor."
+              }
               className="text-[10px] font-medium text-primary hover:text-primary-light transition-colors"
             >
-              {showForm ? "Cerrar" : "+ Cargar avance"}
+              {showForm
+                ? "Cerrar"
+                : indicadores.length > 0
+                ? "+ Registrar novedad"
+                : "+ Cargar avance"}
             </button>
           ) : null}
         </div>
@@ -267,10 +285,11 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
           {indicadores.length > 0 && (
             <p className="text-[11px] text-warning bg-warning/5 border border-warning/20 rounded-lg px-3 py-2">
               Esta meta tiene {indicadores.length}{" "}
-              {indicadores.length === 1 ? "indicador" : "indicadores"}: su avance se
-              calcula desde ellos, así que lo que cargues acá queda como registro pero
-              no mueve el porcentaje. Para que se refleje, cargá el valor en el
-              indicador que corresponda.
+              {indicadores.length === 1 ? "indicador" : "indicadores"}, así que su
+              porcentaje sale de ellos. Lo que escribas acá <strong>queda registrado</strong>{" "}
+              y pasa por Validaciones, pero no mueve el porcentaje. Para que se mueva,
+              cargá el valor en el indicador que corresponda —{" "}
+              {indicadores.length === 1 ? "está" : "están"} acá abajo.
             </p>
           )}
           <AvanceForm meta={meta} proyectoId={proyectoId} onClose={() => setShowForm(false)} />
