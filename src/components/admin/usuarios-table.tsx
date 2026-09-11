@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { actualizarPerfil, desactivarPerfil, eliminarUsuario } from "@/lib/actions";
+import { generarEnlaceRecuperacion } from "@/lib/actions-cuenta";
 import { formatTelefono, normalizarTelefono } from "@/lib/utils";
 import type { PerfilUsuario, UnidadOrganizacional, RolUsuario } from "@/types/database";
 
@@ -92,6 +93,8 @@ function UsuarioRow({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+  const [enlace, setEnlace] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const requierUnidad =
     rol === "secretario" || rol === "subsecretario" || rol === "director" || rol === "coordinador";
@@ -139,6 +142,27 @@ function UsuarioRow({
     startTransition(async () => {
       await desactivarPerfil(perfil.user_id);
     });
+  };
+
+  const generarEnlace = () => {
+    setError(null);
+    setCopiado(false);
+    startTransition(async () => {
+      const r = await generarEnlaceRecuperacion({ user_id: perfil.user_id });
+      if (!r.success) setError(r.error ?? "No se pudo generar el enlace");
+      else setEnlace(r.enlace);
+    });
+  };
+
+  const copiar = async () => {
+    if (!enlace) return;
+    try {
+      await navigator.clipboard.writeText(enlace);
+      setCopiado(true);
+    } catch {
+      // Sin permiso de portapapeles: el enlace está a la vista para copiarlo a mano.
+      setCopiado(false);
+    }
   };
 
   // Eliminar es irreversible, así que va con confirmación en dos pasos en vez
@@ -293,6 +317,18 @@ function UsuarioRow({
             <button onClick={onEdit} className="text-xs text-primary hover:text-primary-light">
               Editar
             </button>
+            {/* 09.09, párrafo 737: la herramienta para ayudar a quien no puede
+                entrar. Genera un enlace de un solo uso; nadie ve la contraseña. */}
+            {perfil.activo && (
+              <button
+                onClick={generarEnlace}
+                disabled={isPending}
+                title="Genera un enlace de un solo uso para que esta persona ponga su contraseña"
+                className="text-xs text-primary hover:text-primary-light disabled:opacity-50"
+              >
+                {isPending && enlace === null ? "Generando…" : "Dar acceso"}
+              </button>
+            )}
             {perfil.activo && (
               <button onClick={desactivar} className="text-xs text-warning hover:text-warning/80">
                 Desactivar
@@ -306,6 +342,38 @@ function UsuarioRow({
                 Eliminar
               </button>
             )}
+          </div>
+        )}
+        {enlace && (
+          <div className="mt-2 rounded-lg border border-primary/30 bg-primary/5 p-2 space-y-1.5 text-left">
+            <p className="text-[10px] text-foreground">
+              Enlace de un solo uso para{" "}
+              <strong>{perfil.nombre ?? perfil.email}</strong>. Mandáselo y que entre: lo
+              deja adentro y ahí pone su contraseña en <strong>Mi perfil</strong>.
+            </p>
+            <input
+              readOnly
+              value={enlace}
+              onClick={(ev) => ev.currentTarget.select()}
+              className="w-full text-[10px] font-mono bg-background border border-border rounded px-2 py-1 text-foreground"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copiar}
+                className="text-[10px] text-primary hover:text-primary-light"
+              >
+                {copiado ? "Copiado ✓" : "Copiar enlace"}
+              </button>
+              <button
+                onClick={() => {
+                  setEnlace(null);
+                  setCopiado(false);
+                }}
+                className="text-[10px] text-muted hover:text-foreground"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         )}
         {error && <p className="text-[10px] text-danger mt-1">{error}</p>}

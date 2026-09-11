@@ -196,6 +196,27 @@ export type UnidadResumen = Pick<
 
 export type ProyectoConUnidad = Proyecto & { unidad: UnidadResumen };
 
+/**
+ * Los proyectos del período: activos y no borrados. UN SOLO UNIVERSO.
+ *
+ * El filtro por `estado` se agregó el 09.09. Antes esta función traía también
+ * los pausados, y el filtro quedaba a criterio de cada pantalla: el Panel
+ * Ejecutivo y la TV filtraban (`dashboard/page.tsx:72`, `tv-panel.tsx:43`) y las
+ * otras cinco no, así que el Panel contaba 441 proyectos y /proyectos, /metas,
+ * /indicadores, /estructura y /avance-direcciones contaban 448. Al hacer clic en
+ * el KPI "Proyectos 441" del Panel se aterrizaba en una pantalla que encabezaba
+ * "448 de 448".
+ *
+ * Los 7 de diferencia son de la Dirección de Inteligencia Artificial, pausados
+ * directamente en la base a fines de junio: hoy la app no tiene ninguna pantalla
+ * para pausar ni reactivar un proyecto (`estado` solo se escribe como "activo" al
+ * crearlo, `actions.ts:1228`), y ninguno de los 7 tuvo nunca una carga de avance.
+ *
+ * "Activos y no borrados" es el criterio que ya usaban las fotos de corte
+ * (`corte-trimestral.ts:235`), el Plan Rector (`plan-rector.ts:233`), el
+ * asistente y el reporte trimestral, o sea el que produce los números oficiales
+ * que el cliente ya vio. Ahora lo usa todo el sistema desde un solo lugar.
+ */
 export const getProyectos = cache(async function getProyectos(
   periodoId: string
 ): Promise<ProyectoConUnidad[]> {
@@ -204,6 +225,7 @@ export const getProyectos = cache(async function getProyectos(
     .from("proyecto")
     .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto, nivel, parent_id)")
     .eq("periodo_id", periodoId)
+    .eq("estado", "activo")
     .is("deleted_at", null)
     .order("orden");
   if (error) throw error;
@@ -530,8 +552,25 @@ export const getResumenDashboard = cache(async function getResumenDashboard(peri
 // ---------------------------------------------------------------------------
 
 /**
- * Las alertas manuales que le llegaron al usuario y todavía están vigentes.
- * Ordenadas por fecha, las más nuevas primero. RLS ya acota a las propias.
+ * Las alertas manuales que le llegaron A ESTE usuario y todavía están vigentes.
+ * Ordenadas por fecha, las más nuevas primero.
+ *
+ * El `.eq("user_id", ...)` es imprescindible y se agregó el 09.09 (párrafo 765:
+ * "los avisos cuando uno toca el tilde o la opción de marcar todo como leído, no
+ * desaparece y dificulta la vista del buscador por área").
+ *
+ * Antes esta consulta no filtraba por usuario y confiaba en la RLS. Para un
+ * usuario común alcanzaba, pero la política de la migración 043 (líneas 103-108)
+ * le deja al admin leer las filas de TODOS los destinatarios. Y quien reportó el
+ * problema es admin: mandaba un aviso a los 72 y recibía 72 filas, 71 ajenas,
+ * todas sin leer. `marcarTodasLasAlertasLeidas` solo puede tocar las propias
+ * (`actions.ts:1553`, y la RLS de UPDATE también), así que esas 71 no se
+ * apagaban nunca: la campanita quedaba clavada en 9+ y `CartelAlertas` dibujaba
+ * un cartel por fila —hasta el tope de 50— que empujaba el título, el formulario
+ * y el buscador por área fuera de la pantalla.
+ *
+ * O sea que el problema no era que marcar como leído no guardara: era que la
+ * lista traía avisos de otra gente que el usuario no podía apagar.
  */
 export const getAlertasDelUsuario = cache(async function getAlertasDelUsuario(): Promise<
   AlertaConLectura[]
@@ -539,9 +578,13 @@ export const getAlertasDelUsuario = cache(async function getAlertasDelUsuario():
   const supabase = await getSupabaseServer();
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
   const { data, error } = await supabase
     .from("alerta_destinatario")
     .select("leida_at, alerta:alerta(*)")
+    .eq("user_id", userData.user.id)
     .order("created_at", { referencedTable: "alerta", ascending: false })
     .limit(50);
   if (error) throw error;

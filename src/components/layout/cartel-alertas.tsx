@@ -28,7 +28,7 @@ export function CartelAlertas({ alertas }: { alertas: AlertaConLectura[] }) {
   };
 
   return (
-    <div className="space-y-2 mb-4">
+    <div className="no-imprimir space-y-2 mb-4">
       {visibles.map((a) => (
         <div
           key={a.id}

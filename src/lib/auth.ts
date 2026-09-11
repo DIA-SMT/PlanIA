@@ -69,6 +69,53 @@ export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]>
 }
 
 /**
+ * Alcance de LECTURA de reportes: qué áreas puede ver un perfil en el reporte
+ * trimestral. Solo hacia abajo — su unidad y las que dependen de ella.
+ *
+ * Va aparte de `getScopeUnidades` a propósito (09.09, pedido del párrafo 732:
+ * "desde este perfil de director se puede ver este cuadro de desempeño que
+ * contiene la información de todas las subsecretarías de la Sec. Gral. Esto no
+ * puede ser así").
+ *
+ * `getScopeUnidades` es el alcance de CARGA, y desde el 26.08 al director le da
+ * también sus ancestros, porque se pidió que pudiera cargar proyectos en su
+ * secretaría (página 38). Eso está bien para escribir y está mal para leer: el
+ * reporte lo usaba como puerta y por eso un director veía el cuadro de toda la
+ * secretaría. Las dos reglas son distintas y ahora son dos funciones distintas;
+ * unificarlas volvería a romper una de las dos.
+ *
+ *   Director      → su dirección y sus departamentos
+ *   Subsecretario → su subsecretaría y las direcciones a su cargo
+ *   Secretario    → toda su secretaría
+ *   Intendenta / admins / `acceso_global` → todas
+ *
+ * Un rol desconocido o un perfil sin unidad se quedan SIN alcance. Es a
+ * propósito: acá el que falla, falla cerrado.
+ */
+export async function getScopeReporte(perfil: PerfilUsuario): Promise<string[]> {
+  const supabase = await getSupabaseServer();
+
+  const veTodo: RolUsuario[] = ["intendenta", "admin_funcional", "admin_tecnico"];
+  if (veTodo.includes(perfil.rol) || perfil.acceso_global === true) {
+    const { data } = await supabase
+      .from("unidad_organizacional")
+      .select("id")
+      .eq("activa", true);
+    return (data ?? []).map((u) => (u as { id: string }).id);
+  }
+
+  const porUnidad: RolUsuario[] = ["secretario", "subsecretario", "director", "coordinador"];
+  if (!porUnidad.includes(perfil.rol) || !perfil.unidad_id) return [];
+
+  // `unidades_descendientes` ya incluye la propia unidad y es recursiva
+  // (010_rbac.sql:60), así que un secretario recibe su secretaría completa.
+  const { data } = await supabase.rpc("unidades_descendientes", {
+    p_unidad_id: perfil.unidad_id,
+  });
+  return ((data ?? []) as { id: string }[]).map((row) => row.id);
+}
+
+/**
  * Lanza error si el perfil actual no tiene uno de los roles permitidos.
  * Para usar al inicio de Server Actions.
  */

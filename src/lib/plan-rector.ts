@@ -6,10 +6,18 @@
  *   área de intervención (5) → eje (17) → objetivo (19) → línea (63)
  * Los ODS cuelgan del eje, no de la línea: así viene el documento.
  *
- * Acá NO se calculan porcentajes todavía. El cálculo espera tres definiciones
- * del cliente (si un proyecto puede colgar de varios ejes, si "sin vínculo" es
- * válido, y a qué nivel hace falta el vínculo). Ver PLAN_RECTOR.md.
+ * Desde el 09.09 SÍ se calcula el avance (párrafo 703: "que se realice la
+ * medición en base a los ámbitos [...] pero no saquen las líneas estratégicas,
+ * déjenlas escritas, solo no las miden"). Era la definición que faltaba: el
+ * nivel al que había que medir. Se calcula para todo el árbol y la pantalla lo
+ * muestra solo en el ámbito.
+ *
+ * Sigue abierto a qué hacer si un proyecto cuelga de varios ejes y si "sin
+ * vínculo" es una respuesta válida. Ver PLAN_RECTOR.md.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Las filas que devuelve PostgREST con embeds vienen sin tipar; se validan al
+// mapearlas.
 import { cache } from "react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import {
@@ -18,15 +26,23 @@ import {
   type NodoRector,
   type NodoRectorArbol,
   type ImputacionProyecto,
+  type ProyectoImputado,
 } from "./plan-rector-comun";
+import {
+  avanceAgregado,
+  avanceMetaEnPlazo,
+  calcularPorcentajeMeta,
+  estadoDeAvance,
+} from "./utils";
 
 // Los tipos y los helpers puros viven en plan-rector-comun.ts para que los
 // componentes con "use client" puedan importarlos sin arrastrar este módulo
 // (que usa getSupabaseServer) al bundle del browser.
 export type {
   TipoNodoRector, EstadoVinculoRector, NodoRector, NodoRectorArbol, ImputacionProyecto,
+  ProyectoImputado,
 } from "./plan-rector-comun";
-export { recortar, rotuloCorto, rotuloCobertura } from "./plan-rector-comun";
+export { recortar, rotuloCorto, rotuloCobertura, colorAmbito } from "./plan-rector-comun";
 
 /**
  * true si el error es "esa tabla no existe".
@@ -50,6 +66,106 @@ function tablaInexistente(e: unknown): boolean {
 }
 
 const ARBOL_VACIO = { arbol: [] as NodoRectorArbol[], totalNodos: 0 };
+
+/**
+ * El avance de un conjunto de proyectos, con la cascada del sistema.
+ *
+ * Usa exactamente las mismas funciones que el Panel Ejecutivo, la TV, la lista
+ * de Proyectos, las fotos de corte y el reporte trimestral:
+ * `avanceMetaEnPlazo` → `avanceAgregado` → `estadoDeAvance`. No hay una fórmula
+ * del Plan Rector: si la hubiera, el ámbito diría un número y el Panel otro
+ * para los mismos proyectos, y la primera comparación rompería la confianza en
+ * las dos pantallas.
+ *
+ * Devuelve un Map solo con los proyectos que siguen VIVOS (activos, no
+ * borrados, del período en curso). Un vínculo a un proyecto que salió del POA
+ * no aparece, así que no infla ni ensucia el promedio del ámbito.
+ */
+async function avanceDeProyectosImputados(
+  supabase: Awaited<ReturnType<typeof getSupabaseServer>>,
+  proyectoIds: string[]
+): Promise<Map<string, ProyectoImputado>> {
+  const salida = new Map<string, ProyectoImputado>();
+  const ids = [...new Set(proyectoIds)];
+  if (ids.length === 0) return salida;
+
+  const { data: periodo } = await supabase
+    .from("periodo")
+    .select("id")
+    .eq("activo", true)
+    .maybeSingle();
+  if (!periodo) return salida;
+
+  const { data: pys } = await supabase
+    .from("proyecto")
+    .select("id, codigo, nombre, unidad:unidad_organizacional(nombre_corto, nombre)")
+    .in("id", ids)
+    .eq("periodo_id", (periodo as { id: string }).id)
+    .eq("estado", "activo")
+    .is("deleted_at", null);
+
+  const vivos = (pys ?? []) as any[];
+  if (vivos.length === 0) return salida;
+  const idsVivos = vivos.map((p) => p.id as string);
+
+  const [metasRes, indRes] = await Promise.all([
+    supabase
+      .from("meta")
+      .select(
+        "id, proyecto_id, tipo_medicion, valor_actual, valor_meta, valor_linea_base, nivel_actual, escala_cualitativa, metadata, fecha_inicio, fecha_limite"
+      )
+      .in("proyecto_id", idsVivos)
+      .is("deleted_at", null),
+    supabase
+      .from("indicador")
+      .select(
+        "id, meta_id, valor_actual, valor_objetivo, valor_actual_texto, estado_semaforo, metadata"
+      )
+      .is("deleted_at", null),
+  ]);
+
+  const metas = (metasRes.data ?? []) as any[];
+  const metaIds = new Set(metas.map((m) => m.id as string));
+  const indPorMeta = new Map<string, any[]>();
+  for (const i of (indRes.data ?? []) as any[]) {
+    if (!metaIds.has(i.meta_id)) continue;
+    if (!indPorMeta.has(i.meta_id)) indPorMeta.set(i.meta_id, []);
+    indPorMeta.get(i.meta_id)!.push(i);
+  }
+  const metasPorPy = new Map<string, any[]>();
+  for (const m of metas) {
+    if (!metasPorPy.has(m.proyecto_id)) metasPorPy.set(m.proyecto_id, []);
+    metasPorPy.get(m.proyecto_id)!.push(m);
+  }
+
+  // Mismo `hoy` que el Panel Ejecutivo y la lista de Proyectos, a propósito: si
+  // acá fuera `hoyLocal()` las pantallas discreparían entre las 21 y las 24 de
+  // Tucumán. La zona horaria es un arreglo aparte, y afecta a seis pantallas.
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  for (const p of vivos) {
+    const pcts = (metasPorPy.get(p.id) ?? []).map(
+      (m) =>
+        avanceMetaEnPlazo(
+          indPorMeta.get(m.id) ?? [],
+          calcularPorcentajeMeta(m),
+          { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+          hoy
+        ).pct
+    );
+    const av = avanceAgregado(pcts);
+    salida.set(p.id as string, {
+      id: p.id as string,
+      codigo: (p.codigo as string | null) ?? null,
+      nombre: p.nombre as string,
+      unidad_nombre: p.unidad?.nombre_corto ?? p.unidad?.nombre ?? null,
+      pct: av.conDatos === 0 ? null : av.pct,
+      estado: (av.conDatos === 0 ? "sin_datos" : av.estado) as ProyectoImputado["estado"],
+    });
+  }
+
+  return salida;
+}
 
 // ---------------------------------------------------------------------------
 // Jerarquía
@@ -81,7 +197,7 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
     // muestran aparte, en la pantalla de imputación.
     supabase
       .from("proyecto_plan_rector")
-      .select("nodo_id")
+      .select("nodo_id, proyecto_id")
       .eq("estado", "confirmado"),
   ]);
 
@@ -93,7 +209,6 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
   const nodos = (nodosRes.data ?? []) as NodoRector[];
 
   const odsPorNodo = new Map<string, { numero: number; nombre: string }[]>();
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   for (const fila of (odsRes.data ?? []) as any[]) {
     const o = fila.ods;
     if (!o) continue;
@@ -102,9 +217,27 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
   }
   for (const lista of odsPorNodo.values()) lista.sort((a, b) => a.numero - b.numero);
 
+  // Los proyectos imputados, con su avance. 09.09, párrafos 694 y 703: hay que
+  // poder ver qué proyectos contiene cada nodo y medir el avance del ámbito.
+  const vinculos = (vinculosRes.data ?? []) as { nodo_id: string; proyecto_id: string }[];
+  const proyectosPorNodo = await avanceDeProyectosImputados(
+    supabase,
+    vinculos.map((v) => v.proyecto_id)
+  );
+
   const imputadosPorNodo = new Map<string, number>();
-  for (const v of (vinculosRes.data ?? []) as { nodo_id: string }[]) {
+  const listaPorNodo = new Map<string, ProyectoImputado[]>();
+  for (const v of vinculos) {
+    const py = proyectosPorNodo.get(v.proyecto_id);
+    // Un vínculo a un proyecto que ya no está activo o fue borrado no cuenta:
+    // el ámbito no puede mostrar avance de algo que salió del POA.
+    if (!py) continue;
     imputadosPorNodo.set(v.nodo_id, (imputadosPorNodo.get(v.nodo_id) ?? 0) + 1);
+    if (!listaPorNodo.has(v.nodo_id)) listaPorNodo.set(v.nodo_id, []);
+    listaPorNodo.get(v.nodo_id)!.push(py);
+  }
+  for (const lista of listaPorNodo.values()) {
+    lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
   // Índice y armado del árbol.
@@ -116,6 +249,9 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
       ods: odsPorNodo.get(n.id) ?? [],
       imputados: imputadosPorNodo.get(n.id) ?? 0,
       imputadosSubarbol: 0,
+      proyectos: listaPorNodo.get(n.id) ?? [],
+      pct: null,
+      estado: "sin_datos",
     });
   }
   const raices: NodoRectorArbol[] = [];
@@ -137,10 +273,28 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
   };
   ordenar(raices);
 
-  // Acumulado del subárbol, de abajo hacia arriba.
-  const acumular = (n: NodoRectorArbol): number => {
-    n.imputadosSubarbol = n.imputados + n.hijos.reduce((a, h) => a + acumular(h), 0);
-    return n.imputadosSubarbol;
+  // Acumulado del subárbol, de abajo hacia arriba: la cantidad de proyectos y
+  // el avance.
+  //
+  // El avance del ámbito es el PROMEDIO SIMPLE de los porcentajes de los
+  // proyectos que cuelgan de él, sin ponderar por cantidad. Es la misma cuenta
+  // que hace el Panel Ejecutivo para un área, así que el número del Plan Rector
+  // y el del Panel hablan el mismo idioma — que es lo que sostiene que a nadie
+  // se le caiga la confianza en el tablero al comparar dos pantallas.
+  //
+  // Los proyectos sin dato cargado no entran en el promedio (son "sin datos",
+  // no "cero"), igual que en el resto del sistema.
+  const acumular = (n: NodoRectorArbol): ProyectoImputado[] => {
+    const propios = n.proyectos;
+    const deHijos = n.hijos.flatMap((h) => acumular(h));
+    const todos = [...propios, ...deHijos];
+    n.imputadosSubarbol = todos.length;
+    const conDato = todos.map((p) => p.pct).filter((x): x is number => x != null);
+    n.pct = conDato.length === 0 ? null : Math.round(conDato.reduce((a, b) => a + b, 0) / conDato.length);
+    // El cast es porque EstadoSemaforo incluye "gris", que estadoDeAvance no
+    // devuelve nunca: es para nodos inactivos y acá no hay.
+    n.estado = estadoDeAvance(n.pct) as NodoRectorArbol["estado"];
+    return todos;
   };
   for (const r of raices) acumular(r);
 

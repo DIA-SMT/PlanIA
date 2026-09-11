@@ -5,16 +5,25 @@ import {
   type ReporteUnidad,
 } from "@/lib/reporte-trimestral";
 import { formatFecha } from "@/lib/utils";
+import { finDeTrimestre } from "@/lib/corte-trimestral";
 import { AnexoMetodologico } from "./anexo-metodologico";
 
 const ORDINAL = ["", "Primer", "Segundo", "Tercer", "Cuarto"];
 
-/** Cómo se llama el área según su nivel, para los rótulos del documento. */
-function etiquetaNivel(nivel: number): string {
-  if (nivel === 0) return "Secretaría";
-  if (nivel === 1) return "Subsecretaría";
-  if (nivel === 2) return "Dirección";
-  return "Área";
+/**
+ * Cómo se llama esta área según su nivel, con su artículo.
+ *
+ * 09.09, párrafo 760: donde el documento decía "área" tiene que decir
+ * "Secretaría". No es un reemplazo a ciegas: el mismo informe se emite para
+ * secretaría, subsecretaría, dirección y departamento, así que el rótulo sale
+ * del nivel de la unidad. Y hace falta el artículo porque "Departamento" es
+ * masculino y los otros tres femeninos: sin esto quedaría "de la Departamento".
+ */
+function rotuloNivel(nivel: number): { nombre: string; dela: string } {
+  if (nivel === 0) return { nombre: "Secretaría", dela: "de la" };
+  if (nivel === 1) return { nombre: "Subsecretaría", dela: "de la" };
+  if (nivel === 2) return { nombre: "Dirección", dela: "de la" };
+  return { nombre: "Departamento", dela: "del" };
 }
 
 /**
@@ -34,18 +43,27 @@ export function ReporteDocumento({
   reporte,
   trimestre,
   anio,
+  emitidoEl,
   children,
 }: {
   reporte: ReporteUnidad;
   trimestre: number;
   anio: number;
+  /** Fecha de emisión (YYYY-MM-DD). Se imprime cuando el informe no sale de una foto. */
+  emitidoEl: string;
   /** El bloque 3 (el análisis), que es interactivo y viene de afuera. */
   children?: React.ReactNode;
 }) {
   const { totalUnidad: t, unidad } = reporte;
+  // El cierre del trimestre que este informe reporta. Sale de la misma función
+  // que usa todo el sistema, alimentada con una fecha del último mes del
+  // trimestre, para no repetir acá la regla de cuándo cierra cada uno.
+  const cierreDelTrimestre = finDeTrimestre(
+    `${anio}-${String(trimestre * 3).padStart(2, "0")}-01`
+  );
   const fase = faseInstitucional(t.pct);
   const nivel = unidad?.nivel ?? 0;
-  const etiqueta = etiquetaNivel(nivel);
+  const r = rotuloNivel(nivel);
   const conArbol = reporte.filas.length > 0;
   const conProyectos = reporte.proyectos.length > 0;
 
@@ -77,26 +95,56 @@ export function ReporteDocumento({
           </div>
           <div className="flex gap-2">
             <dt className="text-muted shrink-0">Datos al:</dt>
-            <dd className="text-foreground">
-              {reporte.corte
-                ? formatFecha(reporte.corte.fecha_corte)
-                : "hoy (vista previa, sin corte guardado)"}
+            <dd className="text-foreground font-medium">
+              {formatFecha(reporte.corte ? reporte.corte.fecha_corte : emitidoEl)}
             </dd>
           </div>
         </dl>
 
+        {/* ----------------------------------------------------------------
+            Aclaración de la fecha de los datos — 11.09.2026
+
+            Cuando el informe NO sale de una foto de cierre, los números son
+            los del día en que se emite. Esto va IMPRESO, no como aviso de
+            pantalla: el aviso de pantalla existía desde antes pero llevaba
+            `no-imprimir`, así que el papel —que es lo que se firma y se
+            archiva— salía sin ninguna marca y se leía como si fueran los
+            números del cierre.
+
+            Concreto: el informe del segundo trimestre de 2026 se emite en
+            septiembre y su cierre fue el 30 de junio. No hay foto de ese día
+            porque la función de guardarla se terminó después, y el registro
+            de cargas del sistema arranca el 31 de julio, así que tampoco se
+            puede reconstruir. Entre el cierre y la emisión hubo movimiento
+            real. Decirlo en el documento es la única forma de que el lector
+            sepa qué está leyendo.
+            ---------------------------------------------------------------- */}
         {reporte.origen === "vivo" && (
-          <p className="no-imprimir text-[11px] text-warning border border-warning/30 bg-warning/5 rounded px-2.5 py-1.5">
-            Vista previa con los datos de hoy. El reporte oficial se emite sobre una foto de
-            corte guardada, para que el número no cambie después de firmarlo.
-          </p>
+          <div className="rounded border border-warning/40 bg-warning/5 px-3 py-2 space-y-1">
+            <p className="text-xs font-semibold text-warning">
+              Aclaración sobre la fecha de los datos
+            </p>
+            <p className="text-[11px] text-foreground/90 leading-relaxed">
+              Las cifras de este informe corresponden al{" "}
+              <strong>{formatFecha(emitidoEl)}</strong>, que es el día de su emisión, y{" "}
+              <strong>no al cierre del trimestre</strong> ({formatFecha(cierreDelTrimestre)}).
+              El sistema no conserva un registro de cómo estaba el POA a esa fecha, así que el
+              estado del cierre no se puede reconstruir. Entre una fecha y la otra hubo
+              actualizaciones de metas e indicadores, de modo que estos valores difieren de
+              los que hubieran correspondido al cierre.
+            </p>
+            <p className="text-[11px] text-muted leading-relaxed">
+              A partir del cierre del tercer trimestre, cada informe se emite sobre el estado
+              guardado el día del cierre y sus cifras no vuelven a cambiar.
+            </p>
+          </div>
         )}
       </header>
 
       {/* ---------- Bloque 1: bloqueado ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          1. Desempeño de la {etiqueta} en el contexto municipal
+          1. Desempeño {r.dela} {r.nombre} en el contexto municipal
         </h2>
         <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-4 space-y-2">
           <p className="text-sm font-semibold text-warning">
@@ -118,7 +166,7 @@ export function ReporteDocumento({
             <strong className="text-foreground tabular-nums">
               {reporte.totalMunicipio.proyectos}
             </strong>{" "}
-            proyectos activos, y esta área{" "}
+            proyectos activos, y esta {r.nombre}{" "}
             <strong className="text-foreground tabular-nums">{t.proyectos}</strong>
             {reporte.totalMunicipio.proyectos > 0 && (
               <>
@@ -134,7 +182,7 @@ export function ReporteDocumento({
       {/* ---------- Bloque 2: estado general ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          2. Estado general de proyectos de la {etiqueta}
+          2. Estado general de proyectos {r.dela} {r.nombre}
         </h2>
         <p className="text-xs text-muted">
           Distribución cuantitativa absoluta del estado de los proyectos vigentes de la
@@ -148,7 +196,7 @@ export function ReporteDocumento({
                 <th>Total proyectos</th>
                 <th>🟢 Finalizados</th>
                 <th>🟡 En Ejecución</th>
-                <th>🔵 No Iniciados</th>
+                <th>🔴 No Iniciados</th>
                 <th>⚪ Sin Datos</th>
               </tr>
             </thead>
@@ -165,10 +213,11 @@ export function ReporteDocumento({
         </div>
 
         <p className="text-xs text-foreground/90">
-          Nivel de avance institucional del área:{" "}
+          Nivel de avance institucional {r.dela} {r.nombre}:{" "}
           <strong>
             {fase.icono} {fase.nombre}
           </strong>
+          <sup className="text-primary font-bold">*</sup>
           {t.pct != null ? (
             <>
               {" "}
@@ -176,25 +225,47 @@ export function ReporteDocumento({
               {t.proyectos - t.sin_datos} de {t.proyectos} proyectos con datos cargados.
             </>
           ) : (
-            <> — ningún proyecto del área tiene datos cargados al corte.</>
+            <> — ningún proyecto {r.dela} {r.nombre} tiene datos cargados al corte.</>
           )}
+        </p>
+
+        {/* 09.09, párrafo 761: la definición de ESTA fase al pie, para no tener
+            que ir al anexo. El texto sale de FASES, el mismo que usa el anexo. */}
+        <p className="text-[11px] text-muted leading-relaxed">
+          <span className="text-primary font-bold">*</span>{" "}
+          <strong className="text-foreground">
+            {fase.nombre} ({fase.rango}):
+          </strong>{" "}
+          {fase.texto}
         </p>
       </section>
 
-      {/* ---------- Bloque 4 (así numerado en la plantilla) ---------- */}
-      <section className="space-y-2 rompe-pagina">
+      {/* ---------- Bloque 3 ----------
+          Era "4." porque la plantilla del cliente numera así, con el análisis
+          como 3 aunque va después. El 09.09 (párrafo 752) pidieron corregirlo:
+          la numeración visible saltaba del 2 al 4. Se renumera en el lugar y no
+          se mueve nada, porque el bloque del análisis no lleva número propio,
+          así que el documento queda 1, 2, 3 sin reordenar contenido que el
+          cliente ya vio.
+
+          Sin la clase de salto de página desde el 09.09 (párrafo 755: todo
+          continuado y solo el anexo en hoja aparte). */}
+      <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          4. {conProyectos ? "Detalle de proyectos" : "Desempeño operativo por áreas"}
+          3.{" "}
+          {conProyectos
+            ? "Detalle de proyectos"
+            : "Desempeño operativo por dependencias"}
         </h2>
         <p className="text-xs text-muted">
           {conProyectos
-            ? "Estado de cada proyecto del área y nivel de actualización de su información en el sistema."
+            ? `Estado de cada proyecto ${r.dela} ${r.nombre} y nivel de actualización de su información en el sistema.`
             : "Volumen de gestión y nivel de actualización de la información por cada dependencia de la estructura orgánica."}
         </p>
 
         {!conArbol && !conProyectos ? (
           <p className="text-sm text-muted border border-border rounded-lg px-3 py-4 text-center">
-            Esta área no tiene proyectos cargados en el POA al momento del corte.
+            Esta {r.nombre} no tiene proyectos cargados en el POA al momento del corte.
           </p>
         ) : conProyectos ? (
           <TablaProyectos proyectos={reporte.proyectos} total={t} />
@@ -207,7 +278,7 @@ export function ReporteDocumento({
                   <th>Total</th>
                   <th>🟢</th>
                   <th>🟡</th>
-                  <th>🔵</th>
+                  <th>🔴</th>
                   <th>⚪</th>
                   <th>
                     Índice de carga
@@ -223,7 +294,7 @@ export function ReporteDocumento({
                   <FilasAnidadas key={(f.unidad_id ?? f.nombre) + f.tipo} fila={f} nivel={0} />
                 ))}
                 <tr className="total">
-                  <td className="izq">TOTAL {etiqueta.toUpperCase()}</td>
+                  <td className="izq">TOTAL {r.nombre.toUpperCase()}</td>
                   <td className="num">{t.proyectos}</td>
                   <td className="num">{t.finalizados}</td>
                   <td className="num">{t.en_ejecucion}</td>
@@ -239,15 +310,18 @@ export function ReporteDocumento({
         {reporte.indiceCargaProvisorio && !conProyectos && (
           <p className="text-[11px] text-warning">
             * <strong>Índice de carga: definición provisoria.</strong> La plantilla incluye la
-            columna pero no la define. Acá se calcula como la proporción de proyectos del área
+            columna pero no la define. Acá se calcula como la proporción de proyectos {r.dela} {r.nombre}
             con datos cargados, o sea el complemento de “Sin Datos”. Pendiente de confirmación
             de Planificación Estratégica.
           </p>
         )}
       </section>
 
-      {/* ---------- Bloque 3: el análisis (interactivo) ---------- */}
-      {children && <div className="rompe-pagina">{children}</div>}
+      {/* ---------- El análisis (interactivo) ----------
+          Sin salto de página desde el 09.09: abría hoja nueva y su hermano
+          inmediato, el anexo, también, así que dos saltos seguidos dejaban una
+          hoja casi vacía en el medio. Ahora solo el anexo abre página. */}
+      {children && <div>{children}</div>}
 
       {/* ---------- Anexo ---------- */}
       <AnexoMetodologico />
@@ -268,7 +342,7 @@ export function ReporteDocumento({
 const ICONO_ESTADO: Record<FilaProyecto["estado"], string> = {
   verde: "🟢",
   amarillo: "🟡",
-  rojo: "🔵",
+  rojo: "🔴",
   sin_datos: "⚪",
 };
 

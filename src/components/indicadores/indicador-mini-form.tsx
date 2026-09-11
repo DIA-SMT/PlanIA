@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { actualizarIndicador, crearIndicador } from "@/lib/actions";
+import Link from "next/link";
+import { crearIndicador } from "@/lib/actions";
+import { avanceIndicador, estadoDeAvance } from "@/lib/utils";
+import { IndicadorCargaForm } from "./indicador-carga-form";
+import { IndicadorAccionesBar } from "./indicador-acciones-bar";
 import type { Indicador } from "@/types/database";
 
 interface Props {
@@ -57,46 +61,101 @@ export function IndicadoresPanel({
         <p className="text-[10px] text-muted/50 italic">Sin indicadores cargados</p>
       ) : (
         <ul className="space-y-1">
-          {indicadores.map((ind) => (
-            <li key={ind.id} className="flex items-center gap-2 text-xs bg-border/20 rounded px-2 py-1.5">
-              <span className={`h-2 w-2 rounded-full shrink-0 ${
-                ind.estado_semaforo === "verde" ? "bg-success" :
-                ind.estado_semaforo === "amarillo" ? "bg-warning" :
-                ind.estado_semaforo === "rojo" ? "bg-info" : "bg-muted/40"
-              }`} />
-              <span className="flex-1 min-w-0 line-clamp-1">{ind.nombre}</span>
-              {editingId === ind.id ? (
-                <EditValue
-                  indicador={ind}
-                  onSubmit={(valor, objetivo) => {
-                    startTransition(async () => {
-                      await actualizarIndicador({
-                        indicador_id: ind.id,
-                        valor_actual: valor,
-                        valor_objetivo: objetivo,
-                        proyecto_id: proyectoId,
-                      });
-                      setEditingId(null);
-                    });
-                  }}
-                  onCancel={() => setEditingId(null)}
-                  isPending={isPending}
-                />
-              ) : (
-                <>
-                  <span className="text-muted shrink-0">
-                    {ind.valor_actual ?? "—"} / {ind.valor_objetivo ?? "—"} {ind.unidad_medida ?? ""}
-                  </span>
-                  <button
-                    onClick={() => setEditingId(ind.id)}
-                    className="text-[10px] text-primary hover:text-primary-light shrink-0"
+          {indicadores.map((ind) => {
+            const pct = avanceIndicador(ind);
+            const estado = estadoDeAvance(pct);
+            const abierto = editingId === ind.id;
+            const valor =
+              ind.valor_actual_texto ?? (ind.valor_actual != null ? String(ind.valor_actual) : "—");
+            const objetivo =
+              ind.valor_objetivo_texto ??
+              (ind.valor_objetivo != null ? String(ind.valor_objetivo) : "—");
+
+            return (
+              <li key={ind.id} className="bg-border/20 rounded px-2 py-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full shrink-0 ${
+                      estado === "verde"
+                        ? "bg-success"
+                        : estado === "amarillo"
+                        ? "bg-warning"
+                        : estado === "rojo"
+                        ? "bg-info"
+                        : "bg-muted/40"
+                    }`}
+                    title={pct == null ? "Sin dato cargado" : `${pct} % de avance`}
+                  />
+                  {/* 09.09, párrafo 768: el indicador se puede clickear y lleva
+                      a su ficha, que es donde está el historial de cargas. */}
+                  <Link
+                    href={`/indicadores/${ind.id}`}
+                    className="flex-1 min-w-0 line-clamp-1 hover:text-primary"
+                    title={ind.nombre}
                   >
-                    Cargar
-                  </button>
-                </>
-              )}
-            </li>
-          ))}
+                    {ind.nombre}
+                  </Link>
+                  <span className="text-muted shrink-0">
+                    {valor} / {objetivo} {ind.unidad_medida ?? ""}
+                  </span>
+                  {puedeEditar && (
+                    <button
+                      onClick={() => setEditingId(abierto ? null : ind.id)}
+                      className="text-[10px] text-primary hover:text-primary-light shrink-0"
+                    >
+                      {abierto ? "Cerrar" : "Editar"}
+                    </button>
+                  )}
+                </div>
+
+                {/* 09.09, párrafos 707 y 710: "toda la edición de indicadores
+                    pasa a PROYECTOS; el botón EDITAR despliega la herramienta de
+                    Indicadores tal cual está". Son literalmente los mismos dos
+                    componentes que monta /indicadores/[id], no una copia
+                    recortada: antes acá solo se podían escribir dos números
+                    (valor y objetivo) y para lo demás había que salir. */}
+                {abierto && puedeEditar && (
+                  <div className="mt-2 pt-2 border-t border-border/40 space-y-3">
+                    <IndicadorCargaForm
+                      indicadorId={ind.id}
+                      proyectoId={proyectoId}
+                      valorActual={ind.valor_actual}
+                      valorActualTexto={ind.valor_actual_texto}
+                      valorObjetivo={ind.valor_objetivo}
+                      valorObjetivoTexto={ind.valor_objetivo_texto}
+                      unidadMedida={ind.unidad_medida}
+                      observacion={ind.observacion}
+                      puedeCargar
+                    />
+                    <IndicadorAccionesBar
+                      indicadorId={ind.id}
+                      proyectoId={proyectoId}
+                      nombre={ind.nombre}
+                      unidadMedida={ind.unidad_medida}
+                      valorObjetivo={ind.valor_objetivo}
+                      valorObjetivoTexto={ind.valor_objetivo_texto}
+                      fechaInicio={ind.fecha_inicio}
+                      fechaFin={ind.fecha_fin}
+                      tieneValor={
+                        ind.valor_actual != null ||
+                        (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "")
+                      }
+                    />
+                    <p className="text-[10px] text-muted/70">
+                      El historial de cargas de este indicador está en{" "}
+                      <Link
+                        href={`/indicadores/${ind.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        su ficha
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -202,52 +261,9 @@ function CreateForm({
   );
 }
 
-function EditValue({
-  indicador,
-  onSubmit,
-  onCancel,
-  isPending,
-}: {
-  indicador: Indicador;
-  onSubmit: (valor: number, objetivo: number | null) => void;
-  onCancel: () => void;
-  isPending: boolean;
-}) {
-  const [valor, setValor] = useState(indicador.valor_actual?.toString() ?? "");
-  const [objetivo, setObjetivo] = useState(indicador.valor_objetivo?.toString() ?? "");
-  return (
-    <span className="flex items-center gap-1 shrink-0">
-      <input
-        type="number"
-        step="any"
-        value={valor}
-        onChange={(e) => setValor(e.target.value)}
-        autoFocus
-        placeholder="Actual"
-        title="Valor actual"
-        className="w-14 text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
-      />
-      <span className="text-muted text-[10px]">/</span>
-      <input
-        type="number"
-        step="any"
-        value={objetivo}
-        onChange={(e) => setObjetivo(e.target.value)}
-        placeholder="Objetivo"
-        title="Objetivo / meta a alcanzar"
-        className="w-14 text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
-      />
-      <button
-        onClick={() => valor && onSubmit(Number(valor), objetivo.trim() !== "" ? Number(objetivo) : null)}
-        disabled={isPending}
-        className="text-[10px] text-success hover:text-success/80 disabled:opacity-50"
-        title="Guardar"
-      >
-        ✓
-      </button>
-      <button onClick={onCancel} className="text-[10px] text-muted hover:text-foreground">
-        ✕
-      </button>
-    </span>
-  );
-}
+// Acá vivía `EditValue`, un formulario de dos campos (valor y objetivo) que era
+// la única forma de tocar un indicador desde el proyecto. Se borró el 09.09 al
+// traer la herramienta completa: tener dos formularios distintos para lo mismo
+// —uno con modo texto y observación, el otro sin— era una trampa, porque el
+// resultado dependía de por dónde hubieras entrado.
+

@@ -10,13 +10,16 @@ import type { AlertaConLectura, IndicadorPorVencer, RolUsuario } from "@/types/d
 
 type NavItem = { href: string; label: string; icon: string; roles?: RolUsuario[] };
 
+// Este es el SEGUNDO menú: la barra de abajo en celular. Sacar algo "del menú"
+// son los dos archivos, no solo el sidebar (09.09, párrafo 713). En el lugar
+// que dejan Indicadores y Estructura entra Reportes, que no estaba y es de lo
+// que más se va a usar de acá al cierre del trimestre.
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
-  { href: "/indicadores", label: "Indicadores", icon: "◉" },
+  { href: "/reportes", label: "Reportes", icon: "▢" },
   { href: "/agenda", label: "Agenda", icon: "▤" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
-  { href: "/estructura", label: "Estructura", icon: "◈" },
   {
     href: "/validaciones",
     label: "Validar",
@@ -98,10 +101,14 @@ export function Topbar({
           </span>
           {perfilNombre && (
             <div className="hidden md:flex items-center gap-2 text-xs">
-              <div className="text-right">
-                <p className="text-foreground font-medium">{perfilNombre}</p>
+              {/* 09.09, párrafo 737: el nombre lleva a Mi perfil, que es donde
+                  cada uno se cambia la contraseña. */}
+              <Link href="/perfil" className="text-right group" title="Mi perfil">
+                <p className="text-foreground font-medium group-hover:text-primary transition-colors">
+                  {perfilNombre}
+                </p>
                 {rol && <p className="text-muted text-[10px]">{rolLabels[rol]}</p>}
-              </div>
+              </Link>
               <button
                 onClick={logout}
                 title="Cerrar sesión"

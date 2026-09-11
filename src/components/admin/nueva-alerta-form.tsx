@@ -105,7 +105,26 @@ export function NuevaAlertaForm({ perfiles }: { perfiles: DestinatarioOpcion[] }
         destinatarios: modo === "todos" ? "todos" : [...elegidos],
       });
       if (r.success) {
-        setOk(`Aviso enviado a ${r.enviadas} ${r.enviadas === 1 ? "persona" : "personas"}.`);
+        // 09.09, párrafo 735: además de la campanita, el aviso va por correo.
+        // Se dice exactamente qué pasó con el correo en vez de dar un "enviado"
+        // a secas: si no está configurado o algo rebotó, quien lo mandó tiene
+        // que enterarse en el momento, no cuando alguien pregunte por qué no le
+        // llegó nada.
+        const base = `Aviso enviado a ${r.enviadas} ${r.enviadas === 1 ? "persona" : "personas"}.`;
+        const c = r.correo;
+        const detalleCorreo = !c
+          ? ""
+          : !c.configurado
+          ? " Por correo no salió: falta configurar el envío (avisale a Sistemas)."
+          : c.error
+          ? ` El correo falló: ${c.error}`
+          : c.enviados === 0
+          ? " Ninguno tenía correo cargado, así que solo les llega por la campanita."
+          : ` Por correo le llegó a ${c.enviados}.` +
+            (c.sinCorreo > 0
+              ? ` ${c.sinCorreo} no ${c.sinCorreo === 1 ? "tiene" : "tienen"} correo cargado.`
+              : "");
+        setOk(base + detalleCorreo);
         setTitulo("");
         setCuerpo("");
         setImportante(false);

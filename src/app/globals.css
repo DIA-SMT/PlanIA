@@ -104,6 +104,11 @@ html:not(.light) .logo-auto {
   border-top: 2px solid var(--mt);
 }
 
+/* Lo que existe solo en papel: en pantalla no se ve. Se usa para el análisis
+   del reporte, que en pantalla es un formulario y al imprimirse tiene que salir
+   como texto limpio (09.09, párrafos 748 y 749). */
+.solo-imprimir { display: none; }
+
 @media print {
   /* Fuera todo lo que no es el documento. El reporte se imprime solo. */
   aside,
@@ -112,6 +117,8 @@ html:not(.light) .logo-auto {
   .no-imprimir {
     display: none !important;
   }
+
+  .solo-imprimir { display: block; }
 
   /* Papel blanco y tinta negra, sin importar el tema de la pantalla. */
   :root, html.light {

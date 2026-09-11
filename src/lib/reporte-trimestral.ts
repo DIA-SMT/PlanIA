@@ -134,14 +134,54 @@ function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
  * ver con los del estado de un proyecto (verde a 100 en la cascada). Son dos
  * escalas distintas sobre cosas distintas, las dos definidas por el cliente.
  */
-export function faseInstitucional(pct: number | null): {
-  icono: string;
-  nombre: string;
-} {
-  if (pct == null || pct === 0) return { icono: "🔎", nombre: "Pendiente de Registro" };
-  if (pct >= 80) return { icono: "🎯", nombre: "Fase de Consolidación" };
-  if (pct >= 50) return { icono: "📋", nombre: "Fase de Desarrollo" };
-  return { icono: "📌", nombre: "Fase de Inicio" };
+/**
+ * Las cuatro fases institucionales, con el texto tal como lo escribió
+ * Planificación en su plantilla.
+ *
+ * Viven acá y no en el anexo porque desde el 09.09 se usan en dos lugares: el
+ * anexo, que las lista todas, y el pie del bloque 2, que muestra la definición
+ * de la fase que le tocó a esta área (párrafo 761: "un asterisco en la fase con
+ * su definición al pie, para no tener que ir al anexo"). Un solo texto para los
+ * dos, o se van a desincronizar.
+ */
+export const FASES = [
+  {
+    icono: "🎯",
+    nombre: "Fase de Consolidación",
+    rango: "80 % al 100 %",
+    texto:
+      "El área alcanzó el objetivo central o está muy cerca de la meta prevista para este trimestre, sosteniendo el ritmo del plan anual.",
+  },
+  {
+    icono: "📋",
+    nombre: "Fase de Desarrollo",
+    rango: "50 % al 79 %",
+    texto:
+      "El área se encuentra trabajando con una dinámica intermedia; los proyectos están en agenda activa y avanzando en territorio.",
+  },
+  {
+    icono: "📌",
+    nombre: "Fase de Inicio",
+    rango: "1 % al 49 %",
+    texto:
+      "El área fijó sus prioridades y tiene las primeras acciones registradas, requiriendo un espacio de acompañamiento técnico para acelerar el ritmo.",
+  },
+  {
+    icono: "🔎",
+    nombre: "Pendiente de Registro",
+    rango: "0 % o áreas sin carga",
+    texto:
+      "El sistema registra la hoja en blanco al momento del corte, señalando la necesidad de iniciar el proceso de carga digital junto a la Dirección de Planificación.",
+  },
+] as const;
+
+export type Fase = (typeof FASES)[number];
+
+export function faseInstitucional(pct: number | null): Fase {
+  if (pct == null || pct === 0) return FASES[3];
+  if (pct >= 80) return FASES[0];
+  if (pct >= 50) return FASES[1];
+  return FASES[2];
 }
 
 export interface AnalisisReporte {
@@ -337,13 +377,17 @@ export async function getReporteUnidad(opciones: {
   // número para todos los lectores—, y eso saltea la RLS. Sin este control,
   // cualquier pantalla que consuma esta capa con `?u=<uuid>` dejaría que un
   // director pida el id de otra área y reciba sus proyectos.
-  const { getPerfilActual, getScopeUnidades } = await import("@/lib/auth");
-  const { perfilVeTodo } = await import("@/lib/utils");
+  const { getPerfilActual, getScopeReporte } = await import("@/lib/auth");
   const perfil = await getPerfilActual();
   if (!perfil) throw new Error("No autenticado");
 
-  if (opciones.unidadId && !perfilVeTodo(perfil)) {
-    const scope = await getScopeUnidades(perfil);
+  // El alcance es el de LECTURA de reportes (solo hacia abajo), no el de carga.
+  // Antes usaba `getScopeUnidades`, que al director le da también sus ancestros,
+  // y por eso pasaba el control para el reporte de toda su secretaría (09.09,
+  // párrafo 732). `getScopeReporte` ya resuelve solo el caso "ve todas", así que
+  // acá no hace falta el atajo de `perfilVeTodo`.
+  if (opciones.unidadId) {
+    const scope = await getScopeReporte(perfil);
     if (!scope.includes(opciones.unidadId)) {
       throw new Error("No tenés acceso al reporte de esa área");
     }

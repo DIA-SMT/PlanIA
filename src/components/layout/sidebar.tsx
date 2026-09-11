@@ -12,15 +12,33 @@ type NavItem = {
   roles?: RolUsuario[]; // undefined = visible para todos los autenticados
 };
 
+// 09.09, párrafo 713: "eliminar la herramienta de indicadores" y sacar
+// ESTRUCTURA del tablero. Las dos salen del menú y las pantallas quedan vivas:
+// /indicadores/[id] es a donde lleva el click desde un proyecto (párrafo 768) y
+// a donde apunta la campanita cuando un indicador está por vencer.
+//
+// El listado general queda accesible desde la tarjeta "Indicadores" del Panel
+// Ejecutivo, que es la única pantalla donde se busca un indicador por nombre sin
+// saber de qué proyecto es. Ya hay un precedente del mismo tipo: /metas nunca
+// estuvo en el menú y se llega solo desde su tarjeta del Panel. Si el cliente
+// prefiere que no quede ninguna puerta, se saca ese link y listo.
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel Ejecutivo", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
-  { href: "/estructura", label: "Estructura", icon: "◈" },
-  { href: "/indicadores", label: "Indicadores", icon: "◉" },
   { href: "/avance-direcciones", label: "Avance por Dirección", icon: "📊" },
   // 24.08, página 36: "incorporar una herramienta para medir los avances del
   // Plan Rector", con la captura señalando este menú.
-  { href: "/plan-rector", label: "Plan Rector", icon: "◇" },
+  //
+  // 09.09, párrafo 715: solo Intendenta, Secretarios y Subsecretarios. Van
+  // también los dos roles de administración, que son los que la mantienen —
+  // Planificación es la que imputa los proyectos al plan. El pedido apuntaba al
+  // menú del director, que es el que no la tiene que ver.
+  {
+    href: "/plan-rector",
+    label: "Plan Rector",
+    icon: "◇",
+    roles: ["intendenta", "secretario", "subsecretario", "admin_funcional", "admin_tecnico"],
+  },
   // Reporte trimestral (pedido del 01.09). Lo ve cualquiera: cada uno accede
   // solo al de su alcance, y eso lo controla la capa de datos.
   { href: "/reportes", label: "Reportes", icon: "▢" },
