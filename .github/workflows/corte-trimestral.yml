@@ -8,16 +8,25 @@ name: Corte trimestral del POA
 # fechas escritas a mano se rompe callado el día que cambie el calendario del
 # POA. Corriendo todos los días, el filtro lo hace el endpoint con la fecha real.
 #
-# Horario: 12:00 UTC = 09:00 en Tucumán, con 12 horas de margen contra el
-# cambio de fecha. El horario NO es crítico porque el endpoint no pregunta "hoy
-# es el último día del trimestre" sino "quedó algún cierre sin foto": si una
-# corrida se atrasa o falla, la del día siguiente rescata el cierre y lo fecha
-# en el día correcto. Antes esto corría 23:30 UTC con media hora de margen, y un
-# atraso de la cola de Actions perdía el cierre para siempre informando éxito.
+# Horario: 02:00 UTC = 23:00 del día ANTERIOR en Tucumán (Argentina es UTC-3
+# todo el año). O sea que la corrida del 1 de octubre a las 02:00 UTC ve como
+# fecha local el 30 de septiembre y guarda el día del cierre COMPLETO, con las
+# cargas que entraron durante la última jornada.
+#
+# Estuvo en 12:00 UTC (09:00 de Tucumán) hasta el 11.09.2026. El problema de esa
+# hora no era técnico: la foto del cierre salía con el estado de la mañana y se
+# perdían las catorce horas restantes del día que el informe dice reportar, que
+# es justo cuando más se carga.
+#
+# Un atraso de la cola de Actions más allá de las 03:00 UTC hace que la fecha
+# local pase al 1 de octubre, pero eso ya no rompe nada: el endpoint no pregunta
+# "hoy es el último día del trimestre" sino "quedó algún cierre sin foto", así
+# que rescata el cierre y lo fecha en el día correcto. Esa red no existía cuando
+# se eligió el horario anterior, y es lo que hace segura esta hora.
 
 on:
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       fecha_corte:
@@ -77,7 +86,14 @@ jobs:
             exit 2
           fi
 
-          if grep -q '"omitido":true' "$RESP"; then
+          if grep -q '"cierre_perdido"' "$RESP"; then
+            # Un cierre que quedó sin foto y ya pasó la ventana de rescate. NO se
+            # inventa: guardar los datos de hoy fechados meses atrás seria
+            # afirmar algo falso sobre un día en el que nadie miró. Sale como
+            # aviso y no como error para no dejar el check en rojo todos los días
+            # por algo que ya no tiene arreglo.
+            echo "::warning::Hay un cierre sin foto fuera de la ventana de rescate. Ese trimestre no se puede reconstruir; el informe tiene que decir a qué fecha corresponden sus cifras."
+          elif grep -q '"omitido":true' "$RESP"; then
             echo "No falta ninguna foto de cierre: nada que hacer."
           elif grep -q '"rescatado":true' "$RESP"; then
             echo "::warning::Se rescató un cierre que no se había tomado el día del cierre. Revisar por qué falló la corrida de ese día."

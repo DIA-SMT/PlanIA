@@ -135,16 +135,55 @@ export function ultimoCierrePasado(fechaIso: string): string {
 }
 
 /**
- * ¿Falta la foto de un cierre que ya pasó?
+ * Cuántos días para atrás puede rescatarse un cierre sin foto.
  *
- * Devuelve la fecha del cierre pendiente, o null si ya está tomada. Es lo que
- * usa el proceso programado: en vez de exigir que HOY sea el último día del
- * trimestre —lo que hacía que un atraso en la cola de GitHub Actions perdiera
- * el cierre para siempre, informando éxito— el cron pregunta si quedó algún
- * cierre sin foto y lo rescata. Como corre todos los días, el reintento sale
- * gratis.
+ * El rescate existe para cubrir una corrida que falló o se atrasó: la cola de
+ * GitHub Actions demoró, el despliegue estaba a mitad de camino, se cayó la
+ * base un rato. Eso se mide en horas o en pocos días.
+ *
+ * Más allá de esa ventana el rescate deja de ser un rescate y pasa a ser una
+ * invención: la foto se llenaría con los datos de HOY y quedaría fechada en un
+ * cierre de hace meses, o sea un documento que afirma algo falso sobre una
+ * fecha en la que nadie miró. Diez días es holgado para cualquier falla real y
+ * corto para que eso no pase.
  */
-export async function cierrePendiente(fechaIso: string): Promise<string | null> {
+export const DIAS_MAXIMOS_DE_RESCATE = 10;
+
+/** Días entre dos fechas ISO (a - b). */
+function diasEntre(a: string, b: string): number {
+  return Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
+}
+
+export interface CierrePendiente {
+  /** El cierre sin foto, o null si no falta ninguno. */
+  fecha: string | null;
+  /**
+   * true si el cierre pasó hace más de `DIAS_MAXIMOS_DE_RESCATE` días. En ese
+   * caso NO hay que tomar la foto: los datos de hoy no son los de esa fecha.
+   */
+  vencido: boolean;
+  dias: number;
+}
+
+/**
+ * ¿Falta la foto de un cierre que ya pasó, y todavía se puede rescatar?
+ *
+ * Es lo que usa el proceso programado: en vez de exigir que HOY sea el último
+ * día del trimestre —lo que hacía que un atraso en la cola de GitHub Actions
+ * perdiera el cierre para siempre, informando éxito— el cron pregunta si quedó
+ * algún cierre sin foto y lo rescata. Como corre todos los días, el reintento
+ * sale gratis.
+ *
+ * El límite de días se agregó el 11.09.2026, y el caso que lo motivó es
+ * concreto: al 11 de septiembre el cierre pendiente es el del 30 de junio, de
+ * 73 días atrás, porque la función de sacar la foto se terminó después de ese
+ * cierre. Sin el límite, la primera corrida del cron habría guardado los datos
+ * de septiembre fechados el 30 de junio, y el informe del segundo trimestre
+ * habría pasado a decir "Datos al: 30/06/2026" sobre cifras de septiembre y sin
+ * la aclaración —que solo aparece cuando NO hay foto—. Justo lo contrario de lo
+ * que se acordó con Planificación.
+ */
+export async function cierrePendiente(fechaIso: string): Promise<CierrePendiente> {
   const cierre = ultimoCierrePasado(fechaIso);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
@@ -156,7 +195,10 @@ export async function cierrePendiente(fechaIso: string): Promise<string | null> 
   const filas = (data ?? []) as { completo?: boolean }[];
   // `completo` no existe hasta la 046: si viene undefined, la foto cuenta.
   const hayCompleta = filas.some((f) => f.completo !== false);
-  return hayCompleta ? null : cierre;
+  if (hayCompleta) return { fecha: null, vencido: false, dias: 0 };
+
+  const dias = diasEntre(fechaIso, cierre);
+  return { fecha: cierre, vencido: dias > DIAS_MAXIMOS_DE_RESCATE, dias };
 }
 
 /**
