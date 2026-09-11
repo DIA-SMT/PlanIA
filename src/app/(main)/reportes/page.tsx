@@ -215,7 +215,12 @@ export default async function ReportesPage({
         </div>
       ) : (
         reporte && (
-          <ReporteDocumento reporte={reporte} trimestre={trimestre} anio={anio}>
+          <ReporteDocumento
+            reporte={reporte}
+            trimestre={trimestre}
+            anio={anio}
+            emitidoEl={hoy}
+          >
             <AnalisisForm
               anio={anio}
               trimestre={trimestre}
