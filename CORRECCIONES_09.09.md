@@ -7,35 +7,50 @@
 
 ---
 
-## Estado de avance al 10.09
+## Estado de avance al 11.09
 
 | Etapa | Qué | Estado |
 |---|---|---|
-| 1 | El reporte deja de ver hacia arriba (A1) | **hecho** — `2a85a15` |
-| 2 | Una sola fórmula de semáforo (A2) | **hecho** — `0d73a44` + `3cfaff0` |
-| 2 | Los avisos leídos se van de la vista (A3) | **hecho** — `3e24e3f` |
-| 3 | Bloque D — las 7 correcciones del reporte | pendiente |
-| 4 | Bloque C — unificar Proyectos e Indicadores | pendiente |
-| 5 | Bloque B — Plan Rector | pendiente |
-| 6 | F (contraseñas) + H (fecha de carga) | pendiente |
-| 7 | E (avisos por correo) | pendiente |
-| 8 | G (POA 2027) | pendiente, y creció: ver abajo |
+| 1 | El reporte deja de ver hacia arriba (A1) | **hecho** |
+| 2 | Una sola fórmula de semáforo (A2) | **hecho** |
+| 2 | Los avisos leídos se van de la vista (A3) | **hecho** |
+| 3 | Bloque D — las 6 correcciones del reporte | **hecho** |
+| 4 | Bloque C — unificar Proyectos e Indicadores | **hecho** |
+| 5 | Bloque B — Plan Rector | **hecho**, pero sin datos que medir (ver abajo) |
+| 6 | F (contraseñas) + H (fecha de carga) + el texto de PRISMA | **hecho** |
+| 7 | E (avisos por correo) | **hecho**, falta la cuenta de correo |
+| 8 | G (POA 2027) | **abierto**: falta definición |
 
-Además salieron dos cosas que no estaban en el plan:
+**26 de los 27 pedidos están implementados.** Falta el POA 2027, que espera
+definición sobre si entra antes o después del informe del 25.
 
-- **Un bug del asistente, arreglado en el camino** (`3cfaff0`): preguntarle por
-  Secretaría General devolvía **0 proyectos** cuando tiene 217. Ver §13.1.
-- **El POA 2027 ya existe, y es el PRISMA.** El pedido #744 dice "esto
-  reemplazaría el PRISMA que no debe figurar en el PLANIA", y resulta que
-  `/poa-2027` son cinco pantallas ya construidas: la ficha PRISMA, con carga de
-  documento, instructivo y exportador. Así que "eliminar PRISMA" no es el ítem
-  corto que decía el plan: es sacar un subsistema entero. Y hay **2 fichas vivas,
-  una cargada el 10.09 a las 15:13**, o sea que alguien lo está usando. Antes de
-  tocarlo hay que preguntar qué se hace con lo ya cargado.
+### Tres cosas que no se resuelven con código
 
-Falta que alguien **entre a la campanita y al reporte con un usuario real** y
-confirme que se sienten bien: la app está detrás de login y desde acá no se puede
-comprobar la interacción, solo el cálculo y el render.
+**El Plan Rector no tiene nada que medir.** La herramienta calcula bien, pero
+hay **un solo vínculo proyecto–plan en toda la base y está en "propuesto"**: los
+confirmados son **0 de 441**. Los cinco ámbitos van a decir "sin datos" hasta que
+Planificación impute. La planilla que mandaron tenía la columna "Programas
+vinculados" vacía, así que la vinculación no existe como dato y hay que
+producirla, de a un proyecto desde su ficha. Es el cuello de botella del bloque.
+
+**El correo necesita una cuenta.** El código está puesto y no manda nada hasta
+que existan las variables `RESEND_API_KEY` y `CORREO_REMITENTE`. Abrir la cuenta
+y verificar el dominio `smt.gob.ar` necesita a quien administre el DNS del
+municipio.
+
+**Los 17 íconos de los ODS.** Hay que bajarlos de `argentina.un.org/es/sdgs` y
+copiarlos en `public/ods/` como `1.png` … `17.png`. Mientras no estén, cada ODS
+se muestra con su número y su color oficial, y las imágenes aparecen solas
+cuando se copien.
+
+### Y una que sí es urgente
+
+**No hay ninguna foto de corte guardada, y el informe comprometido para el 25 es
+el del segundo trimestre**, cuyo cierre fue el 30 de junio. Planificación ya
+escribió dos análisis, los dos de ese trimestre. Si se emite hoy, los números que
+salen son los de hoy debajo de un título que dice "segundo trimestre". No se
+arregla con código: el historial de carga arranca el 31.07 y cubre 229 de 1896
+indicadores. Hay que decidirlo con ellos esta semana.
 
 ---
 
