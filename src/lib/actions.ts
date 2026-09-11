@@ -1463,14 +1463,14 @@ export async function crearAlerta(input: {
   // Los destinatarios se resuelven acá, contra la base, y no se toma la lista
   // que venga del cliente como verdad: si mandaron ids, se intersecan con los
   // perfiles activos que existen de verdad.
-  let userIds: string[];
+  let destinatarios: { user_id: string; email: string | null }[];
   if (input.destinatarios === "todos") {
     const { data, error } = await sb
       .from("perfil_usuario")
-      .select("user_id")
+      .select("user_id, email")
       .eq("activo", true);
     if (error) return { success: false, error: error.message };
-    userIds = (data ?? []).map((p) => (p as { user_id: string }).user_id);
+    destinatarios = (data ?? []) as { user_id: string; email: string | null }[];
   } else {
     const pedidos = [...new Set(input.destinatarios)].filter(Boolean);
     if (pedidos.length === 0) {
@@ -1478,16 +1478,17 @@ export async function crearAlerta(input: {
     }
     const { data, error } = await sb
       .from("perfil_usuario")
-      .select("user_id")
+      .select("user_id, email")
       .eq("activo", true)
       .in("user_id", pedidos);
     if (error) return { success: false, error: error.message };
-    userIds = (data ?? []).map((p) => (p as { user_id: string }).user_id);
+    destinatarios = (data ?? []) as { user_id: string; email: string | null }[];
   }
 
-  if (userIds.length === 0) {
+  if (destinatarios.length === 0) {
     return { success: false, error: "No quedó ningún destinatario activo." };
   }
+  const userIds = destinatarios.map((d) => d.user_id);
 
   const { data: alerta, error: errAlerta } = await sb
     .from("alerta")
@@ -1518,9 +1519,37 @@ export async function crearAlerta(input: {
     return { success: false, error: `No se pudo repartir la alerta: ${errDest.message}` };
   }
 
+  // ---- Correo (09.09, párrafo 735) ----
+  // Va DESPUÉS de guardar y no puede tumbar nada: el aviso ya existe y se ve en
+  // la campanita, que es como funcionaba hasta ahora. Si el correo no está
+  // configurado o alguno rebota, se informa y listo — el aviso no se pierde.
+  const { enviarCorreoAVarios, correoDeAviso } = await import("./correo");
+  const correos = destinatarios
+    .map((d) => d.email)
+    .filter((e): e is string => !!e && e.includes("@"));
+
+  const urlApp = process.env.PLANIA_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? null;
+  const { asunto, texto, html } = correoDeAviso({
+    titulo,
+    cuerpo,
+    importante: input.importante ?? false,
+    deQuien: perfil.nombre ?? null,
+    urlApp: urlApp ? `${urlApp.replace(/\/$/, "")}/dashboard` : null,
+  });
+  const correo = await enviarCorreoAVarios({ para: correos, asunto, texto, html });
+
   revalidatePath("/admin/alertas");
   revalidatePath("/dashboard");
-  return { success: true, enviadas: userIds.length };
+  return {
+    success: true,
+    enviadas: userIds.length,
+    correo: {
+      configurado: correo.configurado,
+      enviados: correo.enviados,
+      sinCorreo: destinatarios.length - correos.length,
+      error: correo.errores[0] ?? null,
+    },
+  };
 }
 
 /** Marca como leída una alerta propia. La RLS acota a las del usuario. */
