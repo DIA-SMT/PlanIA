@@ -86,32 +86,17 @@ export default async function Poa2027Landing() {
         </div>
       )}
 
-      {/* Estructura PRISMA explicada */}
-      <section>
-        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
-          ¿Qué es PRISMA?
-        </h2>
-        <div className="rounded-xl border border-border bg-surface divide-y divide-border">
-          {[
-            ["P", "Programa / Proyecto", "Nombre del programa o proyecto planificado."],
-            ["R", "Relevancia", "Descripción y objetivo: por qué es importante."],
-            ["I", "Indicador", "Cómo se mide el avance o cumplimiento."],
-            ["S", "Secretaría", "Secretaría a la que pertenece."],
-            ["M", "Meta anual", "Meta concreta a alcanzar en 2027."],
-            ["A", "Ancla (línea de base)", "Punto de partida / valor de referencia actual."],
-          ].map(([letra, titulo, desc]) => (
-            <div key={letra} className="flex items-center gap-3 p-3">
-              <span className="h-8 w-8 rounded bg-primary/20 text-primary flex items-center justify-center text-sm font-bold shrink-0">
-                {letra}
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-foreground">{titulo}</p>
-                <p className="text-[11px] text-muted">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* 09.09, párrafo 744: "eliminar lo que dice ¿Qué es PRISMA?".
+          Era un bloque que desplegaba la sigla letra por letra (Programa,
+          Relevancia, Indicador, Secretaría, Meta anual, Ancla). Se saca de acá
+          nomás: la explicación de cómo llenar la ficha está en el instructivo,
+          que es el PDF de arriba.
+
+          Ojo con el alcance de este pedido, que es más chico de lo que parece.
+          El mismo párrafo dice que el duplicado editable del POA 2026
+          "reemplazaría el PRISMA", pero lo que piden borrar hoy es este texto,
+          no las cinco pantallas. Y hay fichas cargadas de verdad, una del 10.09,
+          así que sacar el flujo entero se decide aparte y con ellos. */}
     </div>
   );
 }

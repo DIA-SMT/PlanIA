@@ -127,6 +127,24 @@ export function formatFecha(fecha: string | null): string {
   });
 }
 
+/**
+ * Fecha y hora exactas, para "última carga".
+ *
+ * 09.09, párrafo 740: la tarjeta de la meta decía "Última actualización: Hace 1
+ * mes(es)" y pidieron la fecha exacta. Va con la hora porque una carga pasa en
+ * un momento puntual y dos cargas del mismo día se distinguen.
+ */
+export function formatFechaHora(fecha: string | null): string {
+  if (!fecha) return "—";
+  return new Date(fecha).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function calcularPorcentajeMeta(meta: {
   tipo_medicion: string;
   valor_actual: number | null;

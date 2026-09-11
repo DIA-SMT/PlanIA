@@ -101,10 +101,14 @@ export function Topbar({
           </span>
           {perfilNombre && (
             <div className="hidden md:flex items-center gap-2 text-xs">
-              <div className="text-right">
-                <p className="text-foreground font-medium">{perfilNombre}</p>
+              {/* 09.09, párrafo 737: el nombre lleva a Mi perfil, que es donde
+                  cada uno se cambia la contraseña. */}
+              <Link href="/perfil" className="text-right group" title="Mi perfil">
+                <p className="text-foreground font-medium group-hover:text-primary transition-colors">
+                  {perfilNombre}
+                </p>
                 {rol && <p className="text-muted text-[10px]">{rolLabels[rol]}</p>}
-              </div>
+              </Link>
               <button
                 onClick={logout}
                 title="Cerrar sesión"

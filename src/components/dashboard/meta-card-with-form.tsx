@@ -4,7 +4,13 @@ import { useState, useTransition } from "react";
 import type { Meta, Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta, avanceMetaEnPlazo, semaforoTextColor, formatFechaRelativa } from "@/lib/utils";
+import {
+  calcularPorcentajeMeta,
+  avanceMetaEnPlazo,
+  semaforoTextColor,
+  formatFechaRelativa,
+  formatFechaHora,
+} from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
 import { AvanceForm } from "./avance-form";
 import { IndicadoresPanel } from "@/components/indicadores/indicador-mini-form";
@@ -261,8 +267,14 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
           <PlazoBadge inicio={meta.fecha_inicio} fin={meta.fecha_limite} hoy={hoy}
             cumplido={av.pct != null && av.pct >= 100} />
           {meta.peso != null && <span>Peso: {meta.peso}</span>}
+          {/* 09.09, párrafo 740: "en vez que diga así, podría decir exactamente
+              la fecha de última carga?". Decía "Hace 1 mes(es)". Ahora va la
+              fecha exacta y el relativo queda en el globito, que para mirar de
+              reojo sigue siendo más rápido. */}
           {metaPropioSeg && meta.ultima_actualizacion && (
-            <span>Última actualización: {formatFechaRelativa(meta.ultima_actualizacion)}</span>
+            <span title={formatFechaRelativa(meta.ultima_actualizacion)}>
+              Última carga: {formatFechaHora(meta.ultima_actualizacion)}
+            </span>
           )}
         </div>
       )}

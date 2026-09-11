@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Proyecto, Meta, EstadoSemaforo } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { formatFechaRelativa } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa } from "@/lib/utils";
 
 interface ProyectoCardProps {
   proyecto: Proyecto;
@@ -66,7 +66,9 @@ export function ProyectoCard({ proyecto, metas, avance }: ProyectoCardProps) {
       <div className="flex items-center justify-between mt-2 text-xs text-muted">
         <span>{metas.length} metas</span>
         {tieneSeguimiento ? (
-          <span>{formatFechaRelativa(ultimaAct)}</span>
+          // Fecha exacta, igual que en la tarjeta de la meta (09.09, párrafo
+          // 740). El relativo queda en el globito.
+          <span title={formatFechaRelativa(ultimaAct)}>{formatFecha(ultimaAct)}</span>
         ) : (
           <span className="text-primary/60">Sin seguimiento</span>
         )}
