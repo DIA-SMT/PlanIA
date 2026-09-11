@@ -80,22 +80,38 @@ export async function POST(req: NextRequest) {
   // del 2 o la del 3 lo rescata sola, y la fecha del corte queda en el cierre
   // real, no en el día que corrió.
   if (cuerpo.solo_fin_de_trimestre) {
-    let pendiente: string | null;
+    let pendiente: Awaited<ReturnType<typeof cierrePendiente>>;
     try {
       pendiente = await cierrePendiente(hoy);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return Response.json({ error: `No se pudo consultar el cierre pendiente: ${msg}` }, { status: 500 });
     }
-    if (!pendiente) {
+    if (!pendiente.fecha) {
       return Response.json({
         omitido: true,
         motivo: `el cierre del ${ultimoCierrePasado(hoy)} ya tiene su foto`,
         proximo_cierre: finDeTrimestre(hoy),
       });
     }
+    // Un cierre viejo NO se rescata: la foto se llenaría con los datos de hoy y
+    // quedaría fechada meses atrás, afirmando algo falso sobre un día en el que
+    // nadie miró. Se responde 200 para no dejar el check en rojo todos los días
+    // por algo que ya no tiene arreglo, pero se dice fuerte que ese cierre se
+    // perdió, para que el workflow lo marque como aviso.
+    if (pendiente.vencido) {
+      return Response.json({
+        omitido: true,
+        cierre_perdido: pendiente.fecha,
+        dias: pendiente.dias,
+        motivo:
+          `el cierre del ${pendiente.fecha} no tiene foto y pasaron ${pendiente.dias} días: ` +
+          `ya no se puede reconstruir, y guardarlo con los datos de hoy seria inventar ese dia`,
+        proximo_cierre: finDeTrimestre(hoy),
+      });
+    }
     // Se fecha en el cierre, no en hoy.
-    fechaCorte = pendiente;
+    fechaCorte = pendiente.fecha;
   }
 
   try {
