@@ -12,32 +12,16 @@
  * reporte es el que el cliente ya definió por escrito.
  */
 
-const FASES = [
-  {
-    icono: "🎯",
-    titulo: "Fase de Consolidación (80 % al 100 %)",
-    texto:
-      "El área alcanzó el objetivo central o está muy cerca de la meta prevista para este trimestre, sosteniendo el ritmo del plan anual.",
-  },
-  {
-    icono: "📋",
-    titulo: "Fase de Desarrollo (50 % al 79 %)",
-    texto:
-      "El área se encuentra trabajando con una dinámica intermedia; los proyectos están en agenda activa y avanzando en territorio.",
-  },
-  {
-    icono: "📌",
-    titulo: "Fase de Inicio (1 % al 49 %)",
-    texto:
-      "El área fijó sus prioridades y tiene las primeras acciones registradas, requiriendo un espacio de acompañamiento técnico para acelerar el ritmo.",
-  },
-  {
-    icono: "🔎",
-    titulo: "Pendiente de Registro (0 % o áreas sin carga)",
-    texto:
-      "El sistema registra la hoja en blanco al momento del corte, señalando la necesidad de iniciar el proceso de carga digital junto a la Dirección de Planificación.",
-  },
-];
+import { FASES } from "@/lib/reporte-trimestral";
+
+// Las definiciones viven en `reporte-trimestral.ts` desde el 09.09: el pie del
+// bloque 2 muestra la de la fase que le tocó al área, y si hubiera dos copias
+// se desincronizarían.
+const FASES_ANEXO = FASES.map((f) => ({
+  icono: f.icono,
+  titulo: `${f.nombre} (${f.rango})`,
+  texto: f.texto,
+}));
 
 const ESTADOS = [
   {
@@ -53,7 +37,7 @@ const ESTADOS = [
       "Proyectos activos en territorio que se encuentran documentando tareas y avances físicos dentro de los plazos vigentes.",
   },
   {
-    icono: "🔵",
+    icono: "🔴",
     titulo: "No Iniciados",
     texto:
       "Acciones contempladas en la planificación anual del área, pero cuya fecha operativa de inicio está prevista para meses o trimestres posteriores.",
@@ -93,7 +77,7 @@ export function AnexoMetodologico() {
             A. Niveles de avance institucional (para secretarías, subsecretarías y direcciones)
           </p>
           <ul className="space-y-2">
-            {FASES.map((f) => (
+            {FASES_ANEXO.map((f) => (
               <li key={f.titulo} className="flex gap-2.5 text-sm">
                 <span className="shrink-0" aria-hidden="true">
                   {f.icono}

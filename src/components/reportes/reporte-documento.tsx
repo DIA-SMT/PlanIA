@@ -9,12 +9,20 @@ import { AnexoMetodologico } from "./anexo-metodologico";
 
 const ORDINAL = ["", "Primer", "Segundo", "Tercer", "Cuarto"];
 
-/** Cómo se llama el área según su nivel, para los rótulos del documento. */
-function etiquetaNivel(nivel: number): string {
-  if (nivel === 0) return "Secretaría";
-  if (nivel === 1) return "Subsecretaría";
-  if (nivel === 2) return "Dirección";
-  return "Área";
+/**
+ * Cómo se llama esta área según su nivel, con su artículo.
+ *
+ * 09.09, párrafo 760: donde el documento decía "área" tiene que decir
+ * "Secretaría". No es un reemplazo a ciegas: el mismo informe se emite para
+ * secretaría, subsecretaría, dirección y departamento, así que el rótulo sale
+ * del nivel de la unidad. Y hace falta el artículo porque "Departamento" es
+ * masculino y los otros tres femeninos: sin esto quedaría "de la Departamento".
+ */
+function rotuloNivel(nivel: number): { nombre: string; dela: string } {
+  if (nivel === 0) return { nombre: "Secretaría", dela: "de la" };
+  if (nivel === 1) return { nombre: "Subsecretaría", dela: "de la" };
+  if (nivel === 2) return { nombre: "Dirección", dela: "de la" };
+  return { nombre: "Departamento", dela: "del" };
 }
 
 /**
@@ -45,7 +53,7 @@ export function ReporteDocumento({
   const { totalUnidad: t, unidad } = reporte;
   const fase = faseInstitucional(t.pct);
   const nivel = unidad?.nivel ?? 0;
-  const etiqueta = etiquetaNivel(nivel);
+  const r = rotuloNivel(nivel);
   const conArbol = reporte.filas.length > 0;
   const conProyectos = reporte.proyectos.length > 0;
 
@@ -96,7 +104,7 @@ export function ReporteDocumento({
       {/* ---------- Bloque 1: bloqueado ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          1. Desempeño de la {etiqueta} en el contexto municipal
+          1. Desempeño {r.dela} {r.nombre} en el contexto municipal
         </h2>
         <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-4 space-y-2">
           <p className="text-sm font-semibold text-warning">
@@ -118,7 +126,7 @@ export function ReporteDocumento({
             <strong className="text-foreground tabular-nums">
               {reporte.totalMunicipio.proyectos}
             </strong>{" "}
-            proyectos activos, y esta área{" "}
+            proyectos activos, y esta {r.nombre}{" "}
             <strong className="text-foreground tabular-nums">{t.proyectos}</strong>
             {reporte.totalMunicipio.proyectos > 0 && (
               <>
@@ -134,7 +142,7 @@ export function ReporteDocumento({
       {/* ---------- Bloque 2: estado general ---------- */}
       <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          2. Estado general de proyectos de la {etiqueta}
+          2. Estado general de proyectos {r.dela} {r.nombre}
         </h2>
         <p className="text-xs text-muted">
           Distribución cuantitativa absoluta del estado de los proyectos vigentes de la
@@ -148,7 +156,7 @@ export function ReporteDocumento({
                 <th>Total proyectos</th>
                 <th>🟢 Finalizados</th>
                 <th>🟡 En Ejecución</th>
-                <th>🔵 No Iniciados</th>
+                <th>🔴 No Iniciados</th>
                 <th>⚪ Sin Datos</th>
               </tr>
             </thead>
@@ -165,10 +173,11 @@ export function ReporteDocumento({
         </div>
 
         <p className="text-xs text-foreground/90">
-          Nivel de avance institucional del área:{" "}
+          Nivel de avance institucional {r.dela} {r.nombre}:{" "}
           <strong>
             {fase.icono} {fase.nombre}
           </strong>
+          <sup className="text-primary font-bold">*</sup>
           {t.pct != null ? (
             <>
               {" "}
@@ -176,25 +185,47 @@ export function ReporteDocumento({
               {t.proyectos - t.sin_datos} de {t.proyectos} proyectos con datos cargados.
             </>
           ) : (
-            <> — ningún proyecto del área tiene datos cargados al corte.</>
+            <> — ningún proyecto {r.dela} {r.nombre} tiene datos cargados al corte.</>
           )}
+        </p>
+
+        {/* 09.09, párrafo 761: la definición de ESTA fase al pie, para no tener
+            que ir al anexo. El texto sale de FASES, el mismo que usa el anexo. */}
+        <p className="text-[11px] text-muted leading-relaxed">
+          <span className="text-primary font-bold">*</span>{" "}
+          <strong className="text-foreground">
+            {fase.nombre} ({fase.rango}):
+          </strong>{" "}
+          {fase.texto}
         </p>
       </section>
 
-      {/* ---------- Bloque 4 (así numerado en la plantilla) ---------- */}
-      <section className="space-y-2 rompe-pagina">
+      {/* ---------- Bloque 3 ----------
+          Era "4." porque la plantilla del cliente numera así, con el análisis
+          como 3 aunque va después. El 09.09 (párrafo 752) pidieron corregirlo:
+          la numeración visible saltaba del 2 al 4. Se renumera en el lugar y no
+          se mueve nada, porque el bloque del análisis no lleva número propio,
+          así que el documento queda 1, 2, 3 sin reordenar contenido que el
+          cliente ya vio.
+
+          Sin la clase de salto de página desde el 09.09 (párrafo 755: todo
+          continuado y solo el anexo en hoja aparte). */}
+      <section className="space-y-2">
         <h2 className="text-base font-bold text-foreground">
-          4. {conProyectos ? "Detalle de proyectos" : "Desempeño operativo por áreas"}
+          3.{" "}
+          {conProyectos
+            ? "Detalle de proyectos"
+            : "Desempeño operativo por dependencias"}
         </h2>
         <p className="text-xs text-muted">
           {conProyectos
-            ? "Estado de cada proyecto del área y nivel de actualización de su información en el sistema."
+            ? `Estado de cada proyecto ${r.dela} ${r.nombre} y nivel de actualización de su información en el sistema.`
             : "Volumen de gestión y nivel de actualización de la información por cada dependencia de la estructura orgánica."}
         </p>
 
         {!conArbol && !conProyectos ? (
           <p className="text-sm text-muted border border-border rounded-lg px-3 py-4 text-center">
-            Esta área no tiene proyectos cargados en el POA al momento del corte.
+            Esta {r.nombre} no tiene proyectos cargados en el POA al momento del corte.
           </p>
         ) : conProyectos ? (
           <TablaProyectos proyectos={reporte.proyectos} total={t} />
@@ -207,7 +238,7 @@ export function ReporteDocumento({
                   <th>Total</th>
                   <th>🟢</th>
                   <th>🟡</th>
-                  <th>🔵</th>
+                  <th>🔴</th>
                   <th>⚪</th>
                   <th>
                     Índice de carga
@@ -223,7 +254,7 @@ export function ReporteDocumento({
                   <FilasAnidadas key={(f.unidad_id ?? f.nombre) + f.tipo} fila={f} nivel={0} />
                 ))}
                 <tr className="total">
-                  <td className="izq">TOTAL {etiqueta.toUpperCase()}</td>
+                  <td className="izq">TOTAL {r.nombre.toUpperCase()}</td>
                   <td className="num">{t.proyectos}</td>
                   <td className="num">{t.finalizados}</td>
                   <td className="num">{t.en_ejecucion}</td>
@@ -239,15 +270,18 @@ export function ReporteDocumento({
         {reporte.indiceCargaProvisorio && !conProyectos && (
           <p className="text-[11px] text-warning">
             * <strong>Índice de carga: definición provisoria.</strong> La plantilla incluye la
-            columna pero no la define. Acá se calcula como la proporción de proyectos del área
+            columna pero no la define. Acá se calcula como la proporción de proyectos {r.dela} {r.nombre}
             con datos cargados, o sea el complemento de “Sin Datos”. Pendiente de confirmación
             de Planificación Estratégica.
           </p>
         )}
       </section>
 
-      {/* ---------- Bloque 3: el análisis (interactivo) ---------- */}
-      {children && <div className="rompe-pagina">{children}</div>}
+      {/* ---------- El análisis (interactivo) ----------
+          Sin salto de página desde el 09.09: abría hoja nueva y su hermano
+          inmediato, el anexo, también, así que dos saltos seguidos dejaban una
+          hoja casi vacía en el medio. Ahora solo el anexo abre página. */}
+      {children && <div>{children}</div>}
 
       {/* ---------- Anexo ---------- */}
       <AnexoMetodologico />
@@ -268,7 +302,7 @@ export function ReporteDocumento({
 const ICONO_ESTADO: Record<FilaProyecto["estado"], string> = {
   verde: "🟢",
   amarillo: "🟡",
-  rojo: "🔵",
+  rojo: "🔴",
   sin_datos: "⚪",
 };
 

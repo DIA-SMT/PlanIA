@@ -98,7 +98,7 @@ export function ChatDrawer() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-2xl bg-primary shadow-lg shadow-primary/20 flex items-center justify-center hover:bg-primary-light transition-colors group"
+          className="no-imprimir fixed bottom-6 right-6 z-50 h-14 w-14 rounded-2xl bg-primary shadow-lg shadow-primary/20 flex items-center justify-center hover:bg-primary-light transition-colors group"
           title="Abrir asistente"
         >
           <Image
@@ -113,7 +113,7 @@ export function ChatDrawer() {
 
       {/* Drawer */}
       {open && (
-        <div className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] flex flex-col bg-surface border-l border-border shadow-2xl">
+        <div className="no-imprimir fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] flex flex-col bg-surface border-l border-border shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-3">

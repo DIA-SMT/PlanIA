@@ -90,26 +90,35 @@ export function AnalisisForm({
   if (!puedeEditar) {
     if (!analisis || !publicado) return null;
     return (
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">
-          Análisis de Gestión y Conclusiones del Trimestre
-        </h2>
-        {CAMPOS.map((c) => {
-          const valor = analisis[c.clave];
-          if (!valor) return null;
-          return (
-            <div key={c.clave} className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-sm font-semibold text-foreground mb-1.5">{c.titulo}</p>
-              <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{valor}</p>
-            </div>
-          );
-        })}
-      </section>
+      <TextoLimpio
+        valores={{
+          balance: analisis.balance ?? "",
+          desvios: analisis.desvios ?? "",
+          oportunidades: analisis.oportunidades ?? "",
+        }}
+        borrador={false}
+      />
     );
   }
 
   return (
-    <section className="space-y-3">
+    <>
+    {/* En papel, el texto limpio. En pantalla, el formulario. Antes había un
+        solo bloque —el formulario— y quien podía editar se imprimía los cuadros
+        de texto, el contador de caracteres y los botones, porque la versión
+        limpia estaba detrás de `!puedeEditar` Y publicado. O sea que justo
+        Planificación, que es la que redacta, nunca veía la versión imprimible
+        (09.09, párrafos 748 y 749).
+
+        Se imprime lo que hay en pantalla y no lo último guardado, así imprimir
+        un borrador a medio escribir para leerlo en papel funciona como uno
+        espera. Y va sellado como BORRADOR mientras no esté publicado, para que
+        una hoja suelta no se confunda con el informe final. */}
+    <div className="solo-imprimir">
+      <TextoLimpio valores={texto} borrador={!publicado} />
+    </div>
+
+    <section className="no-imprimir space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold text-foreground">
           Análisis de Gestión y Conclusiones del Trimestre
@@ -215,6 +224,47 @@ export function AnalisisForm({
           {error}
         </p>
       )}
+    </section>
+    </>
+  );
+}
+
+/**
+ * El análisis como texto corrido: lo que se lee en el informe, sin controles.
+ *
+ * Lo usan los dos caminos —el área que lo lee publicado y la impresión de
+ * Planificación— así que el documento sale igual para los dos.
+ */
+function TextoLimpio({
+  valores,
+  borrador,
+}: {
+  valores: { balance: string; desvios: string; oportunidades: string };
+  borrador: boolean;
+}) {
+  const escritos = CAMPOS.filter((c) => valores[c.clave].trim() !== "");
+  if (escritos.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <h2 className="text-lg font-semibold text-foreground">
+          Análisis de Gestión y Conclusiones del Trimestre
+        </h2>
+        {borrador && (
+          <span className="text-[10px] uppercase tracking-wider font-bold text-warning border border-warning/50 rounded px-1.5 py-0.5">
+            Borrador — no publicado
+          </span>
+        )}
+      </div>
+      {escritos.map((c) => (
+        <div key={c.clave} className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-sm font-semibold text-foreground mb-1.5">{c.titulo}</p>
+          <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+            {valores[c.clave]}
+          </p>
+        </div>
+      ))}
     </section>
   );
 }
