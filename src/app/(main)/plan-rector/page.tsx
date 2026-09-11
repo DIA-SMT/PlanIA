@@ -120,13 +120,27 @@ export default async function PlanRectorPage() {
           <span className="font-medium text-foreground">{cobertura.pendientes} sin clasificar</span>
         </div>
 
-        {cobertura.pct < 60 && (
-          <p className="text-xs text-muted/80 leading-relaxed border-t border-border pt-3">
-            Los porcentajes de cumplimiento por ámbito todavía no se muestran. Con esta
-            cobertura, cualquier promedio hablaría de una fracción del POA y no del POA.
-            La imputación se carga desde la ficha de cada proyecto.
-          </p>
-        )}
+        {/* 09.09, párrafo 703: la aclaración metodológica de que se trabaja con
+            información de 2026. Va en la pantalla y no solo en el reporte,
+            porque es acá donde se leen los porcentajes. */}
+        <p className="text-xs text-muted/80 leading-relaxed border-t border-border pt-3">
+          <strong className="text-foreground">Cómo leer estos números.</strong> El avance de
+          cada ámbito es el promedio de los proyectos del <strong>POA 2026</strong> que le
+          fueron imputados — la misma cuenta que usa el Panel Ejecutivo, así que los dos
+          dicen lo mismo. Los proyectos sin datos cargados no cuentan como cero: quedan
+          afuera del promedio. Las líneas estratégicas se muestran completas pero no se
+          miden por separado.
+          {cobertura.pct < 60 && (
+            <>
+              {" "}
+              <strong className="text-warning">
+                Ojo con la cobertura: hoy está imputado el {cobertura.pct} % del POA
+              </strong>
+              , así que estos promedios hablan de esa fracción y no de todo el plan. La
+              imputación se carga desde la ficha de cada proyecto.
+            </>
+          )}
+        </p>
       </section>
 
       {/* El árbol */}
