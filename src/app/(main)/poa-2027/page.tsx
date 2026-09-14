@@ -28,24 +28,13 @@ export default async function Poa2027Landing() {
         </p>
       </div>
 
-      {/* Documento de referencia */}
-      <section>
-        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
-          📄 Documento de referencia
-        </h2>
-        <a
-          href="/poa2027/ficha-prisma.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3 max-w-md"
-        >
-          <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center text-lg">📋</div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Ficha PRISMA + Instructivo</p>
-            <p className="text-[10px] text-muted">Modelo de la ficha y guía de cómo completarla</p>
-          </div>
-        </a>
-      </section>
+      {/* 11.09 — "lo que hay que sacar es esa tabla prisma que sigue figurando
+          en el botón. Ya no abajo pero si en el botón".
+          Acá estaba el botón "Ficha PRISMA + Instructivo", que abría el PDF con
+          la tabla. El bloque de abajo —la sigla explicada letra por letra— ya se
+          había sacado el 09.09; esto es lo que quedaba.
+          El archivo sigue en public/poa2027/ pero ya no está enlazado desde
+          ninguna pantalla: borrarlo es de ellos, no nuestro. */}
 
       {/* Acciones del director */}
       {esDirector ? (

@@ -18,9 +18,20 @@ import {
 export function NodoRector({
   nodo,
   profundidad = 0,
+  colorHeredado = null,
 }: {
   nodo: NodoRectorArbol;
   profundidad?: number;
+  /**
+   * El color del ámbito del que cuelga este nodo.
+   *
+   * 11.09, pedido de Planificación: "si se podría el listado de ejes ponerlos en
+   * color como está en el plan rector impreso, ayuda más a asociar". En el
+   * documento impreso el color no es del ámbito solo: baja a sus ejes, que es lo
+   * que deja ubicar de un vistazo a qué ámbito pertenece cada eje sin tener que
+   * subir con la vista hasta el encabezado.
+   */
+  colorHeredado?: string | null;
 }) {
   const [abierto, setAbierto] = useState(nodo.tipo === "area_intervencion");
   const tieneHijos = nodo.hijos.length > 0;
@@ -41,7 +52,8 @@ export function NodoRector({
 
   const esArea = nodo.tipo === "area_intervencion";
   const esEje = nodo.tipo === "eje";
-  const color = esArea ? colorAmbito(nodo.codigo_cliente) : null;
+  // El ámbito define el color; todo lo que cuelga de él lo hereda.
+  const color = esArea ? colorAmbito(nodo.codigo_cliente) : colorHeredado;
 
   return (
     <li className={esArea ? "" : "border-t border-border/60"}>
@@ -64,8 +76,12 @@ export function NodoRector({
             {nodo.codigo_cliente}
           </span>
         )}
+        {/* El eje lleva el color de su ámbito, como en el plan impreso. */}
         {esEje && nodo.codigo_cliente && (
-          <span className="text-[11px] font-semibold text-muted shrink-0 w-5 text-right tabular-nums">
+          <span
+            className="text-[11px] font-bold shrink-0 w-5 text-right tabular-nums"
+            style={{ color: color ?? undefined }}
+          >
             {nodo.codigo_cliente}.
           </span>
         )}
@@ -130,7 +146,12 @@ export function NodoRector({
               )}
               <ul className={profundidad >= 1 ? "pl-4" : "pl-3"}>
                 {nodo.hijos.map((h) => (
-                  <NodoRector key={h.id} nodo={h} profundidad={profundidad + 1} />
+                  <NodoRector
+                    key={h.id}
+                    nodo={h}
+                    profundidad={profundidad + 1}
+                    colorHeredado={color}
+                  />
                 ))}
               </ul>
             </>
