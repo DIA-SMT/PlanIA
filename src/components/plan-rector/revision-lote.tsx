@@ -47,6 +47,11 @@ export function RevisionLote({ grupos }: { grupos: Grupo[] }) {
       setError("No queda ninguna tildada en este eje.");
       return;
     }
+    // Cuál sigue. Se calcula ANTES de confirmar, porque después este grupo
+    // desaparece de la lista y el índice ya no sirve.
+    const i = grupos.findIndex((x) => x.eje_id === g.eje_id);
+    const siguiente = grupos[i + 1] ?? grupos[i - 1] ?? null;
+
     setError(null);
     setAviso(null);
     startTransition(async () => {
@@ -55,10 +60,18 @@ export function RevisionLote({ grupos }: { grupos: Grupo[] }) {
         setError(r.error ?? "No se pudo confirmar");
         return;
       }
+      const quedan = grupos.length - 1;
       setAviso(
-        `Listo: ${r.confirmados} ${r.confirmados === 1 ? "proyecto asociado" : "proyectos asociados"} al eje ${g.eje_codigo ?? ""}.` +
-          (r.fallidos.length > 0 ? ` ${r.fallidos.length} no se pudieron y quedan acá.` : "")
+        `${r.confirmados} ${r.confirmados === 1 ? "proyecto asociado" : "proyectos asociados"} al eje ${g.eje_codigo ?? ""}.` +
+          (r.fallidos.length > 0 ? ` ${r.fallidos.length} no se pudieron y quedan acá.` : "") +
+          (quedan > 0
+            ? ` Quedan ${quedan} ${quedan === 1 ? "eje" : "ejes"} por revisar — te abrí el que sigue.`
+            : " No queda ninguno más: terminaste.")
       );
+      // El grupo confirmado se va de la lista al refrescar. Sin esto quedaban
+      // todos cerrados y la pantalla parecía terminada, que es exactamente lo
+      // que pasó el 14.09: se confirmaron 2 de 16 ejes y se dio por hecho.
+      setAbierto(siguiente?.eje_id ?? null);
       router.refresh();
     });
   };
@@ -86,8 +99,20 @@ export function RevisionLote({ grupos }: { grupos: Grupo[] }) {
     );
   }
 
+  const totalPendiente = grupos.reduce((n, g) => n + g.propuestas.length, 0);
+
   return (
     <div className="space-y-3">
+      {/* Cuánto falta, siempre a la vista. Sin esto no se nota que hay más
+          abajo: el 14.09 se confirmaron 2 de 16 ejes y se dio por terminado. */}
+      <p className="text-xs text-muted">
+        Te quedan <strong className="text-foreground">{grupos.length}</strong>{" "}
+        {grupos.length === 1 ? "eje" : "ejes"} por revisar,{" "}
+        <strong className="text-foreground">{totalPendiente}</strong>{" "}
+        {totalPendiente === 1 ? "proyecto" : "proyectos"} en total. Se confirma de a un eje:
+        abrí, mirá la lista y dale al botón de abajo.
+      </p>
+
       {aviso && (
         <p className="text-xs text-success border border-success/30 bg-success/5 rounded-lg px-3 py-2">
           {aviso}
