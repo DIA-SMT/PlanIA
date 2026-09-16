@@ -99,7 +99,7 @@ async function avanceDeProyectosImputados(
 
   const { data: pys } = await supabase
     .from("proyecto")
-    .select("id, codigo, nombre, unidad:unidad_organizacional(nombre_corto, nombre)")
+    .select("id, codigo, nombre, unidad_id, unidad:unidad_organizacional(nombre_corto, nombre)")
     .in("id", ids)
     .eq("periodo_id", (periodo as { id: string }).id)
     .eq("estado", "activo")
@@ -108,6 +108,25 @@ async function avanceDeProyectosImputados(
   const vivos = (pys ?? []) as any[];
   if (vivos.length === 0) return salida;
   const idsVivos = vivos.map((p) => p.id as string);
+
+  // La ruta de cada unidad en el organigrama, para poder ordenar los proyectos
+  // agrupados por área (15.09, párrafo 1011).
+  const { data: unis } = await supabase
+    .from("unidad_organizacional")
+    .select("id, parent_id, nivel, orden, nombre, nombre_corto");
+  const uMap = new Map(((unis ?? []) as any[]).map((u) => [u.id as string, u]));
+  const rutaDe = (unidadId: string | null): string => {
+    const partes: string[] = [];
+    let u = unidadId ? uMap.get(unidadId) : null;
+    // Se sube hasta la raíz y se arma la ruta al revés, con el `orden` de cada
+    // nivel rellenado a cuatro dígitos para que 2 no quede después de 10.
+    let guarda = 0;
+    while (u && guarda++ < 10) {
+      partes.unshift(String(u.orden ?? 0).padStart(4, "0") + "·" + (u.nombre_corto ?? u.nombre ?? ""));
+      u = u.parent_id ? uMap.get(u.parent_id) : null;
+    }
+    return partes.join("/");
+  };
 
   const [metasRes, indRes] = await Promise.all([
     supabase
@@ -160,6 +179,7 @@ async function avanceDeProyectosImputados(
       codigo: (p.codigo as string | null) ?? null,
       nombre: p.nombre as string,
       unidad_nombre: p.unidad?.nombre_corto ?? p.unidad?.nombre ?? null,
+      orden_area: rutaDe(p.unidad_id ?? null),
       pct: av.conDatos === 0 ? null : av.pct,
       estado: (av.conDatos === 0 ? "sin_datos" : av.estado) as ProyectoImputado["estado"],
     });
@@ -237,8 +257,14 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
     if (!listaPorNodo.has(v.nodo_id)) listaPorNodo.set(v.nodo_id, []);
     listaPorNodo.get(v.nodo_id)!.push(py);
   }
+  // 15.09, parrafo 1011: agrupados por area siguiendo el organigrama, y dentro
+  // de cada area por nombre de proyecto.
   for (const lista of listaPorNodo.values()) {
-    lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    lista.sort(
+      (a, b) =>
+        a.orden_area.localeCompare(b.orden_area, "es") ||
+        a.nombre.localeCompare(b.nombre, "es")
+    );
   }
 
   // Índice y armado del árbol.

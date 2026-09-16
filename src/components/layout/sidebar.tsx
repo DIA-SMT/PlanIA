@@ -25,7 +25,19 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel Ejecutivo", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
-  { href: "/avance-direcciones", label: "Avance por Dirección", icon: "📊" },
+  // 15.09, párrafo 797: "eliminar la herramienta AVANCE POR DIRECCIÓN del
+  // tablero de los usuarios de los directores. Esa herramienta solamente debe
+  // visualizarse para los usuarios Subsecretarios, Secretarios e Intendente."
+  //
+  // Esto deja el menú del director en cinco items y no en los seis que habían
+  // pedido el 09.09 (párrafo 717), que incluían justamente éste. Se hace lo
+  // nuevo: es de una semana después y es explícito.
+  {
+    href: "/avance-direcciones",
+    label: "Avance por Dirección",
+    icon: "📊",
+    roles: ["intendenta", "secretario", "subsecretario", "admin_funcional", "admin_tecnico"],
+  },
   // 24.08, página 36: "incorporar una herramienta para medir los avances del
   // Plan Rector", con la captura señalando este menú.
   //
