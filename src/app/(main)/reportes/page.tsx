@@ -9,7 +9,8 @@ import {
   getAnalisisReporte,
   type UnidadReporte,
 } from "@/lib/reporte-trimestral";
-import { ReporteDocumento } from "@/components/reportes/reporte-documento";
+import { InformeSecretaria } from "@/components/reportes/informe-secretaria";
+import { InformeDireccion } from "@/components/reportes/informe-direccion";
 import { AnalisisForm } from "@/components/reportes/analisis-form";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -114,10 +115,44 @@ export default async function ReportesPage({
     return `/reportes?${q.toString()}`;
   };
 
-  const porNivel = NIVELES.map((n) => ({
-    ...n,
-    opciones: unidades.filter((u) => u.nivel === n.nivel),
-  })).filter((n) => n.opciones.length > 0);
+  /**
+   * Las áreas agrupadas por secretaría, siguiendo el organigrama.
+   *
+   * 15.09, párrafo 1023: "¿esto se podría ordenar con el mismo criterio que
+   * tienen los proyectos? Como el organigrama: Secretaría, Dirección."
+   *
+   * Antes eran tres bloques planos —Secretarías, Subsecretarías, Direcciones— y
+   * dentro de cada uno el orden no seguía nada: la Dirección de Ambiente podía
+   * quedar a diez chips de su secretaría. Ahora cada secretaría trae debajo todo
+   * lo que cuelga de ella, ordenado por nivel y por su orden en el organigrama.
+   */
+  const porUnidadId = new Map(unidades.map((u) => [u.id, u]));
+  const raizDe = (u: UnidadReporte): UnidadReporte => {
+    let actual = u;
+    let guarda = 0;
+    while (actual.parent_id && guarda++ < 10) {
+      const padre = porUnidadId.get(actual.parent_id);
+      if (!padre) break;
+      actual = padre;
+    }
+    return actual;
+  };
+
+  const grupos = new Map<string, { secretaria: UnidadReporte; opciones: UnidadReporte[] }>();
+  for (const u of unidades) {
+    const raiz = raizDe(u);
+    if (!grupos.has(raiz.id)) grupos.set(raiz.id, { secretaria: raiz, opciones: [] });
+    grupos.get(raiz.id)!.opciones.push(u);
+  }
+  const porSecretaria = [...grupos.values()]
+    .map((g) => ({
+      ...g,
+      // La secretaría primero, después sus subsecretarías y direcciones.
+      opciones: g.opciones.sort(
+        (a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, "es")
+      ),
+    }))
+    .sort((a, b) => a.secretaria.nombre.localeCompare(b.secretaria.nombre, "es"));
 
   return (
     <div className="space-y-6">
@@ -134,21 +169,22 @@ export default async function ReportesPage({
 
         <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
           <div className="space-y-3">
-            {porNivel.map((n) => (
-              <div key={n.nivel}>
+            {porSecretaria.map((g) => (
+              <div key={g.secretaria.id}>
                 <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
-                  {n.etiqueta}
+                  {g.secretaria.nombre}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {n.opciones.map((u: UnidadReporte) => (
+                  {g.opciones.map((u: UnidadReporte) => (
                     <Link
                       key={u.id}
                       href={conQuery({ u: u.id })}
+                      title={NIVELES.find((n) => n.nivel === u.nivel)?.etiqueta}
                       className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
                         u.id === unidadId
                           ? "bg-primary/10 text-primary border-primary/30 font-medium"
                           : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                      }`}
+                      } ${u.nivel > 0 ? "ml-0" : "font-medium text-foreground/90"}`}
                     >
                       {u.nombre}
                     </Link>
@@ -214,8 +250,37 @@ export default async function ReportesPage({
           <p className="text-xs text-muted mt-1 font-mono break-all">{errorReporte}</p>
         </div>
       ) : (
-        reporte && (
-          <ReporteDocumento
+        reporte &&
+        /* 15.09, párrafo 805: "proponemos un nuevo modelo de reporte, ya que
+           tenemos dos tipos de perfiles: secretarios/subsecretarios y
+           directores. Cada tipo de perfil tendrá un modelo diferente de reporte
+           con las características propias de cada área."
+
+           El modelo lo decide el NIVEL DEL ÁREA que se está mirando, no el rol
+           de quien mira: Planificación abre los dos y tiene que ver cada uno
+           como lo va a ver su destinatario. */
+        ((reporte.unidad?.nivel ?? 0) >= 2 ? (
+          <InformeDireccion
+            reporte={reporte}
+            trimestre={trimestre}
+            anio={anio}
+            emitidoEl={hoy}
+            rutaArea={reporte.ruta}
+            pctSuperior={reporte.superior?.pct ?? null}
+            nombreSuperior={reporte.superior?.rotulo ?? null}
+          >
+            <AnalisisForm
+              anio={anio}
+              trimestre={trimestre}
+              unidadId={unidadId}
+              unidadNombre={reporte.unidad?.nombre ?? "el área"}
+              analisis={analisis}
+              puedeEditar={esAdmin}
+              desdeNumero={5}
+            />
+          </InformeDireccion>
+        ) : (
+          <InformeSecretaria
             reporte={reporte}
             trimestre={trimestre}
             anio={anio}
@@ -228,9 +293,10 @@ export default async function ReportesPage({
               unidadNombre={reporte.unidad?.nombre ?? "el área"}
               analisis={analisis}
               puedeEditar={esAdmin}
+              desdeNumero={4}
             />
-          </ReporteDocumento>
-        )
+          </InformeSecretaria>
+        ))
       )}
     </div>
   );

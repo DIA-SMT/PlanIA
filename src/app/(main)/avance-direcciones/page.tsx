@@ -7,6 +7,8 @@ import {
   type IndicadorAvance,
 } from "@/lib/queries";
 import { BackButton } from "@/components/layout/back-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { getPerfilActual } from "@/lib/auth";
 import { avanceMetaEnPlazo, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
 import Link from "next/link";
 import type { Meta, UnidadOrganizacional } from "@/types/database";
@@ -22,7 +24,37 @@ interface ResumenDireccion {
   semaforo: { verde: number; amarillo: number; rojo: number; sin_datos: number };
 }
 
+/**
+ * Quién entra a Avance por Dirección — 15.09, párrafo 797: "solamente debe
+ * visualizarse para los usuarios Subsecretarios, Secretarios e Intendente".
+ *
+ * El control va en la página y no solo en el menú: esconder un link no es un
+ * permiso, la URL sigue andando. Los dos roles de administración entran porque
+ * Planificación necesita ver el avance de todas las direcciones.
+ */
+const ROLES_AVANCE_DIRECCIONES = [
+  "intendenta",
+  "secretario",
+  "subsecretario",
+  "admin_funcional",
+  "admin_tecnico",
+];
+
 export default async function AvanceDireccionesPage() {
+  const perfil = await getPerfilActual();
+  if (!perfil || !ROLES_AVANCE_DIRECCIONES.includes(perfil.rol)) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <BackButton fallback="/dashboard" />
+        <EmptyState
+          title="Avance por Dirección no está disponible para tu perfil"
+          description="Lo consultan la Intendenta, las Secretarías y las Subsecretarías. El avance de tu área lo tenés en el Panel Ejecutivo y en el Reporte trimestral."
+          icon="📊"
+        />
+      </div>
+    );
+  }
+
   const periodo = await getPeriodoActivo();
   const [proyectos, unidades, indicadores, metas] = await Promise.all([
     getProyectos(periodo.id),

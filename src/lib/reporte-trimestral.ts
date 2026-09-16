@@ -42,6 +42,21 @@ export interface ConteoEstados {
    * reporte sea true, esto no se puede publicar como dato.
    */
   indice_carga: number | null;
+  /**
+   * Metas e indicadores del área, y cuántos tienen información cargada.
+   *
+   * 15.09: los dos modelos nuevos piden "Completitud de metas" y "Completitud
+   * de indicadores", definidas en su Anexo como "la proporción de componentes
+   * que cuentan con información registrada respecto del total definido".
+   */
+  metas: number;
+  metas_con_datos: number;
+  indicadores: number;
+  indicadores_con_datos: number;
+  /** metas_con_datos / metas × 100. null si no hay metas. */
+  completitud_metas: number | null;
+  /** indicadores_con_datos / indicadores × 100. null si no hay indicadores. */
+  completitud_indicadores: number | null;
 }
 
 export type TipoFila = "subsecretaria" | "direccion" | "departamento" | "propios_secretaria";
@@ -88,11 +103,27 @@ export interface ReporteUnidad {
   totalMunicipio: ConteoEstados;
   /** true mientras el cliente no defina el Índice de Carga. */
   indiceCargaProvisorio: boolean;
+  /**
+   * El área de la que depende esta, con su avance, para la comparación del
+   * punto 1 del informe de Direcciones (15.09, párrafo 914: "en comparación con
+   * el conjunto de su Secretaría / Subsecretaría, cuyo avance promedio alcanza
+   * el [X]%, la Dirección presenta una diferencia de [+/- X] puntos").
+   *
+   * Sale de las MISMAS filas de la foto, que traen la jerarquía denormalizada
+   * del día del corte: no hace falta otra consulta, y un informe viejo sigue
+   * comparando contra el área que correspondía entonces aunque después hayan
+   * movido la dirección de lugar.
+   */
+  superior: { nombre: string; rotulo: string; pct: number | null } | null;
+  /** La ruta del área, para el encabezado del informe de Direcciones. */
+  ruta: { secretaria: string | null; subsecretaria: string | null };
 }
 
 const VACIO = (): ConteoEstados => ({
   proyectos: 0, finalizados: 0, en_ejecucion: 0, no_iniciados: 0, sin_datos: 0,
   pct: null, indice_carga: null,
+  metas: 0, metas_con_datos: 0, indicadores: 0, indicadores_con_datos: 0,
+  completitud_metas: null, completitud_indicadores: null,
 });
 
 /** Acumula una fila de la foto en un conteo, y junta los pct para promediar. */
@@ -102,23 +133,44 @@ function sumar(acc: ConteoEstados, fila: any, pcts: (number | null)[]) {
   else if (fila.estado === "amarillo") acc.en_ejecucion++;
   else if (fila.estado === "rojo") acc.no_iniciados++;
   else acc.sin_datos++;
+  acc.metas += fila.metas ?? 0;
+  acc.metas_con_datos += fila.metas_con_datos ?? 0;
+  acc.indicadores += fila.indicadores ?? 0;
+  acc.indicadores_con_datos += fila.indicadores_con_datos ?? 0;
   pcts.push(fila.pct ?? null);
 }
 
 /**
- * Cierra un conteo: promedio de avance e índice de carga.
+ * Cierra un conteo: promedio de avance, cobertura y completitud.
  *
- * El promedio usa el mismo criterio que `avanceAgregado` en todo el sistema:
- * los proyectos sin dato cuentan como 0 en el numerador pero siguen en el
- * denominador, y si NINGUNO tiene dato el resultado es null (no 0). Es la
- * diferencia entre "no avanzaron" y "no cargaron", que en un informe que va
- * firmado a un secretario no es un detalle.
+ * EL PROMEDIO CAMBIÓ EL 15.09. Antes los proyectos sin dato contaban como 0 en
+ * el numerador pero seguían en el denominador. Ahora quedan afuera de los dos,
+ * porque es lo que dice el Anexo que escribió Planificación para los modelos
+ * nuevos:
+ *
+ *   "Avance promedio = Σ avance de proyectos evaluables / cantidad de proyectos
+ *    evaluables. Los proyectos clasificados como Sin Datos no intervienen en
+ *    este cálculo."
+ *
+ * Y es más defendible: promediar ceros mezcla "no avanzó" con "no cargó", que
+ * es justo lo que su propio Anexo advierte que no se puede inferir. Un área con
+ * 10 proyectos, 5 al 60 % y 5 sin datos, daba 30 % y ahora da 60 %.
+ *
+ * Medido el 16.09, el cambio se nota: el promedio del municipio pasa de 40 % a
+ * 48 %, y Contaduría de 36 a 65. Un área sin NINGÚN proyecto evaluable ya no da
+ * 0 sino null — no se puede promediar lo que no se midió.
  */
 function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
-  const conDatos = pcts.filter((p) => p != null).length;
-  acc.pct = conDatos === 0 || pcts.length === 0
+  const evaluables = pcts.filter((p): p is number => p != null);
+  acc.pct = evaluables.length === 0
     ? null
-    : Math.round(pcts.reduce<number>((a, p) => a + (p ?? 0), 0) / pcts.length);
+    : Math.round(evaluables.reduce((a, p) => a + p, 0) / evaluables.length);
+  acc.completitud_metas = acc.metas === 0
+    ? null
+    : Math.round((acc.metas_con_datos / acc.metas) * 100);
+  acc.completitud_indicadores = acc.indicadores === 0
+    ? null
+    : Math.round((acc.indicadores_con_datos / acc.indicadores) * 100);
   acc.indice_carga = acc.proyectos === 0
     ? null
     : Math.round(((acc.proyectos - acc.sin_datos) / acc.proyectos) * 100);
@@ -400,7 +452,7 @@ export async function getReporteUnidad(opciones: {
   if (opciones.unidadId && !unidad) throw new Error("Esa área no existe o está inactiva");
 
   const { filas, corte, origen } = await traerFilas(opciones);
-  return armarReporte(filas, corte, origen, unidad);
+  return armarReporte(filas, corte, origen, unidad, unidades);
 }
 
 /**
@@ -418,7 +470,9 @@ export function armarReporte(
   filas: any[],
   corte: ReporteUnidad["corte"],
   origen: "corte" | "vivo",
-  unidad: UnidadReporte | null
+  unidad: UnidadReporte | null,
+  /** El organigrama, para resolver la ruta de un area que no tiene proyectos. */
+  unidades: UnidadReporte[] = []
 ): ReporteUnidad {
   // ---- Totales del municipio ----
   const accMun = VACIO();
@@ -436,6 +490,8 @@ export function armarReporte(
       proyectos: [],
       totalMunicipio: accMun,
       indiceCargaProvisorio: true,
+      superior: null,
+      ruta: { secretaria: null, subsecretaria: null },
     };
   }
 
@@ -447,6 +503,70 @@ export function armarReporte(
   for (const f of propias) sumar(accU, f, pctsU);
   cerrar(accU, pctsU);
 
+  // ---- El área de la que depende, para la comparación del informe de Dirección ----
+  // Se toma de las mismas filas, que traen la jerarquía del día del corte: así un
+  // informe viejo sigue diciendo lo mismo aunque después muevan el área de lugar.
+  // Cuando el área no tiene ni un proyecto no hay fila de dónde sacarla, y ahí se
+  // cae al organigrama de hoy — son 10 direcciones, que si no salían con el
+  // encabezado en blanco y sin comparación.
+  const unaPropia = propias[0];
+  const porId = new Map(unidades.map((u) => [u.id, u]));
+  const ancestros: UnidadReporte[] = [];
+  let subiendo = unidad.parent_id ? porId.get(unidad.parent_id) : undefined;
+  for (let i = 0; subiendo && i < 10; i++) {
+    ancestros.push(subiendo);
+    subiendo = subiendo.parent_id ? porId.get(subiendo.parent_id) : undefined;
+  }
+  const delArbol = (nivel: number) => ancestros.find((a) => a.nivel === nivel) ?? null;
+
+  const ruta = {
+    secretaria: (unaPropia?.secretaria_nombre ?? delArbol(0)?.nombre ?? null) as string | null,
+    subsecretaria: (unaPropia?.subsecretaria_nombre ?? delArbol(1)?.nombre ?? null) as string | null,
+  };
+
+  // El conjunto inmediato con el que se compara: para un departamento —los cuatro
+  // museos— su dirección; para una dirección, su subsecretaría, y si cuelga
+  // directo de la secretaría, esa. Comparar un museo contra toda la subsecretaría
+  // saltearía justo al que lo tiene a cargo.
+  let superior: ReporteUnidad["superior"] = null;
+  if (unidad.nivel >= 2) {
+    const opciones: { id: string | null; nombre: string | null; rotulo: string; campo: string }[] =
+      unidad.nivel >= 3
+        ? [
+            {
+              id: unaPropia?.direccion_id ?? delArbol(2)?.id ?? null,
+              nombre: unaPropia?.direccion_nombre ?? delArbol(2)?.nombre ?? null,
+              rotulo: "Dirección",
+              campo: "direccion_id",
+            },
+          ]
+        : [];
+    opciones.push(
+      {
+        id: unaPropia?.subsecretaria_id ?? delArbol(1)?.id ?? null,
+        nombre: unaPropia?.subsecretaria_nombre ?? delArbol(1)?.nombre ?? null,
+        rotulo: "Subsecretaría",
+        campo: "subsecretaria_id",
+      },
+      {
+        id: unaPropia?.secretaria_id ?? delArbol(0)?.id ?? null,
+        nombre: unaPropia?.secretaria_nombre ?? delArbol(0)?.nombre ?? null,
+        rotulo: "Secretaría",
+        campo: "secretaria_id",
+      }
+    );
+
+    const elegida = opciones.find((o) => o.id && o.nombre);
+    if (elegida) {
+      const delSuperior = filas.filter((f) => f[elegida.campo] === elegida.id);
+      const accSup = VACIO();
+      const pctsSup: (number | null)[] = [];
+      for (const f of delSuperior) sumar(accSup, f, pctsSup);
+      cerrar(accSup, pctsSup);
+      superior = { nombre: elegida.nombre!, rotulo: elegida.rotulo, pct: accSup.pct };
+    }
+  }
+
   const base = {
     origen,
     corte,
@@ -454,30 +574,34 @@ export function armarReporte(
     totalUnidad: accU,
     totalMunicipio: accMun,
     indiceCargaProvisorio: true,
+    superior,
+    ruta,
   };
 
-  // ---- De nivel 2 para abajo: la lista de proyectos ----
+  // ---- La lista de proyectos ----
+  // Desde el 15.09 se arma para TODOS los niveles, no solo de dirección para
+  // abajo: el modelo nuevo de Secretarías y Subsecretarías pide un "Detalle de
+  // proyectos" con la dirección responsable de cada uno, que es el cuadro de
+  // respaldo de los indicadores consolidados del informe.
+  const proyectos: FilaProyecto[] = propias
+    .map((f) => ({
+      nombre: f.proyecto_nombre as string,
+      codigo: (f.proyecto_codigo ?? null) as string | null,
+      unidad_nombre: (f.unidad_nombre ?? null) as string | null,
+      estado: f.estado as FilaProyecto["estado"],
+      pct: (f.pct ?? null) as number | null,
+      metas: Number(f.metas ?? 0),
+      metas_con_datos: Number(f.metas_con_datos ?? 0),
+      indicadores: Number(f.indicadores ?? 0),
+      indicadores_con_datos: Number(f.indicadores_con_datos ?? 0),
+    }))
+    // Primero lo que tiene datos y más avance, después por nombre: lo que hay
+    // que mirar queda arriba.
+    .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.nombre.localeCompare(b.nombre, "es"));
+
   // Para una dirección un árbol de unidades no dice nada: 55 de las 56 no
   // tienen sub-unidades, así que la tabla tendría una sola fila igual al total.
-  // Lo que le sirve a un director es ver sus proyectos, que promedian 7.
   if (unidad.nivel >= 2) {
-    const proyectos: FilaProyecto[] = propias
-      .map((f) => ({
-        nombre: f.proyecto_nombre as string,
-        codigo: (f.proyecto_codigo ?? null) as string | null,
-        unidad_nombre: (f.unidad_nombre ?? null) as string | null,
-        estado: f.estado as FilaProyecto["estado"],
-        pct: (f.pct ?? null) as number | null,
-        metas: Number(f.metas ?? 0),
-        metas_con_datos: Number(f.metas_con_datos ?? 0),
-        indicadores: Number(f.indicadores ?? 0),
-        indicadores_con_datos: Number(f.indicadores_con_datos ?? 0),
-      }))
-      // Primero lo que tiene datos y más avance, después por nombre: lo que hay
-      // que mirar queda arriba.
-      .sort(
-        (a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.nombre.localeCompare(b.nombre, "es")
-      );
     return { ...base, filas: [], proyectos };
   }
 
@@ -576,5 +700,5 @@ export function armarReporte(
   // agregado y no una parte de la estructura.
   if (propios) filasTabla.push(materializar(propios));
 
-  return { ...base, filas: filasTabla, proyectos: [] };
+  return { ...base, filas: filasTabla, proyectos };
 }

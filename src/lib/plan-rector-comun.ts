@@ -31,6 +31,20 @@ export interface ProyectoImputado {
   codigo: string | null;
   nombre: string;
   unidad_nombre: string | null;
+  /**
+   * Clave para ordenar siguiendo el organigrama: la ruta de la unidad desde la
+   * secretaría hacia abajo.
+   *
+   * 15.09, párrafo 1011: "¿podrían ordenar la columna de la derecha de manera tal
+   * que al mirar esté agrupado por área? [...] que no salte de la secretaría de
+   * ambiente a centros vecinales si por ejemplo también está la dirección de
+   * ambiente."
+   *
+   * Ordenar por el nombre del área no alcanza: alfabéticamente una dirección
+   * queda lejos de su secretaría. Con la ruta completa, todo lo que cuelga de una
+   * secretaría queda junto y en el orden del organigrama.
+   */
+  orden_area: string;
   pct: number | null;
   estado: "verde" | "amarillo" | "rojo" | "sin_datos";
 }

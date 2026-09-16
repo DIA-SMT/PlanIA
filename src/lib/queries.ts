@@ -70,6 +70,72 @@ export interface EventoAgenda {
  * guarda por semana (lunes) + día de la semana, así que se traen las semanas
  * que solapan el rango y después se expande cada actividad a su fecha real.
  */
+export interface HitoCalendario {
+  id: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  tipo: string | null;
+  nombre: string;
+  secretaria: string | null;
+  direccion: string | null;
+  /**
+   * true si el hito viene de antes y sigue después del período que se está
+   * mirando: no empieza ni termina acá, está en curso.
+   *
+   * Hace falta para ordenar. Hay 12 hitos que arrancan en enero y terminan en
+   * diciembre —programas sostenidos todo el año— y sin esto encabezan todas las
+   * semanas del calendario, empujando abajo lo que de verdad pasa en la semana
+   * que alguien está mirando.
+   */
+  enCurso: boolean;
+}
+
+/**
+ * Los hitos del municipio que tocan un rango de fechas.
+ *
+ * 15.09, párrafos 799 a 803: "necesitamos que las fechas que tienen, con sus
+ * actividades, se visualicen en la agenda de todos los usuarios, no importa el
+ * tipo de perfil que tengan". Por eso no hay filtro por unidad ni por rol: la
+ * RLS de `hito_calendario` deja leer a cualquiera autenticado.
+ *
+ * Devuelve un hito por fila, NO uno por día. Medido sobre la planilla que
+ * mandaron: 54 de los 92 hitos tienen rango, la mediana de esos es de 29 días y
+ * hay días con 24 hitos encima. Repetir cada hito en cada día de su rango
+ * enterraría la agenda propia de cada área, que es lo que la pantalla existe
+ * para mostrar.
+ */
+export async function getHitosDelRango(desde: string, hasta: string): Promise<HitoCalendario[]> {
+  const supabase = await getSupabaseServer();
+  const { data, error } = await supabase
+    .from("hito_calendario")
+    .select("id, fecha_desde, fecha_hasta, tipo, nombre, secretaria, direccion")
+    // Se solapan si empiezan antes de que termine el rango y terminan después de
+    // que empiece.
+    .lte("fecha_desde", hasta)
+    .gte("fecha_hasta", desde)
+    .order("fecha_desde")
+    .order("nombre");
+
+  if (error) {
+    // La tabla llega con la migración 049 y el código se despliega solo: entre un
+    // deploy y que alguien aplique la migración, la agenda no se puede caer.
+    if (/does not exist|schema cache/i.test(error.message)) return [];
+    throw error;
+  }
+
+  const filas = (data ?? []) as Omit<HitoCalendario, "enCurso">[];
+  return filas
+    .map((h) => ({ ...h, enCurso: h.fecha_desde < desde && h.fecha_hasta > hasta }))
+    // Primero lo que empieza o termina en este período, que es la novedad;
+    // después lo que viene de antes y sigue, que es contexto.
+    .sort(
+      (a, b) =>
+        Number(a.enCurso) - Number(b.enCurso) ||
+        a.fecha_desde.localeCompare(b.fecha_desde) ||
+        a.nombre.localeCompare(b.nombre, "es")
+    );
+}
+
 export async function getEventosAgenda(desde: string, hasta: string): Promise<EventoAgenda[]> {
   const supabase = await getSupabaseServer();
   const { data, error } = await supabase
