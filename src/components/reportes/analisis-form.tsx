@@ -7,21 +7,29 @@ import type { AnalisisReporte } from "@/lib/reporte-trimestral";
 
 const MAX = 4000;
 
+/**
+ * Las dos secciones que redacta Planificación.
+ *
+ * Cambiaron el 15.09 con los modelos nuevos: antes eran tres (Balance, Desvíos,
+ * Oportunidades de mejora de carga) y ahora los dos modelos piden las mismas
+ * dos, con los títulos que ellos escribieron.
+ *
+ * Se reusan las columnas que ya tiene la tabla en vez de migrar: son campos de
+ * texto libre y cambiarles el rótulo no cambia nada de lo que hacen. La tercera
+ * queda sin usar y lo que se haya escrito ahí sigue guardado.
+ */
 const CAMPOS = [
   {
     clave: "balance" as const,
-    titulo: "Balance del Período",
-    ayuda: "Qué pasó en el trimestre en esta área, en términos de gestión.",
+    titulo: "Principales resultados",
+    ayuda:
+      "Desempeño, ejecución, planificación e información: qué muestra el período en cada uno.",
   },
   {
     clave: "desvios" as const,
-    titulo: "Identificación de Desvíos",
-    ayuda: "Dónde se apartó de lo planificado y por qué.",
-  },
-  {
-    clave: "oportunidades" as const,
-    titulo: "Oportunidades de Mejora de Carga",
-    ayuda: "Qué se puede mejorar en el registro de la información en el sistema.",
+    titulo: "Aspectos de seguimiento",
+    ayuda:
+      "Qué hay que mirar en el próximo corte y por qué: proyectos sin avance, no iniciados, registros sin datos, carga pendiente.",
   },
 ];
 
@@ -39,6 +47,7 @@ export function AnalisisForm({
   unidadNombre,
   analisis,
   puedeEditar,
+  desdeNumero,
 }: {
   anio: number;
   trimestre: number;
@@ -46,6 +55,8 @@ export function AnalisisForm({
   unidadNombre: string;
   analisis: AnalisisReporte | null;
   puedeEditar: boolean;
+  /** Numero de la primera seccion redactada, segun el modelo de informe. */
+  desdeNumero: number;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -59,7 +70,8 @@ export function AnalisisForm({
   const [sucio, setSucio] = useState(false);
 
   const publicado = analisis?.estado === "publicado";
-  const vacio = !texto.balance.trim() && !texto.desvios.trim() && !texto.oportunidades.trim();
+  // Solo las dos secciones que hoy se redactan: la tercera quedo sin usar el 15.09.
+  const vacio = !texto.balance.trim() && !texto.desvios.trim();
 
   const correr = (fn: () => Promise<{ success: boolean; error?: string }>, mensaje: string) => {
     setError(null);
@@ -97,6 +109,7 @@ export function AnalisisForm({
           oportunidades: analisis.oportunidades ?? "",
         }}
         borrador={false}
+        desdeNumero={desdeNumero}
       />
     );
   }
@@ -115,13 +128,13 @@ export function AnalisisForm({
         espera. Y va sellado como BORRADOR mientras no esté publicado, para que
         una hoja suelta no se confunda con el informe final. */}
     <div className="solo-imprimir">
-      <TextoLimpio valores={texto} borrador={!publicado} />
+      <TextoLimpio valores={texto} borrador={!publicado} desdeNumero={desdeNumero} />
     </div>
 
     <section className="no-imprimir space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold text-foreground">
-          Análisis de Gestión y Conclusiones del Trimestre
+          Análisis de gestión
         </h2>
         <span
           className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded ${
@@ -180,7 +193,7 @@ export function AnalisisForm({
           <button
             onClick={() => guardar(true)}
             disabled={isPending || vacio}
-            title={vacio ? "Escribí al menos uno de los tres campos" : undefined}
+            title={vacio ? "Escribí al menos una de las dos secciones" : undefined}
             className="text-sm bg-primary text-white rounded-lg px-4 py-2 hover:bg-primary/90 disabled:opacity-50"
           >
             Publicar
@@ -238,33 +251,36 @@ export function AnalisisForm({
 function TextoLimpio({
   valores,
   borrador,
+  desdeNumero,
 }: {
   valores: { balance: string; desvios: string; oportunidades: string };
   borrador: boolean;
+  /** Numero de la primera seccion: 4 en el informe de Secretaria, 5 en el de Direccion. */
+  desdeNumero: number;
 }) {
   const escritos = CAMPOS.filter((c) => valores[c.clave].trim() !== "");
   if (escritos.length === 0) return null;
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <h2 className="text-lg font-semibold text-foreground">
-          Análisis de Gestión y Conclusiones del Trimestre
-        </h2>
-        {borrador && (
-          <span className="text-[10px] uppercase tracking-wider font-bold text-warning border border-warning/50 rounded px-1.5 py-0.5">
-            Borrador — no publicado
-          </span>
-        )}
-      </div>
-      {escritos.map((c) => (
-        <div key={c.clave} className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-foreground mb-1.5">{c.titulo}</p>
+    <>
+      {borrador && (
+        <p className="text-[10px] uppercase tracking-wider font-bold text-warning border border-warning/50 rounded px-1.5 py-0.5 inline-block">
+          Borrador — no publicado
+        </p>
+      )}
+      {/* Van como secciones numeradas del informe y no dentro de un bloque
+          aparte: en los modelos del 15.09 son la 4 y la 5 del de Secretarías, y
+          la 5 y la 6 del de Direcciones. */}
+      {escritos.map((c, i) => (
+        <section key={c.clave} className="space-y-2">
+          <h2 className="text-base font-bold text-foreground">
+            {desdeNumero + i}. {c.titulo}
+          </h2>
           <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
             {valores[c.clave]}
           </p>
-        </div>
+        </section>
       ))}
-    </section>
+    </>
   );
 }

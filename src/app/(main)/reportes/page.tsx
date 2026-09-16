@@ -9,7 +9,8 @@ import {
   getAnalisisReporte,
   type UnidadReporte,
 } from "@/lib/reporte-trimestral";
-import { ReporteDocumento } from "@/components/reportes/reporte-documento";
+import { InformeSecretaria } from "@/components/reportes/informe-secretaria";
+import { InformeDireccion } from "@/components/reportes/informe-direccion";
 import { AnalisisForm } from "@/components/reportes/analisis-form";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -249,8 +250,37 @@ export default async function ReportesPage({
           <p className="text-xs text-muted mt-1 font-mono break-all">{errorReporte}</p>
         </div>
       ) : (
-        reporte && (
-          <ReporteDocumento
+        reporte &&
+        /* 15.09, párrafo 805: "proponemos un nuevo modelo de reporte, ya que
+           tenemos dos tipos de perfiles: secretarios/subsecretarios y
+           directores. Cada tipo de perfil tendrá un modelo diferente de reporte
+           con las características propias de cada área."
+
+           El modelo lo decide el NIVEL DEL ÁREA que se está mirando, no el rol
+           de quien mira: Planificación abre los dos y tiene que ver cada uno
+           como lo va a ver su destinatario. */
+        ((reporte.unidad?.nivel ?? 0) >= 2 ? (
+          <InformeDireccion
+            reporte={reporte}
+            trimestre={trimestre}
+            anio={anio}
+            emitidoEl={hoy}
+            rutaArea={reporte.ruta}
+            pctSuperior={reporte.superior?.pct ?? null}
+            nombreSuperior={reporte.superior?.rotulo ?? null}
+          >
+            <AnalisisForm
+              anio={anio}
+              trimestre={trimestre}
+              unidadId={unidadId}
+              unidadNombre={reporte.unidad?.nombre ?? "el área"}
+              analisis={analisis}
+              puedeEditar={esAdmin}
+              desdeNumero={5}
+            />
+          </InformeDireccion>
+        ) : (
+          <InformeSecretaria
             reporte={reporte}
             trimestre={trimestre}
             anio={anio}
@@ -263,9 +293,10 @@ export default async function ReportesPage({
               unidadNombre={reporte.unidad?.nombre ?? "el área"}
               analisis={analisis}
               puedeEditar={esAdmin}
+              desdeNumero={4}
             />
-          </ReporteDocumento>
-        )
+          </InformeSecretaria>
+        ))
       )}
     </div>
   );
