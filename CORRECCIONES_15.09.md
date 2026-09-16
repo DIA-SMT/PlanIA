@@ -193,3 +193,63 @@ Es la misma pregunta abierta desde el 01.09 y su propio Anexo la deja pendiente.
 Sin esa fórmula, el punto 1 del modelo de Secretarías queda con un párrafo que no
 se puede completar. ¿Lo dejamos visible diciendo que falta la definición, como está
 hoy, o lo sacamos hasta que la tengan?
+
+---
+
+## Estado al 16.09: los 11 pedidos, cerrados
+
+Las cinco preguntas fueron respondidas: el calendario se importa una vez y se
+vuelve a correr cuando manden una planilla nueva; los modelos nuevos reemplazan al
+informe actual; SIPEM queda como nombre del informe y el resto del sistema sigue
+siendo PlanIA; el primer informe con el modelo nuevo es el del T3; y el "aporte al
+consolidado municipal" queda visible diciendo que falta la definición.
+
+| # | Pedido | Estado |
+|---|---|---|
+| 1 | Avance por Dirección fuera del menú del director | hecho |
+| 2 | Calendario de hitos en la agenda | hecho — 92 hitos cargados |
+| 3 y 4 | Los dos modelos nuevos de informe | hecho |
+| 5 | Proyectos del Plan Rector agrupados por área | hecho |
+| 6 | El avance del Plan Rector es el del POA 2026 | hecho |
+| 7 | Panel de cobertura solo para Planificación | hecho |
+| 8 | Solo los ámbitos donde el área tiene proyectos | hecho |
+| 9 | Borrar el reporte publicado de Ambiente | hecho |
+| 10 | Selector de áreas como el organigrama | hecho |
+| 11 | Las notificaciones no llegan | respondido: faltan las dos variables de correo |
+
+### Lo que cambió en los números
+
+El promedio pasó a calcularse como dice su propio Anexo: promedio simple de los
+proyectos **evaluables**, sin contar como cero a los que no tienen datos. Antes un
+proyecto sin cargar y uno cargado en cero pesaban igual, que es lo que hacía que un
+área con carga incompleta pareciera parada.
+
+**El promedio municipal sube de 40 % a 48 %.** Los movimientos más grandes:
+Innovación Tecnológica 61 → 82, Contaduría 36 → 65, Gobierno 17 → 30. Ninguna baja.
+Los "sin datos" no desaparecen: siguen contados y a la vista en la tabla de estados
+y en la cobertura de información.
+
+### Verificado contra producción (16.09)
+
+- Las 10 secretarías suman los 443 proyectos del municipio: el consolidado cierra.
+- En las 79 áreas el detalle de proyectos coincide con el total de la cabecera.
+- Las 79 áreas renderizan los dos modelos sin un solo número roto.
+- Las 10 direcciones sin proyectos —Movilidad Urbana, Tribunal de Faltas, Crédito
+  Público y las demás— ya salen con su secretaría en el encabezado y con la
+  comparación contra su área superior. Antes salían en blanco.
+- Los cuatro museos son nivel 3: se comparan contra la Dirección de Museos, no
+  contra la Subsecretaría de Cultura.
+
+### Lo que queda, y no depende de nosotros
+
+- La fórmula del **aporte al consolidado municipal**. El párrafo está en el
+  informe diciendo qué falta.
+- Las variables `RESEND_API_KEY` y `CORREO_REMITENTE` para que salgan los correos.
+- Los 17 íconos de ODS en `public/ods/`.
+- Que Planificación termine de confirmar las 327 imputaciones al Plan Rector que
+  quedan, más los 102 que van a mano (`PLAN_RECTOR_A_MANO.md`).
+- Si confirman que el sistema entero pasa a llamarse SIPEM, hay que cambiarlo en
+  el resto de las pantallas: hoy solo lo dicen los dos informes.
+
+`reporte-documento.tsx` y `anexo-metodologico.tsx` quedaron sin uso. No se borran
+todavía por si el modelo nuevo vuelve para atrás en la revisión.
