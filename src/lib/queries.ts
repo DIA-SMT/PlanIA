@@ -78,6 +78,16 @@ export interface HitoCalendario {
   nombre: string;
   secretaria: string | null;
   direccion: string | null;
+  /**
+   * true si el hito viene de antes y sigue después del período que se está
+   * mirando: no empieza ni termina acá, está en curso.
+   *
+   * Hace falta para ordenar. Hay 12 hitos que arrancan en enero y terminan en
+   * diciembre —programas sostenidos todo el año— y sin esto encabezan todas las
+   * semanas del calendario, empujando abajo lo que de verdad pasa en la semana
+   * que alguien está mirando.
+   */
+  enCurso: boolean;
 }
 
 /**
@@ -112,7 +122,18 @@ export async function getHitosDelRango(desde: string, hasta: string): Promise<Hi
     if (/does not exist|schema cache/i.test(error.message)) return [];
     throw error;
   }
-  return (data ?? []) as HitoCalendario[];
+
+  const filas = (data ?? []) as Omit<HitoCalendario, "enCurso">[];
+  return filas
+    .map((h) => ({ ...h, enCurso: h.fecha_desde < desde && h.fecha_hasta > hasta }))
+    // Primero lo que empieza o termina en este período, que es la novedad;
+    // después lo que viene de antes y sigue, que es contexto.
+    .sort(
+      (a, b) =>
+        Number(a.enCurso) - Number(b.enCurso) ||
+        a.fecha_desde.localeCompare(b.fecha_desde) ||
+        a.nombre.localeCompare(b.nombre, "es")
+    );
 }
 
 export async function getEventosAgenda(desde: string, hasta: string): Promise<EventoAgenda[]> {

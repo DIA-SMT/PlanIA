@@ -20,7 +20,7 @@
  *     busque `<c ...>...</c>` se come varias celdas de una. Por eso el parseo
  *     corta por tag y no por par de tags.
  */
-import { readFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, mkdtempSync, copyFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,8 +68,16 @@ async function main() {
     process.exit(1);
   }
 
+  // Un .xlsx es un zip, pero Expand-Archive mira la extensión y rechaza
+  // cualquier cosa que no termine en .zip. Se copia con ese nombre y listo.
   const dir = mkdtempSync(join(tmpdir(), "hitos-"));
-  execFileSync("powershell", ["-NoProfile", "-Command", `Expand-Archive -LiteralPath '${ruta}' -DestinationPath '${dir}' -Force`]);
+  const comoZip = join(dir, "libro.zip");
+  copyFileSync(ruta, comoZip);
+  execFileSync("powershell", [
+    "-NoProfile",
+    "-Command",
+    `Expand-Archive -LiteralPath '${comoZip}' -DestinationPath '${dir}' -Force`,
+  ]);
 
   const shared = readFileSync(join(dir, "xl/sharedStrings.xml"), "utf8");
   const sst = [...shared.matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>

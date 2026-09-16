@@ -31,20 +31,31 @@ function rango(desde: string, hasta: string): string {
 export function HitosDelPeriodo({ hitos }: { hitos: HitoCalendario[] }) {
   if (hitos.length === 0) return null;
 
+  const propios = hitos.filter((h) => !h.enCurso);
+  const enCurso = hitos.filter((h) => h.enCurso);
+
   return (
     <section className="rounded-xl border border-border bg-surface overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-border flex items-baseline gap-2">
+      <div className="px-4 py-2.5 border-b border-border flex items-baseline gap-2 flex-wrap">
         <h2 className="text-sm font-semibold text-foreground">Calendario de hitos</h2>
         <span className="text-[11px] text-muted">
-          {hitos.length} {hitos.length === 1 ? "hito" : "hitos"} en este período · del municipio
+          {propios.length > 0
+            ? `${propios.length} ${propios.length === 1 ? "hito" : "hitos"} en este período`
+            : "sin hitos propios de este período"}
+          {enCurso.length > 0 && ` · ${enCurso.length} en curso`} · del municipio
         </span>
       </div>
 
       <ul className="divide-y divide-border/60 max-h-72 overflow-y-auto">
         {hitos.map((h) => (
-          <li key={h.id} className="flex items-start gap-3 px-4 py-2">
+          <li
+            key={h.id}
+            className={`flex items-start gap-3 px-4 py-2 ${h.enCurso ? "opacity-60" : ""}`}
+          >
             <span className="text-[11px] text-muted tabular-nums shrink-0 w-28 pt-0.5">
-              {rango(h.fecha_desde, h.fecha_hasta)}
+              {/* Los que vienen de antes y siguen después no se fechan: repetir
+                  "5 ene al 30 dic" en cada semana del año no dice nada. */}
+              {h.enCurso ? "todo el período" : rango(h.fecha_desde, h.fecha_hasta)}
             </span>
             {h.tipo && (
               <span
