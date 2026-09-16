@@ -2,6 +2,7 @@ import {
   getUnidades,
   getAgendasSemana,
   getEventosAgenda,
+  getHitosDelRango,
   lunesIso,
   sumarDias,
   type EventoAgenda,
@@ -17,6 +18,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
 import { CalendarioVista } from "@/components/agenda/calendario-vista";
+import { HitosDelPeriodo } from "@/components/agenda/hitos-del-periodo";
 import { NuevaActividadForm } from "@/components/agenda/nueva-actividad-form";
 import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
 import { tokenDeUnidad } from "@/lib/ics";
@@ -102,11 +104,14 @@ export default async function AgendaPage({ searchParams }: Props) {
   // Datos
   // -------------------------------------------------------
   const semanaFoco = lunesIso(fecha); // semana de la lista de fichas de abajo
-  const [unidades, eventosRango, agendas, perfil] = await Promise.all([
+  const [unidades, eventosRango, agendas, perfil, hitos] = await Promise.all([
     getUnidades(),
     getEventosAgenda(desde, hasta),
     getAgendasSemana(semanaFoco),
     getPerfilActual(),
+    // 15.09, párrafo 803: los hitos del municipio los ve todo el mundo, sin
+    // filtro por área ni por rol.
+    getHitosDelRango(desde, hasta),
   ]);
   const esGlobal = perfilVeTodo(perfil);
 
@@ -294,6 +299,11 @@ export default async function AgendaPage({ searchParams }: Props) {
           hoy={hoy}
         />
       </Suspense>
+
+      {/* 15.09, párrafos 799 a 803: el calendario de hitos del municipio, que
+          ve cualquier usuario sea cual sea su perfil. Va arriba del calendario y
+          no dentro de los días: ver el comentario de HitosDelPeriodo. */}
+      <HitosDelPeriodo hitos={hitos} />
 
       <CalendarioVista
         vista={vista}

@@ -70,6 +70,51 @@ export interface EventoAgenda {
  * guarda por semana (lunes) + día de la semana, así que se traen las semanas
  * que solapan el rango y después se expande cada actividad a su fecha real.
  */
+export interface HitoCalendario {
+  id: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  tipo: string | null;
+  nombre: string;
+  secretaria: string | null;
+  direccion: string | null;
+}
+
+/**
+ * Los hitos del municipio que tocan un rango de fechas.
+ *
+ * 15.09, párrafos 799 a 803: "necesitamos que las fechas que tienen, con sus
+ * actividades, se visualicen en la agenda de todos los usuarios, no importa el
+ * tipo de perfil que tengan". Por eso no hay filtro por unidad ni por rol: la
+ * RLS de `hito_calendario` deja leer a cualquiera autenticado.
+ *
+ * Devuelve un hito por fila, NO uno por día. Medido sobre la planilla que
+ * mandaron: 54 de los 92 hitos tienen rango, la mediana de esos es de 29 días y
+ * hay días con 24 hitos encima. Repetir cada hito en cada día de su rango
+ * enterraría la agenda propia de cada área, que es lo que la pantalla existe
+ * para mostrar.
+ */
+export async function getHitosDelRango(desde: string, hasta: string): Promise<HitoCalendario[]> {
+  const supabase = await getSupabaseServer();
+  const { data, error } = await supabase
+    .from("hito_calendario")
+    .select("id, fecha_desde, fecha_hasta, tipo, nombre, secretaria, direccion")
+    // Se solapan si empiezan antes de que termine el rango y terminan después de
+    // que empiece.
+    .lte("fecha_desde", hasta)
+    .gte("fecha_hasta", desde)
+    .order("fecha_desde")
+    .order("nombre");
+
+  if (error) {
+    // La tabla llega con la migración 049 y el código se despliega solo: entre un
+    // deploy y que alguien aplique la migración, la agenda no se puede caer.
+    if (/does not exist|schema cache/i.test(error.message)) return [];
+    throw error;
+  }
+  return (data ?? []) as HitoCalendario[];
+}
+
 export async function getEventosAgenda(desde: string, hasta: string): Promise<EventoAgenda[]> {
   const supabase = await getSupabaseServer();
   const { data, error } = await supabase
