@@ -1108,6 +1108,19 @@ interface FichaPrismaInput {
   ancla?: string | null;
 }
 
+/**
+ * Las fichas del POA 2027.
+ *
+ * 17.09: "cada direccion pueda editar solo su poa". Las tres acciones hablan
+ * con `getSupabaseServer()` —el cliente CON la sesion del usuario— y no con el
+ * cliente suelto de `./supabase`, que se conecta con la clave publica y sin
+ * identificar a nadie. Con ese, la RLS de la migracion 050 no tendria a quien
+ * mirar y toda escritura fallaria.
+ *
+ * La RLS es la que manda. Las comprobaciones de aca arriba estan igual porque
+ * una fila que la RLS descarta no da error: el UPDATE afecta cero filas y la
+ * pantalla diria "guardado" sin haber guardado nada.
+ */
 export async function crearFichaPrisma(input: FichaPrismaInput) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
@@ -1121,6 +1134,7 @@ export async function crearFichaPrisma(input: FichaPrismaInput) {
     return { success: false, error: "El campo Programa/Proyecto es obligatorio" };
   }
 
+  const supabase = await getSupabaseServer();
   const { error } = await supabase.from("ficha_prisma").insert({
     unidad_id: perfil.unidad_id,
     anio: 2027,
@@ -1146,18 +1160,23 @@ export async function editarFichaPrisma(id: string, input: FichaPrismaInput) {
     return { success: false, error: "El campo Programa/Proyecto es obligatorio" };
   }
 
-  // Verificar pertenencia: el director solo edita fichas de su unidad
+  const supabase = await getSupabaseServer();
+
+  // La ficha tiene que estar dentro del alcance de CARGA, no solo ser de la
+  // propia direccion: el secretario carga sobre su arbol y el director tambien
+  // sobre su secretaria. Antes esto miraba la pertenencia solo cuando el rol
+  // era 'director', asi que un secretario, un subsecretario o un coordinador
+  // editaba la ficha de cualquier direccion del municipio.
   const { data: ficha } = await supabase
     .from("ficha_prisma")
     .select("unidad_id")
     .eq("id", id)
     .single();
   if (!ficha) return { success: false, error: "Ficha no encontrada" };
-  if (
-    perfil.rol === "director" &&
-    (ficha as { unidad_id: string }).unidad_id !== perfil.unidad_id
-  ) {
-    return { success: false, error: "No podés editar fichas de otra dirección" };
+
+  const alcance = await getScopeUnidades(perfil);
+  if (!alcance.includes((ficha as { unidad_id: string }).unidad_id)) {
+    return { success: false, error: "No podés editar fichas de otra área" };
   }
 
   const { error } = await supabase
@@ -1180,6 +1199,23 @@ export async function editarFichaPrisma(id: string, input: FichaPrismaInput) {
 export async function eliminarFichaPrisma(id: string) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
+
+  const supabase = await getSupabaseServer();
+
+  // Antes esto solo pedia estar logueado: cualquier usuario borraba la ficha de
+  // cualquier direccion pasando el id.
+  const { data: ficha } = await supabase
+    .from("ficha_prisma")
+    .select("unidad_id")
+    .eq("id", id)
+    .single();
+  if (!ficha) return { success: false, error: "Ficha no encontrada" };
+
+  const alcance = await getScopeUnidades(perfil);
+  if (!alcance.includes((ficha as { unidad_id: string }).unidad_id)) {
+    return { success: false, error: "No podés borrar fichas de otra área" };
+  }
+
   const { error } = await supabase
     .from("ficha_prisma")
     .update({ deleted_at: new Date().toISOString() })
