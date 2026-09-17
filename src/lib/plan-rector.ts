@@ -34,6 +34,7 @@ import {
   avanceMetaEnPlazo,
   calcularPorcentajeMeta,
   estadoDeAvance,
+  promedioDeProyectos,
 } from "./utils";
 
 // Los tipos y los helpers puros viven en plan-rector-comun.ts para que los
@@ -316,8 +317,7 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
     const deHijos = n.hijos.flatMap((h) => acumular(h));
     const todos = [...propios, ...deHijos];
     n.imputadosSubarbol = todos.length;
-    const conDato = todos.map((p) => p.pct).filter((x): x is number => x != null);
-    n.pct = conDato.length === 0 ? null : Math.round(conDato.reduce((a, b) => a + b, 0) / conDato.length);
+    n.pct = promedioDeProyectos(todos.map((p) => p.pct)).pct;
     // El cast es porque EstadoSemaforo incluye "gris", que estadoDeAvance no
     // devuelve nunca: es para nodos inactivos y acá no hay.
     n.estado = estadoDeAvance(n.pct) as NodoRectorArbol["estado"];

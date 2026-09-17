@@ -178,8 +178,10 @@ export default async function PlanRectorPage() {
           sobre ese ámbito van por ahí.
           {" "}El promedio se calcula igual que en el Panel Ejecutivo, así que las dos
           pantallas dicen lo mismo. Los proyectos sin datos cargados no cuentan como cero:
-          quedan afuera del promedio. Las líneas estratégicas se muestran completas pero no
-          se miden por separado.
+          quedan afuera del promedio. Los <strong>no iniciados sí cuentan</strong>: tienen
+          carga, su avance da 0 y promedian como 0. No es lo mismo un proyecto que no
+          arrancó que uno del que no sabemos nada. Las líneas estratégicas se muestran
+          completas pero no se miden por separado.
           {esPlanificacion && cobertura.pct < 60 && (
             <>
               {" "}

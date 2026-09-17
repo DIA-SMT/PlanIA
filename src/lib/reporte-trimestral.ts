@@ -21,6 +21,7 @@
  */
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { calcularFotoCorte } from "@/lib/corte-trimestral";
+import { promedioDeProyectos } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -161,10 +162,7 @@ function sumar(acc: ConteoEstados, fila: any, pcts: (number | null)[]) {
  * 0 sino null — no se puede promediar lo que no se midió.
  */
 function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
-  const evaluables = pcts.filter((p): p is number => p != null);
-  acc.pct = evaluables.length === 0
-    ? null
-    : Math.round(evaluables.reduce((a, p) => a + p, 0) / evaluables.length);
+  acc.pct = promedioDeProyectos(pcts).pct;
   acc.completitud_metas = acc.metas === 0
     ? null
     : Math.round((acc.metas_con_datos / acc.metas) * 100);
