@@ -253,6 +253,36 @@ export function avanceIndicador(ind: {
   return null; // sin dato
 }
 
+/**
+ * Promedio de un CONJUNTO DE PROYECTOS: un área, una dirección, un ámbito del
+ * Plan Rector.
+ *
+ * Promedia solo los proyectos que tienen dato. Un proyecto sin ningún indicador
+ * cargado no entra: no se sabe si avanzó, y meterlo como cero confunde "sin
+ * datos" con "sin avance". Es la fórmula que el propio Anexo del cliente define
+ * y la que usan el Plan Rector y los dos informes trimestrales.
+ *
+ * Los NO INICIADOS sí entran, y entran como 0: tienen carga y su avance dio
+ * cero, que es un dato y no una ausencia.
+ *
+ * No confundir con `avanceAgregado`, que es para lo de ADENTRO de un proyecto
+ * —indicadores dentro de una meta, metas dentro de un proyecto— donde una meta
+ * sin dato sí pesa como cero. Son dos reglas distintas a propósito: el Anexo
+ * habla de proyectos.
+ *
+ * Existe para que la regla esté escrita UNA vez. El 16.09 estaba copiada en el
+ * Plan Rector y en el reporte, y "Avance por Dirección" se había quedado con la
+ * vieja: 15 de las 49 direcciones mostraban un número distinto según qué
+ * pantalla se abriera.
+ */
+export function promedioDeProyectos(pcts: (number | null)[]): AvanceNivel {
+  const total = pcts.length;
+  const conDato = pcts.filter((p): p is number => p != null);
+  if (conDato.length === 0) return { pct: null, estado: "sin_datos", conDatos: 0, total };
+  const pct = Math.round(conDato.reduce((a, p) => a + p, 0) / conDato.length);
+  return { pct, estado: estadoDeAvance(pct), conDatos: conDato.length, total };
+}
+
 // Agrega los % de los hijos (contando todos; los null = 0 %). Si ninguno tiene
 // dato → pct null (sin datos).
 export function avanceAgregado(pcts: (number | null)[]): AvanceNivel {

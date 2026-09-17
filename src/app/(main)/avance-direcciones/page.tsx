@@ -9,7 +9,13 @@ import {
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getPerfilActual } from "@/lib/auth";
-import { avanceMetaEnPlazo, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
+import {
+  avanceMetaEnPlazo,
+  avanceAgregado,
+  promedioDeProyectos,
+  calcularPorcentajeMeta,
+  estadoDeAvance,
+} from "@/lib/utils";
 import Link from "next/link";
 import type { Meta, UnidadOrganizacional } from "@/types/database";
 
@@ -105,13 +111,16 @@ export default async function AvanceDireccionesPage() {
     (proyectosPorUnidad.get(py.unidad_id) ?? proyectosPorUnidad.set(py.unidad_id, []).get(py.unidad_id)!).push(py);
   }
 
-  // Resumen por dirección: avance = promedio de sus proyectos (contando todos)
+  // Resumen por dirección: promedio de sus proyectos, con la misma regla que el
+  // Plan Rector y los informes — los que no tienen dato quedan afuera en vez de
+  // contar como cero. Hasta el 16.09 esta pantalla los contaba como cero y por
+  // eso 15 de las 49 direcciones mostraban acá un número y en el reporte otro.
   const resumenes: ResumenDireccion[] = [];
   for (const [unidadId, pys] of proyectosPorUnidad.entries()) {
     const unidad = unidadById.get(unidadId);
     if (!unidad) continue;
     const pcts = pys.map((p) => avancePorProyecto.get(p.id) ?? null);
-    const agg = avanceAgregado(pcts);
+    const agg = promedioDeProyectos(pcts);
     const semaforo = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
     for (const p of pcts) semaforo[estadoDeAvance(p) as keyof typeof semaforo]++;
     resumenes.push({
@@ -136,7 +145,7 @@ export default async function AvanceDireccionesPage() {
   for (const [secId, lista] of porSecretaria.entries()) {
     const pysSec = lista.flatMap((l) => (proyectosPorUnidad.get(l.unidad.id) ?? []));
     const pcts = pysSec.map((p) => avancePorProyecto.get(p.id) ?? null);
-    promedioPorSec.set(secId, avanceAgregado(pcts).pct);
+    promedioPorSec.set(secId, promedioDeProyectos(pcts).pct);
   }
 
   const secretarias = Array.from(porSecretaria.keys())
@@ -154,6 +163,14 @@ export default async function AvanceDireccionesPage() {
         <h1 className="text-2xl font-bold text-foreground">Avance por Dirección</h1>
         <p className="text-sm text-muted mt-1">
           Avance de la POA de cada dirección: indicadores → metas → proyectos · {periodo.nombre}
+        </p>
+        {/* La misma aclaración que el Plan Rector, para que nadie tenga que
+            deducir por qué un área con la mitad sin cargar no aparece en cero. */}
+        <p className="text-xs text-muted/80 mt-2 leading-relaxed">
+          El promedio toma los proyectos que tienen datos cargados; los que no tienen
+          quedan afuera en vez de contar como cero, y se muestran aparte. Los{" "}
+          <strong>no iniciados sí cuentan</strong>: tienen carga y su avance da 0. Es la
+          misma cuenta que el Plan Rector y el reporte trimestral.
         </p>
       </div>
 
