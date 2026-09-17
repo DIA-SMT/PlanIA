@@ -12,6 +12,7 @@ import { ProyectoAcciones } from "@/components/dashboard/proyecto-acciones";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual } from "@/lib/auth";
+import { FichaDelLibroPOA, fichaDelLibro } from "@/components/proyectos/ficha-del-libro";
 import { formatFecha, calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceIndicadorEnPlazo } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
@@ -48,11 +49,10 @@ export default async function ProyectoDetallePage({
   const perfil = await getPerfilActual();
 
   // Espejo de `usuario_puede_cargar_unidad` (SQL). Se usa el helper y no una
-  // cadena de ifs propia para que la UI no quede atrás de la RLS: hasta la
-  // migración 042 acá se comparaba `perfil.unidad_id === proyecto.unidad_id`
-  // para el director, y desde el 26.08 el director también carga sobre las
-  // unidades por ENCIMA de la suya (su subsecretaría y su secretaría). Con la
-  // comparación vieja, la base se lo permitía y la pantalla no.
+  // cadena de ifs propia para que la UI no quede atrás de la RLS: la regla vive
+  // en tres lugares —la función SQL, `getScopeUnidades` y este helper— y el
+  // 17.09 se cambió en los tres a la vez. Si se toca uno solo, la pantalla
+  // ofrece lo que la base rechaza, o al revés.
   const unidades = await getUnidades();
   const puedeCargar =
     !!perfil &&
@@ -78,6 +78,9 @@ export default async function ProyectoDetallePage({
   const estadoGlobal = avanceProy.estado;
   const tieneSeguimiento = avanceProy.conDatos > 0;
   const conDatosInd = indicadores.filter((i) => avanceIndicadorEnPlazo(i, ahora) != null).length;
+
+  // La ficha que trae el libro del POA de la secretaría, si se importó.
+  const ficha = fichaDelLibro(proyecto.metadata);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -152,6 +155,10 @@ export default async function ProyectoDetallePage({
           {proyecto.fecha_fin && <span>Fin: {formatFecha(proyecto.fecha_fin)}</span>}
         </div>
       </div>
+
+      {/* Lo que dice el libro del POA sobre este proyecto (17.09). Si no se
+          importó su ficha, no aparece nada. */}
+      {ficha && <FichaDelLibroPOA ficha={ficha} descripcion={proyecto.descripcion ?? null} />}
 
       {/* Plan Rector: acá se produce el vínculo que el Excel del cliente no trajo. */}
       <ImputacionCard

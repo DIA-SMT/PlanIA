@@ -31,9 +31,16 @@ export const getPerfilActual = cache(async function getPerfilActual(): Promise<P
  * la app de `usuario_puede_cargar_unidad` (SQL), y se usa para decidir qué
  * mostrar como editable. La RLS sigue siendo la que manda.
  * - intendenta / admins → todas las unidades activas
- * - director → su unidad + descendientes + ANCESTROS (26.08: carga también en
- *   su subsecretaría y su secretaría)
- * - resto → su unidad + descendientes
+ * - todos los demás → su unidad + lo que cuelga de ella
+ *
+ * 17.09: "los directores solo pueden trabajar y cargar los datos de su
+ * dirección". Hasta acá el director sumaba también sus ANCESTROS, por el pedido
+ * del 26.08 de poder cargar en su secretaría (migración 042). El pedido nuevo
+ * es el contrario y con la regla general, así que los cuatro roles quedan con
+ * el mismo criterio y lo único que los distingue es de dónde cuelgan.
+ *
+ * Va junto con la migración 051: si cambia solo acá, la pantalla deja de
+ * ofrecer lo que la base sigue permitiendo.
  */
 export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]> {
   const supabase = await getSupabaseServer();
@@ -49,23 +56,11 @@ export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]>
 
   if (!perfil.unidad_id) return [];
 
-  const idsDe = (data: unknown) =>
-    ((data ?? []) as { id: string }[]).map((row) => row.id);
-
-  if (perfil.rol === "director") {
-    const [descendientes, ancestros] = await Promise.all([
-      supabase.rpc("unidades_descendientes", { p_unidad_id: perfil.unidad_id }),
-      supabase.rpc("unidades_ancestras", { p_unidad_id: perfil.unidad_id }),
-    ]);
-    // `unidades_descendientes` incluye la propia; `unidades_ancestras` no la
-    // repite, pero el Set deja el resultado a prueba de eso igual.
-    return [...new Set([...idsDe(descendientes.data), ...idsDe(ancestros.data)])];
-  }
-
+  // `unidades_descendientes` incluye la propia unidad.
   const { data } = await supabase.rpc("unidades_descendientes", {
     p_unidad_id: perfil.unidad_id,
   });
-  return idsDe(data);
+  return ((data ?? []) as { id: string }[]).map((row) => row.id);
 }
 
 /**
@@ -77,12 +72,15 @@ export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]>
  * contiene la información de todas las subsecretarías de la Sec. Gral. Esto no
  * puede ser así").
  *
- * `getScopeUnidades` es el alcance de CARGA, y desde el 26.08 al director le da
- * también sus ancestros, porque se pidió que pudiera cargar proyectos en su
- * secretaría (página 38). Eso está bien para escribir y está mal para leer: el
- * reporte lo usaba como puerta y por eso un director veía el cuadro de toda la
- * secretaría. Las dos reglas son distintas y ahora son dos funciones distintas;
- * unificarlas volvería a romper una de las dos.
+ * `getScopeUnidades` es el alcance de CARGA. Entre el 26.08 y el 17.09 al
+ * director le daba también sus ancestros, porque habían pedido que pudiera
+ * cargar en su secretaría (página 38), y el reporte usaba esa misma función
+ * como puerta: por eso un director veía el cuadro de toda la secretaría. El
+ * 17.09 la carga volvió a ser solo hacia abajo, así que hoy las dos funciones
+ * devuelven casi lo mismo. Siguen separadas a propósito: son dos preguntas
+ * distintas —qué puedo escribir y qué puedo leer— y juntarlas hace que el día
+ * que una cambie se lleve puesta a la otra sin que nadie lo note, que es
+ * exactamente lo que pasó en agosto.
  *
  *   Director      → su dirección y sus departamentos
  *   Subsecretario → su subsecretaría y las direcciones a su cargo

@@ -541,8 +541,9 @@ export function ancestrosUnidades<T extends { id: string; parent_id: string | nu
  * (SQL) — la RLS sigue siendo la que manda; esto es solo para no ofrecer en la
  * UI opciones que la base va a rechazar.
  *
- * El director carga en su unidad y en las de arriba (su subsecretaría si tiene,
- * y su secretaría), no en las direcciones hermanas. (26.08)
+ * Todos cargan sobre su unidad y las que cuelgan de ella. El director, desde el
+ * 17.09, ya no alcanza a las de arriba: "los directores solo pueden trabajar y
+ * cargar los datos de su dirección" (migración 051, que revierte la 042).
  *
  * Ojo: `intendenta` y `admin_tecnico` ven todo pero no cargan nada, igual que
  * en la función SQL. Para la agenda semanal la regla es otra: ver
@@ -556,11 +557,7 @@ export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string
   // Copia, no el array de entrada: quien la reciba puede ordenarla in-place.
   if (perfil.rol === "admin_funcional") return [...unidades];
   if (!perfil.unidad_id) return [];
-  if (perfil.rol === "director") {
-    const propia = unidades.filter((u) => u.id === perfil.unidad_id);
-    return [...propia, ...ancestrosUnidades(unidades, perfil.unidad_id)];
-  }
-  if (perfil.rol === "secretario" || perfil.rol === "subsecretario" || perfil.rol === "coordinador") {
+  if (["director", "secretario", "subsecretario", "coordinador"].includes(perfil.rol ?? "")) {
     return subtreeUnidades(unidades, perfil.unidad_id);
   }
   return [];
