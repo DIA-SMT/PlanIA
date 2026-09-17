@@ -1,0 +1,25 @@
+const MESES: Record<string, number> = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+};
+
+/**
+ * "enero a diciembre de 2026", "Enero/Diciembre 2026", "marzo a diciembre".
+ *
+ * Devuelve el primer dia del mes de inicio y el ultimo del mes de fin. Si no se
+ * entiende, null: es preferible dejar la fecha vacia a inventar uno.
+ */
+function fechasDelPeriodo(texto: string | undefined): { inicio: string; fin: string } | null {
+  if (!texto) return null;
+  const t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const anio = Number(t.match(/\b(20\d\d)\b/)?.[1] ?? 2026);
+  const nombres = Object.keys(MESES).join("|");
+  const rango = t.match(new RegExp(`\b(${nombres})\b\s*(?:a|hasta|al|/|-|\u2013)\s*\b(${nombres})\b`));
+  if (!rango) return null;
+  const m1 = MESES[rango[1]];
+  const m2 = MESES[rango[2]];
+  const dosDigitos = (n: number) => String(n).padStart(2, "0");
+  const ultimoDia = new Date(Date.UTC(anio, m2, 0)).getUTCDate();
+  return { inicio: `${anio}-${dosDigitos(m1)}-01`, fin: `${anio}-${dosDigitos(m2)}-${dosDigitos(ultimoDia)}` };
+}
+
