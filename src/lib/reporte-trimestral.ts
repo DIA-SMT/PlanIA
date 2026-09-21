@@ -21,7 +21,7 @@
  */
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { calcularFotoCorte } from "@/lib/corte-trimestral";
-import { promedioDeProyectos, avanceAgregado } from "@/lib/utils";
+import { promedioDeProyectos } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -33,18 +33,6 @@ export interface ConteoEstados {
   sin_datos: number;
   /** Promedio de avance de los proyectos de la fila. null si ninguno tiene dato. */
   pct: number | null;
-  /**
-   * El mismo promedio pero SOBRE EL TOTAL de proyectos: los que no tienen dato
-   * pesan como cero en vez de quedar afuera.
-   *
-   * 18.09, párrafo 970: el informe dice "presenta un avance del X % sobre el
-   * total de los proyectos planificados". Va aparte y no reemplaza a `pct`
-   * porque `pct` es el que usan el Plan Rector, el Panel y Avance por Dirección,
-   * y esos tres tienen que seguir diciendo el mismo número entre sí.
-   *
-   * Sobre los 443 proyectos del municipio: `pct` da 48 % y este 41 %.
-   */
-  pct_sobre_total: number | null;
   /**
    * Proporción de proyectos con datos cargados, 0-100.
    *
@@ -134,7 +122,7 @@ export interface ReporteUnidad {
 
 const VACIO = (): ConteoEstados => ({
   proyectos: 0, finalizados: 0, en_ejecucion: 0, no_iniciados: 0, sin_datos: 0,
-  pct: null, pct_sobre_total: null, indice_carga: null,
+  pct: null, indice_carga: null,
   metas: 0, metas_con_datos: 0, indicadores: 0, indicadores_con_datos: 0,
   completitud_metas: null, completitud_indicadores: null,
 });
@@ -175,7 +163,6 @@ function sumar(acc: ConteoEstados, fila: any, pcts: (number | null)[]) {
  */
 function cerrar(acc: ConteoEstados, pcts: (number | null)[]): ConteoEstados {
   acc.pct = promedioDeProyectos(pcts).pct;
-  acc.pct_sobre_total = avanceAgregado(pcts).pct;
   acc.completitud_metas = acc.metas === 0
     ? null
     : Math.round((acc.metas_con_datos / acc.metas) * 100);
