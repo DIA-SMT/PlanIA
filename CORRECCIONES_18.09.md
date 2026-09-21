@@ -102,3 +102,68 @@ para lo mismo.
 avisos?**
 Si es el informe, hace falta decidir cuándo se manda (al cerrar el trimestre, al
 publicarlo), a quién exactamente y si va el PDF adjunto o un enlace.
+
+---
+
+## Estado al 21.09: los tres bloques hechos
+
+Se implementó **literalmente lo que dice el documento**, sin esperar respuesta a
+las cinco preguntas de arriba. Quedan anotadas porque dos de ellas cambian
+números que ellos van a ver.
+
+| Bloque | Estado |
+|---|---|
+| Los hitos dentro de la cuadrícula, con el interruptor "Evento" | hecho |
+| El informe de avance, un solo modelo con tres secciones | hecho |
+| El área como desplegable y los tres botones | hecho |
+| El informe por correo a cada responsable | hecho |
+
+### Lo que se borró, porque el modelo nuevo no lo tiene
+
+`informe-secretaria.tsx`, `informe-direccion.tsx`, `partes-informe.tsx`,
+`anexo-sipem.tsx`, `anexo-metodologico.tsx`, `reporte-documento.tsx`,
+`analisis-form.tsx` y `boton-imprimir.tsx`. Con ellos se van el Anexo I, las dos
+secciones que redactaba Planificación, la comparación contra el municipio, los
+indicadores clave y la completitud de metas e indicadores. La tabla
+`reporte_analisis` y sus acciones quedan en la base, sin usar: borrarlas sería
+tirar lo que ya escribieron.
+
+### El número del punto 1 cambia
+
+El modelo dice "un avance del X % **sobre el total de los proyectos
+planificados**", así que los proyectos sin datos vuelven a pesar como cero:
+
+| | promedio de evaluables | sobre el total |
+|---|---|---|
+| Municipio | 49 % | **41 %** |
+| Innovación Tecnológica | 87 % | **59 %** |
+| Contaduría General | 65 % | **36 %** |
+| Niñez y Juventud | 58 % | 58 % |
+
+Va en un campo aparte, `pct_sobre_total`. **No se tocó `pct`**: ese lo usan el
+Plan Rector, el Panel Ejecutivo y Avance por Dirección, que el 17.09 se
+unificaron para que digan el mismo número entre sí. Si ahora el informe dijera
+uno distinto del Panel, es a propósito y es lo que pidieron.
+
+### El envío del informe por correo
+
+Va en la pantalla de **Cortes trimestrales** y lo dispara Planificación a mano.
+No sale solo al cerrar el trimestre: son 63 correos y conviene que alguien
+decida cuándo salen. Cada uno recibe el informe de **su** área, con sus números
+y el enlace al detalle; las áreas sin proyectos no reciben nada. Hay un botón de
+ensayo que cuenta a cuántos les llegaría sin mandar nada.
+
+Medido hoy: **67 responsables**, todos con correo cargado, **63 recibirían** el
+informe cubriendo **57 áreas**.
+
+**Ojo con esto:** cuatro direcciones tienen proyectos y **ningún usuario
+cargado**, así que su informe no le llega a nadie.
+
+| Dirección | Proyectos |
+|---|---|
+| Parque 9 de Julio | 30 |
+| Salud Ambiental | 12 |
+| Ambiente | 11 |
+| Bromatología | 9 |
+
+Son 62 proyectos. Hay que crearles usuario o decir quién los recibe.
