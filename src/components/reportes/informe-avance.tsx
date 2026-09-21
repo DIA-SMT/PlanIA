@@ -81,8 +81,24 @@ export function InformeAvance({
             que es como está escrito en el documento. */}
         <dl className="space-y-1 text-xs">
           {[
-            { rotulo: "Secretaría", valor: nivel === 0 ? reporte.unidad?.nombre : reporte.ruta.secretaria },
-            { rotulo: "Subsecretaría", valor: nivel === 1 ? reporte.unidad?.nombre : reporte.ruta.subsecretaria },
+            {
+              rotulo: "Secretaría",
+              valor: nivel === 0 ? reporte.unidad?.nombre : reporte.ruta.secretaria,
+            },
+            {
+              rotulo: "Subsecretaría",
+              // En el informe de una Secretaría esta línea va vacía. Antes salía
+              // con la subsecretaría del PRIMER proyecto del área, que no quiere
+              // decir nada: el informe de Secretaría General decía
+              // "Subsecretaría: Gestión Estratégica y Documentación" como si
+              // fuera de ella.
+              valor:
+                nivel === 0
+                  ? null
+                  : nivel === 1
+                  ? reporte.unidad?.nombre
+                  : reporte.ruta.subsecretaria,
+            },
             { rotulo: "Dirección", valor: nivel >= 2 ? reporte.unidad?.nombre : null },
             {
               rotulo: "Fecha de corte",

@@ -1,6 +1,6 @@
 import { getPerfilActual, getScopeReporte } from "@/lib/auth";
 import { hoyLocal } from "@/lib/utils";
-import { trimestreDe, ultimoCierrePasado } from "@/lib/corte-trimestral";
+import { trimestreDe } from "@/lib/corte-trimestral";
 import {
   getReporteUnidad,
   getUnidadesParaReporte,
@@ -82,12 +82,16 @@ export default async function ReportesPage({
   const verCorte = params.corte != null && cortes.length > 0;
   const corteElegido = verCorte ? cortes[0] : undefined;
 
-  // El trimestre del informe: el del corte si hay uno, si no el del último
-  // cierre pasado. NO el del día de hoy: del 1 al 30 de octubre el trimestre en
-  // curso es el cuarto, pero el informe que se está armando es del tercero.
-  const cierre = ultimoCierrePasado(hoy);
-  const trimestre = corteElegido?.trimestre ?? (Number(params.t) || trimestreDe(cierre));
-  const anio = corteElegido?.anio ?? Number(cierre.slice(0, 4));
+  // El trimestre que rotula el informe.
+  //
+  // Con "Generar Informe" es el del corte: ese es el informe oficial de un
+  // trimestre cerrado. Con "Vista previa" son los datos de HOY, así que el
+  // rótulo es el trimestre de hoy: el 21 de septiembre decía "Segundo
+  // trimestre" —el último cerrado— arriba de datos de septiembre, que es el
+  // tercero.
+  const trimestre =
+    corteElegido?.trimestre ?? (Number(params.t) || trimestreDe(hoy));
+  const anio = corteElegido?.anio ?? Number(hoy.slice(0, 4));
 
   let reporte: Awaited<ReturnType<typeof getReporteUnidad>> | null = null;
   let errorReporte: string | null = null;

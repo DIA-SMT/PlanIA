@@ -118,9 +118,22 @@ export function formatFechaRelativa(fecha: string | null): string {
   return `Hace ${Math.floor(diffDias / 30)} mes(es)`;
 }
 
+/**
+ * Una fecha sola —"2026-09-21"— es un día del calendario, no un instante.
+ *
+ * `new Date("2026-09-21")` la interpreta como medianoche UTC, y al mostrarla en
+ * Tucumán (UTC-3) da el 20. En Vercel no se notaba porque el servidor corre en
+ * UTC, pero el mismo informe abierto desde una máquina de acá decía un día menos
+ * en la fecha de corte. Agregarle la hora la ancla al día local, que es el que
+ * la persona escribió.
+ */
+function comoDiaLocal(fecha: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? new Date(`${fecha}T00:00:00`) : new Date(fecha);
+}
+
 export function formatFecha(fecha: string | null): string {
   if (!fecha) return "—";
-  return new Date(fecha).toLocaleDateString("es-AR", {
+  return comoDiaLocal(fecha).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
