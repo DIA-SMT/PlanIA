@@ -1,4 +1,4 @@
-import { formatFecha } from "@/lib/utils";
+import { avanceGlobalPorConteo, formatFecha } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
 
 /**
@@ -42,6 +42,14 @@ export function InformeAvance({
   const nivel = reporte.unidad?.nivel ?? 0;
   const r = rotulos(nivel);
   const pctDe = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
+
+  // El mismo numero del medidor del Panel Ejecutivo, con su misma funcion.
+  const avance = avanceGlobalPorConteo({
+    verde: t.finalizados,
+    amarillo: t.en_ejecucion,
+    rojo: t.no_iniciados,
+    sin_datos: t.sin_datos,
+  });
 
   const filas = [
     { icono: "🟢", nombre: "Finalizados", cantidad: t.finalizados },
@@ -92,25 +100,27 @@ export function InformeAvance({
         <h2 className="text-base font-bold text-foreground">
           1. Desempeño de la {r.titulo.toLowerCase()} en el contexto municipal
         </h2>
-        {/* 21.09: "en el informe tiene que coincidir el porcentaje del grado de
-            avance con lo que dice el sistema". Asi que va `pct`, el mismo
-            promedio que muestran el Plan Rector y Avance por Direccion, y no el
-            calculado sobre el total que pedia el modelo del 18.09 —ese daba
-            41 % donde el resto del sistema dice 49 %.
+        {/* DE DONDE SALE ESTE NUMERO, que se corrigio dos veces el mismo dia.
+            21.09: "aquí debería estar el 66 % que dice el panel ejecutivo".
+            Es el medidor del Panel —finalizados + en ejecución sobre el total—
+            y no el promedio de los porcentajes de cada proyecto. Son dos cuentas
+            distintas y para la Secretaría General del segundo trimestre daban
+            66 % y 45 %.
 
-            La frase dice "que cuentan con informacion cargada" y no "sobre el
-            total" justamente por eso: el numero que piden deja afuera a los
-            proyectos sin datos, y la oracion tiene que describir lo que el
-            numero hace. */}
+            Por eso llama a `avanceGlobalPorConteo`, la misma función del Panel y
+            de la pantalla de TV, en vez de repetir la division acá: el pedido es
+            que los dos digan lo mismo, y la unica forma de que eso se sostenga
+            es que sea la misma cuenta y no dos que hoy coinciden. */}
         <p className="text-xs text-foreground/90 leading-relaxed">
           De acuerdo con los registros disponibles en SIPEM al momento del corte, {r.el}{" "}
           presenta un avance del{" "}
-          <strong className="tabular-nums">{t.pct != null ? `${t.pct} %` : "—"}</strong> sobre
-          los proyectos planificados que cuentan con información cargada
+          <strong className="tabular-nums">{avance != null ? `${avance} %` : "—"}</strong>, que
+          corresponde a los proyectos finalizados y en ejecución sobre el total de los
+          proyectos planificados
           {t.proyectos > 0 && (
             <>
               {" "}
-              (<span className="tabular-nums">{t.proyectos - t.sin_datos}</span> de{" "}
+              (<span className="tabular-nums">{t.finalizados + t.en_ejecucion}</span> de{" "}
               <span className="tabular-nums">{t.proyectos}</span>)
             </>
           )}
