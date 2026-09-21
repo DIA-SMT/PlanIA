@@ -1,4 +1,4 @@
-import { formatFecha } from "@/lib/utils";
+import { formatFecha, avanceGlobalPorConteo } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
 
 /**
@@ -42,6 +42,16 @@ export function InformeAvance({
   const nivel = reporte.unidad?.nivel ?? 0;
   const r = rotulos(nivel);
   const pctDe = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
+
+  // El mismo número que el medidor "Cumplimiento global del POA" del Panel
+  // Ejecutivo: finalizados + en ejecución sobre el total. Se calcula con la
+  // misma función que usa el Panel para que no puedan separarse nunca.
+  const avance = avanceGlobalPorConteo({
+    verde: t.finalizados,
+    amarillo: t.en_ejecucion,
+    rojo: t.no_iniciados,
+    sin_datos: t.sin_datos,
+  }) ?? 0;
 
   const filas = [
     { icono: "🟢", nombre: "Finalizados", cantidad: t.finalizados },
@@ -92,29 +102,25 @@ export function InformeAvance({
         <h2 className="text-base font-bold text-foreground">
           1. Desempeño de la {r.titulo.toLowerCase()} en el contexto municipal
         </h2>
-        {/* 21.09: "en el informe tiene que coincidir el porcentaje del grado de
-            avance con lo que dice el sistema". Asi que va `pct`, el mismo
-            promedio que muestran el Plan Rector y Avance por Direccion, y no el
-            calculado sobre el total que pedia el modelo del 18.09 —ese daba
-            41 % donde el resto del sistema dice 49 %.
+        {/* 21.09: "aquí debería estar el 66 % que dice el panel ejecutivo".
+            Es el "Cumplimiento global del POA" del Panel: los proyectos
+            finalizados más los que están en ejecución, sobre el total del área.
+            No es el promedio de cuánto avanzó cada uno.
 
-            La frase dice "que cuentan con informacion cargada" y no "sobre el
-            total" justamente por eso: el numero que piden deja afuera a los
-            proyectos sin datos, y la oracion tiene que describir lo que el
-            numero hace. */}
+            Por eso queda la frase tal como la escribieron en el modelo —"sobre
+            el total de los proyectos planificados"—: con esta cuenta el
+            denominador SÍ es el total, incluidos los no iniciados y los que no
+            tienen datos, que aportan cero.
+
+            Es el tercer número que se probó acá en cuatro días: el modelo del
+            18.09 pedía el promedio sobre el total (45 % en Secretaría General),
+            después que coincidiera con el sistema (48 %), y ahora que coincida
+            con el Panel (66 %). Este último es el único que se puede verificar
+            mirando las dos pantallas juntas. */}
         <p className="text-xs text-foreground/90 leading-relaxed">
           De acuerdo con los registros disponibles en SIPEM al momento del corte, {r.el}{" "}
-          presenta un avance del{" "}
-          <strong className="tabular-nums">{t.pct != null ? `${t.pct} %` : "—"}</strong> sobre
-          los proyectos planificados que cuentan con información cargada
-          {t.proyectos > 0 && (
-            <>
-              {" "}
-              (<span className="tabular-nums">{t.proyectos - t.sin_datos}</span> de{" "}
-              <span className="tabular-nums">{t.proyectos}</span>)
-            </>
-          )}
-          .
+          presenta un avance del <strong className="tabular-nums">{avance} %</strong> sobre el
+          total de los proyectos planificados.
         </p>
       </section>
 
