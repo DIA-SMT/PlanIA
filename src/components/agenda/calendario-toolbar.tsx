@@ -22,6 +22,10 @@ interface Props {
   anterior: string;
   siguiente: string;
   hoy: string;
+  /** Si los hitos del municipio se pintan dentro de la cuadrícula. */
+  eventos: boolean;
+  /** Cuántos hitos hay en el período, para no ofrecer un interruptor vacío. */
+  cantidadEventos: number;
 }
 
 /**
@@ -42,6 +46,8 @@ export function CalendarioToolbar({
   anterior,
   siguiente,
   hoy,
+  eventos,
+  cantidadEventos,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -121,6 +127,31 @@ export function CalendarioToolbar({
           </button>
         </div>
         <h2 className="text-base font-semibold text-foreground capitalize mx-1">{titulo}</h2>
+
+        {/* 18.09: "a la par del mes debería existir una sola opción que diga
+            Evento". Prende y apaga los hitos del municipio dentro de la
+            cuadrícula. Vive en la URL, así el que prefiere ver solo la agenda de
+            su área se guarda el enlace con los hitos apagados. */}
+        {cantidadEventos > 0 && (
+          <button
+            onClick={() => navegar({ eventos: eventos ? "0" : null })}
+            aria-pressed={eventos}
+            title={
+              eventos
+                ? "Ocultar los hitos del municipio"
+                : "Mostrar los hitos del municipio en el calendario"
+            }
+            className={`text-xs rounded-lg px-2.5 py-1.5 border inline-flex items-center gap-1.5 transition-colors ${
+              eventos
+                ? "border-accent/40 bg-accent/10 text-accent"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${eventos ? "bg-accent" : "bg-muted/50"}`} />
+            Evento
+            <span className="tabular-nums opacity-70">{cantidadEventos}</span>
+          </button>
+        )}
 
         <div className="ml-auto flex items-center rounded-lg border border-border overflow-hidden">
           {btnVista("mes", "Mes")}

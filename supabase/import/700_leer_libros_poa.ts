@@ -67,9 +67,15 @@ function textoDeDocx(ruta: string): string {
   return xml
     .split(/<\/w:p>/)
     .map((p) =>
-      [...p.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
+      // `<w:t>` y `<w:t xml:space="preserve">`, NADA MÁS. Con `<w:t[^>]*>` se
+      // colaba `<w:tblPr>`, que empieza igual, y por esa vía entraban cientos de
+      // caracteres de XML de tablas en medio del texto. Pasó: cuatro proyectos
+      // de Servicios Públicos quedaron con XML crudo en la descripción.
+      [...p.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
         .map((m) => m[1])
         .join("")
+        // Red de seguridad: si algún día se cuela otra etiqueta, no llega al dato.
+        .replace(/<[^>]*>/g, "")
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")

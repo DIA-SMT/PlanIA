@@ -18,7 +18,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
 import { CalendarioVista } from "@/components/agenda/calendario-vista";
-import { HitosDelPeriodo } from "@/components/agenda/hitos-del-periodo";
 import { NuevaActividadForm } from "@/components/agenda/nueva-actividad-form";
 import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
 import { tokenDeUnidad } from "@/lib/ics";
@@ -34,6 +33,8 @@ interface Props {
     sub?: string;
     dir?: string;
     q?: string;
+    /** "0" apaga los hitos del municipio dentro de la cuadrícula (18.09). */
+    eventos?: string;
     // Compatibilidad con los links viejos (?semana=YYYY-MM-DD)
     semana?: string;
   }>;
@@ -53,6 +54,9 @@ export default async function AgendaPage({ searchParams }: Props) {
   const vista: VistaCalendario =
     params.vista === "semana" || params.vista === "dia" ? params.vista : "mes";
   const fecha = esIso(params.fecha) ? params.fecha : esIso(params.semana) ? params.semana : hoy;
+  // 18.09: los hitos del municipio se pintan dentro de la cuadrícula y el
+  // interruptor "Evento" de la barra los saca. Prendido por defecto.
+  const verHitos = params.eventos !== "0";
 
   // -------------------------------------------------------
   // Rango de días que se muestra según la vista
@@ -297,13 +301,10 @@ export default async function AgendaPage({ searchParams }: Props) {
           anterior={anterior}
           siguiente={siguiente}
           hoy={hoy}
+          eventos={verHitos}
+          cantidadEventos={hitos.length}
         />
       </Suspense>
-
-      {/* 15.09, párrafos 799 a 803: el calendario de hitos del municipio, que
-          ve cualquier usuario sea cual sea su perfil. Va arriba del calendario y
-          no dentro de los días: ver el comentario de HitosDelPeriodo. */}
-      <HitosDelPeriodo hitos={hitos} />
 
       <CalendarioVista
         vista={vista}
@@ -313,6 +314,7 @@ export default async function AgendaPage({ searchParams }: Props) {
         hoy={hoy}
         indicePorUnidad={indicePorUnidad}
         unidadesEditables={unidadesEditables.map((u) => u.id)}
+        hitos={verHitos ? hitos : []}
         altaDelDia={
           vista === "dia" ? (
             <NuevaActividadForm

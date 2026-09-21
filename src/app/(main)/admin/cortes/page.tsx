@@ -1,6 +1,7 @@
 import { getPerfilActual } from "@/lib/auth";
 import { listarCortes, finDeTrimestre, ultimoCierrePasado } from "@/lib/corte-trimestral";
 import { TomarCorteBoton } from "@/components/admin/tomar-corte-boton";
+import { EnviarInformesBoton } from "@/components/admin/enviar-informes-boton";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatFecha, hoyLocal } from "@/lib/utils";
@@ -142,6 +143,30 @@ export default async function CortesPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* 18.09, párrafo 1033: "la idea es que le llegue el informe a cada mail,
+          a cada secretario, subsecretario y director". Va acá y no en la
+          pantalla del reporte, que quedó con solo tres botones, y se dispara a
+          mano: son 68 correos y conviene que alguien decida cuándo salen. */}
+      {cortes.length > 0 && (
+        <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">
+              Enviar el informe a los responsables
+            </h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              A cada secretario, subsecretario y director le llega por correo el informe de
+              avance de <strong>su</strong> área, con sus números y el enlace al detalle. Las
+              áreas sin proyectos no reciben nada. Sale del último corte tomado:{" "}
+              {cortes[0].anio} · T{cortes[0].trimestre} del {formatFecha(cortes[0].fecha_corte)}.
+            </p>
+          </div>
+          <EnviarInformesBoton
+            corteId={cortes[0].id}
+            etiqueta={`${cortes[0].trimestre}° trimestre ${cortes[0].anio}`}
+          />
+        </section>
       )}
 
       <p className="text-[11px] text-muted/70 leading-relaxed">

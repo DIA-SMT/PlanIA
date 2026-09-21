@@ -1,11 +1,11 @@
 # Libros del POA 2026: lo que hay que mirar a mano
 
-Generado el 2026-09-17 a partir de 8 libros.
+Generado el 2026-09-21 a partir de 8 libros.
 
-Se leyeron **366** proyectos. **331** emparejaron solos con un proyecto
+Se leyeron **366** proyectos. **330** emparejaron solos con un proyecto
 del sistema. Acá están los otros dos grupos, que nadie carga hasta que estén revisados.
 
-## Emparejados pero dudosos (21)
+## Emparejados pero dudosos (22)
 
 El nombre del libro y el del sistema se parecen pero no son iguales. Si es el mismo
 proyecto, no hay que hacer nada; si no lo es, avisá y lo sacamos.
@@ -27,6 +27,7 @@ proyecto, no hay que hacer nada; si no lo es, avisá y lo sacamos.
 | Dirección de Adulto Mayor | Cierre institucional | Cierre de año y exposición de talleres | 0.5 |
 | Dirección de Salud | Capacitación en RCP y uso del DEA CUANTITATIVO | Capacitación al Personal de la Dirección de Salud | 0.5 |
 | Dirección de Vía Pública | Capacitación al Personal de la Dirección de Salud CUANTITATIVO | Fortalecimiento Institucional y Capacitación del Personal | 0.5 |
+| Dirección de Salud | Mes del cuidado de la mujer | Tráiler Integral de la Mujer | 0.5 |
 | Direccion de Inteligencia Artificial | Programas de Capacitación y Formación Comunitaria CUANTITATIVO | Capacitacion Funcionarios | 0.5 |
 | Direccion de Inteligencia Artificial | Innovación y uso de Inteligencia Artificial | Sistema de Gobernanza de Datos y Ética en Inteligencia Artificial (Decreto 0596/25) | 0.67 |
 | Dirección de Turismo | Identidad Institucional | Identidad tucumana (Gastronomía y Danza) | 0.5 |
