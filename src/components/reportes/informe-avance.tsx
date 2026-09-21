@@ -92,13 +92,29 @@ export function InformeAvance({
         <h2 className="text-base font-bold text-foreground">
           1. Desempeño de la {r.titulo.toLowerCase()} en el contexto municipal
         </h2>
+        {/* 21.09: "en el informe tiene que coincidir el porcentaje del grado de
+            avance con lo que dice el sistema". Asi que va `pct`, el mismo
+            promedio que muestran el Plan Rector y Avance por Direccion, y no el
+            calculado sobre el total que pedia el modelo del 18.09 —ese daba
+            41 % donde el resto del sistema dice 49 %.
+
+            La frase dice "que cuentan con informacion cargada" y no "sobre el
+            total" justamente por eso: el numero que piden deja afuera a los
+            proyectos sin datos, y la oracion tiene que describir lo que el
+            numero hace. */}
         <p className="text-xs text-foreground/90 leading-relaxed">
           De acuerdo con los registros disponibles en SIPEM al momento del corte, {r.el}{" "}
           presenta un avance del{" "}
-          <strong className="tabular-nums">
-            {t.pct_sobre_total != null ? `${t.pct_sobre_total} %` : "—"}
-          </strong>{" "}
-          sobre el total de los proyectos planificados.
+          <strong className="tabular-nums">{t.pct != null ? `${t.pct} %` : "—"}</strong> sobre
+          los proyectos planificados que cuentan con información cargada
+          {t.proyectos > 0 && (
+            <>
+              {" "}
+              (<span className="tabular-nums">{t.proyectos - t.sin_datos}</span> de{" "}
+              <span className="tabular-nums">{t.proyectos}</span>)
+            </>
+          )}
+          .
         </p>
       </section>
 

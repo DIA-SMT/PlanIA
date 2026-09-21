@@ -48,7 +48,7 @@ const ROLES_QUE_RECIBEN = ["secretario", "subsecretario", "director"];
 function resumen(t: ConteoEstados): string {
   const pct = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
   return [
-    `Avance sobre el total de los proyectos planificados: ${t.pct_sobre_total ?? 0} %`,
+    `Avance sobre los proyectos con información cargada: ${t.pct ?? 0} % (${t.proyectos - t.sin_datos} de ${t.proyectos})`,
     `Proyectos registrados en SIPEM: ${t.proyectos}`,
     `  Finalizados: ${t.finalizados} (${pct(t.finalizados)} %)`,
     `  En ejecución: ${t.en_ejecucion} (${pct(t.en_ejecucion)} %)`,
