@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getPerfilActual, getScopeReporte } from "@/lib/auth";
 import { hoyLocal } from "@/lib/utils";
 import { trimestreDe, ultimoCierrePasado } from "@/lib/corte-trimestral";
@@ -6,31 +5,21 @@ import {
   getReporteUnidad,
   getUnidadesParaReporte,
   getCortesParaReporte,
-  getAnalisisReporte,
-  type UnidadReporte,
 } from "@/lib/reporte-trimestral";
-import { InformeSecretaria } from "@/components/reportes/informe-secretaria";
-import { InformeDireccion } from "@/components/reportes/informe-direccion";
-import { AnalisisForm } from "@/components/reportes/analisis-form";
+import { InformeAvance } from "@/components/reportes/informe-avance";
+import { BarraReporte } from "@/components/reportes/barra-reporte";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BotonImprimir } from "@/components/reportes/boton-imprimir";
 
 export const revalidate = 0;
 
-const NIVELES = [
-  { nivel: 0, etiqueta: "Secretarías" },
-  { nivel: 1, etiqueta: "Subsecretarías" },
-  { nivel: 2, etiqueta: "Direcciones" },
-  { nivel: 3, etiqueta: "Departamentos" },
-];
-
 /**
- * Reporte trimestral de cumplimiento — etapas 4 y 7.
+ * Informe de Avance de la Planificación Operativa Anual.
  *
- * Se elige área y corte por querystring, como el resto del sistema (`?u=`,
- * `?corte=`). El mismo informe sirve para secretaría, subsecretaría y dirección,
- * que es lo que pidieron: 66 áreas con proyectos sobre las 79 activas.
+ * Reescrita el 18.09 (párrafos 953 a 1028). Queda: el área como desplegable,
+ * los tres botones y el informe. Se fueron la lista de chips por secretaría, el
+ * selector "Corte del que salen los datos" y el bloque de análisis que redactaba
+ * Planificación, porque el modelo nuevo no los tiene.
  *
  * El control de acceso NO está acá: vive en getReporteUnidad, que valida el
  * alcance del perfil antes de leer. Poner la puerta en la pantalla dejaría el
@@ -52,16 +41,14 @@ export default async function ReportesPage({
     );
   }
 
-  const esAdmin = perfil.rol === "admin_funcional";
   const hoy = hoyLocal();
 
   // Áreas que este usuario puede pedir. La capa de datos lo valida igual; esto
   // es para no ofrecerle opciones que va a rechazar.
   //
   // 09.09: usa `getScopeReporte` (solo hacia abajo) y NO `getScopeUnidades`,
-  // que es el alcance de carga y al director le suma sus ancestros. Con el de
-  // carga, un director veía en el selector —y podía abrir— el reporte de toda
-  // su secretaría.
+  // que es el alcance de carga. Con el de carga, un director veía en el selector
+  // —y podía abrir— el reporte de toda su secretaría.
   const todas = await getUnidadesParaReporte();
   const scope = new Set(await getScopeReporte(perfil));
   const unidades = todas.filter((u) => scope.has(u.id));
@@ -80,18 +67,22 @@ export default async function ReportesPage({
   }
 
   let cortes: Awaited<ReturnType<typeof getCortesParaReporte>> = [];
-  let errorCortes: string | null = null;
   try {
     cortes = await getCortesParaReporte();
-  } catch (e) {
-    errorCortes = e instanceof Error ? e.message : String(e);
+  } catch {
+    // Sin cortes se sigue: el informe sale con los datos de hoy y el botón
+    // "Generar Informe" queda apagado.
   }
 
   const unidadId = params.u && unidades.some((u) => u.id === params.u) ? params.u : unidades[0].id;
-  const corteId = params.corte && cortes.some((c) => c.id === params.corte) ? params.corte : undefined;
-  const corteElegido = cortes.find((c) => c.id === corteId);
 
-  // El trimestre del reporte: el del corte si hay uno, si no el del último
+  // 18.09: se fue el selector de corte. "Generar Informe" toma el último cierre
+  // guardado —el número oficial, que no vuelve a cambiar— y "Vista previa" los
+  // datos del día.
+  const verCorte = params.corte != null && cortes.length > 0;
+  const corteElegido = verCorte ? cortes[0] : undefined;
+
+  // El trimestre del informe: el del corte si hay uno, si no el del último
   // cierre pasado. NO el del día de hoy: del 1 al 30 de octubre el trimestre en
   // curso es el cuarto, pero el informe que se está armando es del tercero.
   const cierre = ultimoCierrePasado(hoy);
@@ -101,147 +92,21 @@ export default async function ReportesPage({
   let reporte: Awaited<ReturnType<typeof getReporteUnidad>> | null = null;
   let errorReporte: string | null = null;
   try {
-    reporte = await getReporteUnidad({ unidadId, corteId });
+    reporte = await getReporteUnidad({ unidadId, corteId: corteElegido?.id });
   } catch (e) {
     errorReporte = e instanceof Error ? e.message : String(e);
   }
-
-  const analisis = await getAnalisisReporte({ anio, trimestre, unidadId }).catch(() => null);
-
-  const conQuery = (extra: Record<string, string | undefined>) => {
-    const q = new URLSearchParams();
-    const base = { u: unidadId, corte: corteId, t: String(trimestre), ...extra };
-    for (const [k, v] of Object.entries(base)) if (v) q.set(k, v);
-    return `/reportes?${q.toString()}`;
-  };
-
-  /**
-   * Las áreas agrupadas por secretaría, siguiendo el organigrama.
-   *
-   * 15.09, párrafo 1023: "¿esto se podría ordenar con el mismo criterio que
-   * tienen los proyectos? Como el organigrama: Secretaría, Dirección."
-   *
-   * Antes eran tres bloques planos —Secretarías, Subsecretarías, Direcciones— y
-   * dentro de cada uno el orden no seguía nada: la Dirección de Ambiente podía
-   * quedar a diez chips de su secretaría. Ahora cada secretaría trae debajo todo
-   * lo que cuelga de ella, ordenado por nivel y por su orden en el organigrama.
-   */
-  const porUnidadId = new Map(unidades.map((u) => [u.id, u]));
-  const raizDe = (u: UnidadReporte): UnidadReporte => {
-    let actual = u;
-    let guarda = 0;
-    while (actual.parent_id && guarda++ < 10) {
-      const padre = porUnidadId.get(actual.parent_id);
-      if (!padre) break;
-      actual = padre;
-    }
-    return actual;
-  };
-
-  const grupos = new Map<string, { secretaria: UnidadReporte; opciones: UnidadReporte[] }>();
-  for (const u of unidades) {
-    const raiz = raizDe(u);
-    if (!grupos.has(raiz.id)) grupos.set(raiz.id, { secretaria: raiz, opciones: [] });
-    grupos.get(raiz.id)!.opciones.push(u);
-  }
-  const porSecretaria = [...grupos.values()]
-    .map((g) => ({
-      ...g,
-      // La secretaría primero, después sus subsecretarías y direcciones.
-      opciones: g.opciones.sort(
-        (a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, "es")
-      ),
-    }))
-    .sort((a, b) => a.secretaria.nombre.localeCompare(b.secretaria.nombre, "es"));
 
   return (
     <div className="space-y-6">
       <div className="no-imprimir space-y-4 max-w-5xl">
         <BackButton fallback="/dashboard" />
-
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Reporte trimestral</h1>
-          <p className="text-sm text-muted mt-1">
-            Cumplimiento de metas operativas por área. Para descargarlo, usá Imprimir →
-            Guardar como PDF.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
-          <div className="space-y-3">
-            {porSecretaria.map((g) => (
-              <div key={g.secretaria.id}>
-                <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
-                  {g.secretaria.nombre}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {g.opciones.map((u: UnidadReporte) => (
-                    <Link
-                      key={u.id}
-                      href={conQuery({ u: u.id })}
-                      title={NIVELES.find((n) => n.nivel === u.nivel)?.etiqueta}
-                      className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                        u.id === unidadId
-                          ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                          : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                      } ${u.nivel > 0 ? "ml-0" : "font-medium text-foreground/90"}`}
-                    >
-                      {u.nombre}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-border pt-3">
-            <p className="text-[10px] text-muted uppercase tracking-wider mb-1.5">
-              Corte del que salen los datos
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              <Link
-                href={conQuery({ corte: undefined })}
-                className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                  !corteId
-                    ? "bg-warning/10 text-warning border-warning/30 font-medium"
-                    : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                }`}
-              >
-                Hoy (vista previa)
-              </Link>
-              {cortes.map((c) => (
-                <Link
-                  key={c.id}
-                  href={conQuery({ corte: c.id })}
-                  className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
-                    c.id === corteId
-                      ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                      : "text-muted border-border hover:text-foreground hover:bg-surface-hover"
-                  }`}
-                >
-                  {c.anio} · T{c.trimestre} · {c.fecha_corte}
-                </Link>
-              ))}
-            </div>
-            {cortes.length === 0 && !errorCortes && (
-              <p className="text-[11px] text-muted mt-1.5">
-                Todavía no hay ninguna foto de corte guardada.{" "}
-                {esAdmin && (
-                  <Link href="/admin/cortes" className="text-primary hover:underline">
-                    Tomar una
-                  </Link>
-                )}
-              </p>
-            )}
-            {errorCortes && (
-              <p className="text-[11px] text-danger mt-1.5">
-                No se pudieron leer los cortes: {errorCortes}
-              </p>
-            )}
-          </div>
-
-          {reporte && <BotonImprimir />}
-        </div>
+        <BarraReporte
+          unidades={unidades}
+          unidadId={unidadId}
+          hayCorte={cortes.length > 0}
+          verCorte={verCorte}
+        />
       </div>
 
       {errorReporte ? (
@@ -250,53 +115,9 @@ export default async function ReportesPage({
           <p className="text-xs text-muted mt-1 font-mono break-all">{errorReporte}</p>
         </div>
       ) : (
-        reporte &&
-        /* 15.09, párrafo 805: "proponemos un nuevo modelo de reporte, ya que
-           tenemos dos tipos de perfiles: secretarios/subsecretarios y
-           directores. Cada tipo de perfil tendrá un modelo diferente de reporte
-           con las características propias de cada área."
-
-           El modelo lo decide el NIVEL DEL ÁREA que se está mirando, no el rol
-           de quien mira: Planificación abre los dos y tiene que ver cada uno
-           como lo va a ver su destinatario. */
-        ((reporte.unidad?.nivel ?? 0) >= 2 ? (
-          <InformeDireccion
-            reporte={reporte}
-            trimestre={trimestre}
-            anio={anio}
-            emitidoEl={hoy}
-            rutaArea={reporte.ruta}
-            pctSuperior={reporte.superior?.pct ?? null}
-            nombreSuperior={reporte.superior?.rotulo ?? null}
-          >
-            <AnalisisForm
-              anio={anio}
-              trimestre={trimestre}
-              unidadId={unidadId}
-              unidadNombre={reporte.unidad?.nombre ?? "el área"}
-              analisis={analisis}
-              puedeEditar={esAdmin}
-              desdeNumero={5}
-            />
-          </InformeDireccion>
-        ) : (
-          <InformeSecretaria
-            reporte={reporte}
-            trimestre={trimestre}
-            anio={anio}
-            emitidoEl={hoy}
-          >
-            <AnalisisForm
-              anio={anio}
-              trimestre={trimestre}
-              unidadId={unidadId}
-              unidadNombre={reporte.unidad?.nombre ?? "el área"}
-              analisis={analisis}
-              puedeEditar={esAdmin}
-              desdeNumero={4}
-            />
-          </InformeSecretaria>
-        ))
+        reporte && (
+          <InformeAvance reporte={reporte} trimestre={trimestre} anio={anio} emitidoEl={hoy} />
+        )
       )}
     </div>
   );
