@@ -1,4 +1,4 @@
-import { formatFecha, avanceGlobalPorConteo } from "@/lib/utils";
+import { avanceGlobalPorConteo, formatFecha } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
 
 /**
@@ -43,15 +43,13 @@ export function InformeAvance({
   const r = rotulos(nivel);
   const pctDe = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
 
-  // El mismo número que el medidor "Cumplimiento global del POA" del Panel
-  // Ejecutivo: finalizados + en ejecución sobre el total. Se calcula con la
-  // misma función que usa el Panel para que no puedan separarse nunca.
+  // El mismo numero del medidor del Panel Ejecutivo, con su misma funcion.
   const avance = avanceGlobalPorConteo({
     verde: t.finalizados,
     amarillo: t.en_ejecucion,
     rojo: t.no_iniciados,
     sin_datos: t.sin_datos,
-  }) ?? 0;
+  });
 
   const filas = [
     { icono: "🟢", nombre: "Finalizados", cantidad: t.finalizados },
@@ -81,24 +79,8 @@ export function InformeAvance({
             que es como está escrito en el documento. */}
         <dl className="space-y-1 text-xs">
           {[
-            {
-              rotulo: "Secretaría",
-              valor: nivel === 0 ? reporte.unidad?.nombre : reporte.ruta.secretaria,
-            },
-            {
-              rotulo: "Subsecretaría",
-              // En el informe de una Secretaría esta línea va vacía. Antes salía
-              // con la subsecretaría del PRIMER proyecto del área, que no quiere
-              // decir nada: el informe de Secretaría General decía
-              // "Subsecretaría: Gestión Estratégica y Documentación" como si
-              // fuera de ella.
-              valor:
-                nivel === 0
-                  ? null
-                  : nivel === 1
-                  ? reporte.unidad?.nombre
-                  : reporte.ruta.subsecretaria,
-            },
+            { rotulo: "Secretaría", valor: nivel === 0 ? reporte.unidad?.nombre : reporte.ruta.secretaria },
+            { rotulo: "Subsecretaría", valor: nivel === 1 ? reporte.unidad?.nombre : reporte.ruta.subsecretaria },
             { rotulo: "Dirección", valor: nivel >= 2 ? reporte.unidad?.nombre : null },
             {
               rotulo: "Fecha de corte",
@@ -118,25 +100,31 @@ export function InformeAvance({
         <h2 className="text-base font-bold text-foreground">
           1. Desempeño de la {r.titulo.toLowerCase()} en el contexto municipal
         </h2>
-        {/* 21.09: "aquí debería estar el 66 % que dice el panel ejecutivo".
-            Es el "Cumplimiento global del POA" del Panel: los proyectos
-            finalizados más los que están en ejecución, sobre el total del área.
-            No es el promedio de cuánto avanzó cada uno.
+        {/* DE DONDE SALE ESTE NUMERO, que se corrigio dos veces el mismo dia.
+            21.09: "aquí debería estar el 66 % que dice el panel ejecutivo".
+            Es el medidor del Panel —finalizados + en ejecución sobre el total—
+            y no el promedio de los porcentajes de cada proyecto. Son dos cuentas
+            distintas y para la Secretaría General del segundo trimestre daban
+            66 % y 45 %.
 
-            Por eso queda la frase tal como la escribieron en el modelo —"sobre
-            el total de los proyectos planificados"—: con esta cuenta el
-            denominador SÍ es el total, incluidos los no iniciados y los que no
-            tienen datos, que aportan cero.
-
-            Es el tercer número que se probó acá en cuatro días: el modelo del
-            18.09 pedía el promedio sobre el total (45 % en Secretaría General),
-            después que coincidiera con el sistema (48 %), y ahora que coincida
-            con el Panel (66 %). Este último es el único que se puede verificar
-            mirando las dos pantallas juntas. */}
+            Por eso llama a `avanceGlobalPorConteo`, la misma función del Panel y
+            de la pantalla de TV, en vez de repetir la division acá: el pedido es
+            que los dos digan lo mismo, y la unica forma de que eso se sostenga
+            es que sea la misma cuenta y no dos que hoy coinciden. */}
         <p className="text-xs text-foreground/90 leading-relaxed">
           De acuerdo con los registros disponibles en SIPEM al momento del corte, {r.el}{" "}
-          presenta un avance del <strong className="tabular-nums">{avance} %</strong> sobre el
-          total de los proyectos planificados.
+          presenta un avance del{" "}
+          <strong className="tabular-nums">{avance != null ? `${avance} %` : "—"}</strong>, que
+          corresponde a los proyectos finalizados y en ejecución sobre el total de los
+          proyectos planificados
+          {t.proyectos > 0 && (
+            <>
+              {" "}
+              (<span className="tabular-nums">{t.finalizados + t.en_ejecucion}</span> de{" "}
+              <span className="tabular-nums">{t.proyectos}</span>)
+            </>
+          )}
+          .
         </p>
       </section>
 
