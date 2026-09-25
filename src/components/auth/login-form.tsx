@@ -7,7 +7,10 @@ import { getSupabaseBrowser } from "@/lib/supabase/browser";
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const fromPath = params.get("from") ?? "/dashboard";
+  // 22.09: el destino por defecto es el selector de sistema y ya no el Panel
+  // Ejecutivo. Si venias de una URL concreta —la campanita, un enlace del
+  // informe— el `from` te devuelve ahi y el selector no aparece.
+  const fromPath = params.get("from") ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

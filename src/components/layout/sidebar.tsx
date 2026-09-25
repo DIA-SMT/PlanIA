@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { RolUsuario } from "@/types/database";
+import { PieInstitucional } from "./pie-institucional";
 
 type NavItem = {
   href: string;
@@ -122,30 +123,17 @@ export function Sidebar({ rol }: { rol: RolUsuario | null }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border space-y-3">
-        <div className="flex items-center justify-center gap-4">
-          <Image
-            src="/logos/Direccion IA logo Secregeneral Dashboard.png"
-            alt="Dirección de IA"
-            width={100}
-            height={32}
-            className="logo-auto h-8 w-auto opacity-70"
-          />
-          <Image
-            src="/logos/logoPlanificacion.jpeg"
-            alt="Dirección de Planificación Estratégica"
-            title="Dirección de Planificación Estratégica"
-            width={80}
-            height={32}
-            className="h-8 w-auto rounded opacity-80"
-          />
-        </div>
-        <p className="text-[9px] text-muted/60 text-center leading-relaxed">
-          <span className="font-semibold">PlanIA</span> · desarrollado por la Dirección
-          de Inteligencia Artificial en conjunto con la Dirección de Planificación
-          Estratégica de la Municipalidad de San Miguel de Tucumán
-        </p>
+      {/* 22.09: se puede volver al selector de sistema. */}
+      <div className="px-4 pb-2">
+        <Link
+          href="/"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+        >
+          <span>←</span> Cambiar de sistema
+        </Link>
       </div>
+
+      <PieInstitucional producto="PlanIA" />
     </aside>
   );
 }
