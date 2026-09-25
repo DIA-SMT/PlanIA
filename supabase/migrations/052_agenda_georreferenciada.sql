@@ -93,20 +93,14 @@ CREATE TABLE IF NOT EXISTS public.actividad (
 
 -- La agenda siempre pregunta por un rango de fechas, y el mapa por las que
 -- tienen pin.
-CREATE INDEX IF NOT EXISTS idx_actividad_fecha
-  ON public.actividad(fecha) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_actividad_unidad_fecha
-  ON public.actividad(unidad_id, fecha) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_actividad_con_pin
-  ON public.actividad(fecha) WHERE deleted_at IS NULL AND lat IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_actividad_fecha ON public.actividad(fecha) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_actividad_unidad_fecha ON public.actividad(unidad_id, fecha) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_actividad_con_pin ON public.actividad(fecha) WHERE deleted_at IS NULL AND lat IS NOT NULL;
 
 DROP TRIGGER IF EXISTS trg_actividad_updated_at ON public.actividad;
-CREATE TRIGGER trg_actividad_updated_at
-  BEFORE UPDATE ON public.actividad
-  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER trg_actividad_updated_at BEFORE UPDATE ON public.actividad FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
-COMMENT ON TABLE public.actividad IS
-  'Actividades territoriales del municipio (Agenda Georreferenciada, 22.09). Las ve todo el mundo; las edita el area responsable.';
+COMMENT ON TABLE public.actividad IS 'Actividades territoriales del municipio (Agenda Georreferenciada, 22.09). Las ve todo el mundo; las edita el area responsable.';
 
 -- ------------------------------------------------------------
 -- 2) El historial de cambios
@@ -124,11 +118,9 @@ CREATE TABLE IF NOT EXISTS public.actividad_historial (
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_actividad_historial
-  ON public.actividad_historial(actividad_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_actividad_historial ON public.actividad_historial(actividad_id, created_at DESC);
 
-COMMENT ON TABLE public.actividad_historial IS
-  'Una fila por campo modificado de una actividad. La escribe un trigger, no la aplicacion.';
+COMMENT ON TABLE public.actividad_historial IS 'Una fila por campo modificado de una actividad. La escribe un trigger, no la aplicacion.';
 
 -- ------------------------------------------------------------
 -- 3) El trigger que anota los cambios
@@ -185,9 +177,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS trg_actividad_historial ON public.actividad;
-CREATE TRIGGER trg_actividad_historial
-  AFTER UPDATE ON public.actividad
-  FOR EACH ROW EXECUTE FUNCTION public.registrar_cambio_actividad();
+CREATE TRIGGER trg_actividad_historial AFTER UPDATE ON public.actividad FOR EACH ROW EXECUTE FUNCTION public.registrar_cambio_actividad();
 
 -- ------------------------------------------------------------
 -- 4) Quien puede que

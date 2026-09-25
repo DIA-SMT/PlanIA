@@ -49,12 +49,9 @@ CREATE TABLE IF NOT EXISTS public.poa_area (
 );
 
 DROP TRIGGER IF EXISTS trg_poa_area_updated_at ON public.poa_area;
-CREATE TRIGGER trg_poa_area_updated_at
-  BEFORE UPDATE ON public.poa_area
-  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER trg_poa_area_updated_at BEFORE UPDATE ON public.poa_area FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
-COMMENT ON TABLE public.poa_area IS
-  'Estado del POA de un area para un anio: borrador o enviado al area de arriba. El destino es el padre en el organigrama y por eso no se guarda.';
+COMMENT ON TABLE public.poa_area IS 'Estado del POA de un area para un anio: borrador o enviado al area de arriba. El destino es el padre en el organigrama y por eso no se guarda.';
 
 -- ------------------------------------------------------------
 -- 2) Las observaciones sobre una ficha
@@ -72,11 +69,9 @@ CREATE TABLE IF NOT EXISTS public.ficha_observacion (
   resuelta_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_ficha_observacion
-  ON public.ficha_observacion(ficha_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ficha_observacion ON public.ficha_observacion(ficha_id, created_at DESC);
 
-COMMENT ON TABLE public.ficha_observacion IS
-  'Observaciones sobre una ficha PRISMA. La secretaria no corrige la ficha de una direccion: le deja una observacion (25.09).';
+COMMENT ON TABLE public.ficha_observacion IS 'Observaciones sobre una ficha PRISMA. La secretaria no corrige la ficha de una direccion: le deja una observacion (25.09).';
 
 -- ------------------------------------------------------------
 -- 3) Quien puede que
