@@ -125,57 +125,26 @@ COMMENT ON TABLE public.actividad_historial IS 'Una fila por campo modificado de
 -- ------------------------------------------------------------
 -- 3) El trigger que anota los cambios
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.registrar_cambio_actividad()
-  RETURNS trigger AS $$
-DECLARE
-  correo text;
+-- Una sola comparacion generica en vez de un IF por campo. Antes eran ocho
+-- bloques y cincuenta lineas, y el editor SQL de Supabase cortaba el bloque
+-- $$ por la mitad al pegarlo. Ademas, asi, el dia que se agregue una columna a
+-- `actividad` alcanza con sumarla a la lista de abajo.
+--
+-- La etiqueta $hist$ en vez de $$ es a proposito: los editores que parten el
+-- script por punto y coma reconocen mejor una comilla de dolar con nombre.
+CREATE OR REPLACE FUNCTION public.registrar_cambio_actividad() RETURNS trigger AS $hist$
+DECLARE correo text; campo text; antes jsonb := to_jsonb(OLD); ahora jsonb := to_jsonb(NEW);
 BEGIN
-  SELECT p.email INTO correo
-    FROM public.perfil_usuario p WHERE p.user_id = auth.uid();
-
-  -- Solo los campos que le importan a alguien. La descripcion y el briefing se
-  -- anotan como "cambio" sin el texto entero: el historial es para saber que se
-  -- movio y cuando, no para guardar dos copias de todo.
-  IF NEW.fecha IS DISTINCT FROM OLD.fecha THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'fecha', OLD.fecha::text, NEW.fecha::text, auth.uid(), correo);
-  END IF;
-  IF NEW.hora_desde IS DISTINCT FROM OLD.hora_desde THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'hora', OLD.hora_desde::text, NEW.hora_desde::text, auth.uid(), correo);
-  END IF;
-  IF NEW.titulo IS DISTINCT FROM OLD.titulo THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'titulo', OLD.titulo, NEW.titulo, auth.uid(), correo);
-  END IF;
-  IF NEW.estado IS DISTINCT FROM OLD.estado THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'estado', OLD.estado, NEW.estado, auth.uid(), correo);
-  END IF;
-  IF NEW.lugar_texto IS DISTINCT FROM OLD.lugar_texto THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'lugar', OLD.lugar_texto, NEW.lugar_texto, auth.uid(), correo);
-  END IF;
-  IF (NEW.lat IS DISTINCT FROM OLD.lat) OR (NEW.lng IS DISTINCT FROM OLD.lng) THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'ubicacion',
-            CASE WHEN OLD.lat IS NULL THEN NULL ELSE OLD.lat || ', ' || OLD.lng END,
-            CASE WHEN NEW.lat IS NULL THEN NULL ELSE NEW.lat || ', ' || NEW.lng END,
-            auth.uid(), correo);
-  END IF;
-  IF NEW.unidad_id IS DISTINCT FROM OLD.unidad_id THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'area', OLD.unidad_id::text, NEW.unidad_id::text, auth.uid(), correo);
-  END IF;
-  IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at AND NEW.deleted_at IS NOT NULL THEN
-    INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
-    VALUES (NEW.id, 'borrada', NULL, NEW.deleted_at::text, auth.uid(), correo);
-  END IF;
-
+  SELECT p.email INTO correo FROM public.perfil_usuario p WHERE p.user_id = auth.uid();
+  FOREACH campo IN ARRAY ARRAY['fecha','hora_desde','hora_hasta','titulo','estado','lugar_texto','lat','lng','unidad_id','tipo','requiere_confirmacion','deleted_at'] LOOP
+    IF antes -> campo IS DISTINCT FROM ahora -> campo THEN
+      INSERT INTO public.actividad_historial (actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por, cambiado_por_email)
+      VALUES (NEW.id, campo, antes ->> campo, ahora ->> campo, auth.uid(), correo);
+    END IF;
+  END LOOP;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
+$hist$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_actividad_historial ON public.actividad;
 CREATE TRIGGER trg_actividad_historial AFTER UPDATE ON public.actividad FOR EACH ROW EXECUTE FUNCTION public.registrar_cambio_actividad();
 
