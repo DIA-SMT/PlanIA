@@ -30,7 +30,7 @@ const items: Item[] = [
   { href: "/territorio", label: "Inicio", icon: "◎" },
   { href: "/territorio/agenda", label: "Agenda", icon: "📅", pronto: true },
   { href: "/territorio/mapa", label: "Mapa Territorial", icon: "🗺", pronto: true },
-  { href: "/territorio/actividades", label: "Actividades", icon: "▦", pronto: true },
+  { href: "/territorio/actividades", label: "Actividades", icon: "▦" },
   { href: "/territorio/briefing", label: "Briefing", icon: "◫", pronto: true },
   { href: "/territorio/actualidad", label: "Actualidad", icon: "◈", pronto: true },
   {
