@@ -126,11 +126,12 @@ COMMENT ON TABLE public.actividad_historial IS 'Una fila por campo modificado de
 -- 3) El trigger que anota los cambios
 -- ------------------------------------------------------------
 -- Una sola comparacion generica en vez de un IF por campo. Antes eran ocho
--- bloques y cincuenta lineas, y el editor SQL de Supabase cortaba el bloque
--- $$ por la mitad al pegarlo. Ademas, asi, el dia que se agregue una columna a
--- `actividad` alcanza con sumarla a la lista de abajo.
+-- bloques y cincuenta lineas, y el editor SQL de Supabase cortaba la funcion
+-- por la mitad al pegarla. Ademas, asi, el dia que se agregue una columna a
+-- `actividad` alcanza con sumarla a la lista de abajo en vez de escribir otro
+-- IF, y de paso ahora se anotan doce campos y no ocho.
 --
--- La etiqueta $hist$ en vez de $$ es a proposito: los editores que parten el
+-- La comilla de dolar lleva etiqueta a proposito: los editores que parten el
 -- script por punto y coma reconocen mejor una comilla de dolar con nombre.
 CREATE OR REPLACE FUNCTION public.registrar_cambio_actividad() RETURNS trigger AS $hist$
 DECLARE correo text; campo text; antes jsonb := to_jsonb(OLD); ahora jsonb := to_jsonb(NEW);
