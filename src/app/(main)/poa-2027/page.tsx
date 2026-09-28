@@ -1,25 +1,32 @@
 import Link from "next/link";
 import { getPerfilActual } from "@/lib/auth";
-import { getPoaDelArea, getObservaciones } from "@/lib/poa-2027";
-import { CircuitoPoa } from "@/components/poa2027/circuito-poa";
+import { getPoaDelArea, getObservaciones, ANIO_POA } from "@/lib/poa-2027";
+import { DocumentoPoa } from "@/components/poa2027/documento-poa";
+import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
 
 export const revalidate = 0;
 
 /**
- * POA 2027 — la carga de fichas y el circuito de envío entre áreas.
+ * POA 2027 — el documento, editable, en la pantalla principal.
  *
- * 25.09: "las POA se arman por secretarías, entonces cada secretaría debería
- * tomar los proyectos suyos y de cada dirección que dependen de ella", y "en la
- * pantalla de las secretarías debería aparecerle el documento completo: lo suyo
- * más lo que cada dirección envió".
+ * 28.09: "en esta pantalla me gustaría que aparezca ya el pdf editable". Antes
+ * acá había tres tarjetas y el documento estaba a un clic de distancia, en
+ * /poa-2027/exportar. Ahora la pantalla ES el POA: arriba las acciones, abajo el
+ * documento con lo propio y lo que mandaron las áreas de abajo.
  *
- * El tercer botón era "Generar POA 2027" y bajaba un documento con las fichas
- * propias nomás. Ahora el envío es un acto del circuito —"el botón de la derecha
- * que diga guardar o enviar a POA"— y vive en el bloque de abajo, junto a lo que
- * cada área mandó. El documento sigue estando, como enlace.
+ * El circuito —quién envió y quién no, y las observaciones— tampoco está en un
+ * bloque aparte: cada área lo dice en su encabezado dentro del documento, y las
+ * observaciones cuelgan de la ficha que observan.
  */
-export default async function Poa2027Landing() {
+export default async function Poa2027Page() {
   const perfil = await getPerfilActual();
+
+  const puedeCargar =
+    perfil?.rol === "director" ||
+    perfil?.rol === "subsecretario" ||
+    perfil?.rol === "secretario" ||
+    perfil?.rol === "coordinador" ||
+    perfil?.rol === "admin_funcional";
 
   let circuito: Awaited<ReturnType<typeof getPoaDelArea>> | null = null;
   let observaciones: Awaited<ReturnType<typeof getObservaciones>> = [];
@@ -39,81 +46,77 @@ export default async function Poa2027Landing() {
     }
   }
 
-  const puedeCargar =
-    perfil?.rol === "director" ||
-    perfil?.rol === "subsecretario" ||
-    perfil?.rol === "secretario" ||
-    perfil?.rol === "coordinador" ||
-    perfil?.rol === "admin_funcional";
-
-  const cantidadFichas = circuito?.propia?.fichas.length ?? 0;
-
+  const propia = circuito?.propia;
   return (
-    <div className="space-y-8 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">POA 2027 — Ficha PRISMA</h1>
-        <p className="text-sm text-muted mt-1">
-          Planificación de proyectos para el Plan Operativo Anual 2027 mediante la metodología
-          PRISMA.
-        </p>
-      </div>
-
-      {puedeCargar ? (
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link
-            href="/poa-2027/cargar"
-            className="rounded-xl border border-primary/30 bg-primary/5 p-5 hover:bg-primary/10 transition-colors text-center"
-          >
-            <div className="text-2xl mb-2">➕</div>
-            <p className="text-sm font-semibold text-foreground">Cargar ficha nueva</p>
-            <p className="text-[10px] text-muted mt-1">Crear una ficha PRISMA</p>
-          </Link>
-          <Link
-            href="/poa-2027/mis-fichas"
-            className="rounded-xl border border-border bg-surface p-5 hover:border-primary/40 transition-colors text-center"
-          >
-            <div className="text-2xl mb-2">📑</div>
-            <p className="text-sm font-semibold text-foreground">Mis fichas</p>
-            <p className="text-[10px] text-muted mt-1">
-              {cantidadFichas} {cantidadFichas === 1 ? "ficha cargada" : "fichas cargadas"} · ver y
-              editar
-            </p>
-          </Link>
-          <Link
-            href="/poa-2027/exportar"
-            className="rounded-xl border border-border bg-surface p-5 hover:border-primary/40 transition-colors text-center"
-          >
-            <div className="text-2xl mb-2">📥</div>
-            <p className="text-sm font-semibold text-foreground">Ver el documento</p>
-            <p className="text-[10px] text-muted mt-1">El POA armado, para revisar y bajar</p>
-          </Link>
-        </section>
-      ) : (
-        <div className="rounded-xl border border-border bg-surface p-6 text-center">
-          <p className="text-sm text-muted">
-            La carga de fichas PRISMA está disponible para las áreas que planifican. Con tu rol
-            actual podés ver los documentos de referencia.
+    <div className="space-y-6 max-w-4xl">
+      <div className="no-imprimir space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">POA {ANIO_POA}</h1>
+          <p className="text-sm text-muted mt-1">
+            {puedeCargar
+              ? "Este es el documento que se va a enviar. Hacé clic sobre cualquier texto de tus fichas para corregirlo acá mismo."
+              : "El Plan Operativo Anual 2027, armado con las fichas PRISMA de cada área."}
           </p>
         </div>
-      )}
+
+        {puedeCargar && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/poa-2027/mis-fichas"
+              className="text-sm bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
+            >
+              Editar mi POA
+            </Link>
+            <a
+              href="/api/poa-2027/exportar"
+              className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"
+            >
+              Descargar Word
+            </a>
+          </div>
+        )}
+
+        {propia && (
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <EnviarPoa
+              unidadId={propia.id}
+              destino={circuito?.destino?.nombre ?? null}
+              enviado={propia.enviado}
+              enviadoEl={propia.enviado_at}
+              sinFichas={propia.fichas.length === 0}
+            />
+            {propia.tocadoDespues && (
+              <p className="text-[11px] text-warning mt-2">
+                Editaste alguna ficha después de enviar. Quien la recibió ve la versión nueva.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {error ? (
-        <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">
-          <p className="text-sm font-semibold text-danger">No se pudo leer el circuito del POA</p>
+        <div className="no-imprimir rounded-xl border border-danger/30 bg-danger/5 p-4">
+          <p className="text-sm font-semibold text-danger">No se pudo armar el documento</p>
           <p className="text-xs text-muted mt-1 font-mono break-all">{error}</p>
           <p className="text-xs text-muted mt-2">
             Si dice que no existe la tabla, falta aplicar la migración 053.
           </p>
         </div>
+      ) : !perfil?.unidad_id ? (
+        <div className="rounded-xl border border-border bg-surface p-6 text-center">
+          <p className="text-sm text-muted">
+            Tu perfil no tiene un área asignada, así que no hay un POA que mostrar. Escribile a
+            Planificación Estratégica.
+          </p>
+        </div>
       ) : (
-        circuito?.propia && (
-          <CircuitoPoa
-            propia={circuito.propia}
-            recibidas={circuito.recibidas}
-            destino={circuito.destino}
+        propia && (
+          <DocumentoPoa
+            propia={propia}
+            recibidas={circuito?.recibidas ?? []}
+            anio={ANIO_POA}
             observaciones={observaciones}
             // La secretaría no corrige la ficha de una dirección: la observa.
-            // El área dueña no se observa a sí misma.
             puedeObservar={puedeCargar}
           />
         )

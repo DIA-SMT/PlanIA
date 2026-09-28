@@ -23,6 +23,12 @@ export interface FichaConArea {
   indicador: string | null;
   meta_anual: string | null;
   ancla: string | null;
+  /** Periodo de trabajo y hito: el POA real los usa y PRISMA no los tenia (28.09). */
+  periodo: string | null;
+  hito: string | null;
+  /** propuesta = la trajo el sistema del 2026 y espera que el area la acepte. */
+  estado: string;
+  proyecto_origen_id: string | null;
   unidad_id: string;
   unidad_nombre: string;
   updated_at: string;
@@ -88,7 +94,10 @@ export async function getPoaDelArea(unidadId: string): Promise<{
   const [fichasRes, estadosRes, obsRes] = await Promise.all([
     sb
       .from("ficha_prisma")
-      .select("id, codigo, programa, relevancia, indicador, meta_anual, ancla, unidad_id, updated_at")
+      .select(
+        "id, codigo, programa, relevancia, indicador, meta_anual, ancla, periodo, hito, " +
+          "estado, proyecto_origen_id, unidad_id, updated_at"
+      )
       .in("unidad_id", ids)
       .is("deleted_at", null)
       .order("created_at"),
@@ -110,7 +119,9 @@ export async function getPoaDelArea(unidadId: string): Promise<{
   const armar = (u: any): AreaDelPoa => {
     const estado = estados.get(u.id);
     const suyas = fichas
-      .filter((f) => f.unidad_id === u.id)
+      // El documento lleva solo lo ACEPTADO: una propuesta que el area todavia
+      // no miro no es parte de su POA (28.09).
+      .filter((f) => f.unidad_id === u.id && f.estado === "aceptada")
       .map((f) => ({
         ...f,
         unidad_nombre: nombreDe(u),
@@ -163,4 +174,41 @@ export async function getObservaciones(fichaIds: string[]): Promise<Observacion[
     .in("ficha_id", fichaIds)
     .order("created_at", { ascending: false });
   return (data ?? []) as Observacion[];
+}
+
+/**
+ * Las fichas del area propia, aceptadas y propuestas — 28.09.
+ *
+ * Es lo que necesita la pantalla de "Editar mi POA": el documento muestra solo
+ * lo aceptado, pero para editar hace falta ver tambien lo que el sistema trajo
+ * del 2026 y todavia nadie miro.
+ */
+export async function getMisFichas(unidadId: string): Promise<FichaConArea[]> {
+  const sb = await getSupabaseServer();
+  const [fichasRes, obsRes, unidadRes] = await Promise.all([
+    sb
+      .from("ficha_prisma")
+      .select(
+        "id, codigo, programa, relevancia, indicador, meta_anual, ancla, periodo, hito, " +
+          "estado, proyecto_origen_id, unidad_id, updated_at"
+      )
+      .eq("unidad_id", unidadId)
+      .eq("anio", ANIO_POA)
+      .is("deleted_at", null)
+      .order("estado")
+      .order("programa"),
+    sb.from("ficha_observacion").select("ficha_id").is("resuelta_at", null),
+    sb.from("unidad_organizacional").select("nombre, nombre_corto").eq("id", unidadId).single(),
+  ]);
+
+  const obs = new Map<string, number>();
+  for (const o of (obsRes.data ?? []) as any[]) obs.set(o.ficha_id, (obs.get(o.ficha_id) ?? 0) + 1);
+  const u = unidadRes.data as any;
+  const nombre = u?.nombre_corto ?? u?.nombre ?? "";
+
+  return ((fichasRes.data ?? []) as any[]).map((f) => ({
+    ...f,
+    unidad_nombre: nombre,
+    observaciones: obs.get(f.id) ?? 0,
+  }));
 }
