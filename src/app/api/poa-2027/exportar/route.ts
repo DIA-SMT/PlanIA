@@ -19,17 +19,44 @@ export async function GET() {
   if (!perfil) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const sb = await getSupabaseServer();
+
+  // 28.09: el documento que se baja tiene que ser el MISMO que muestra el
+  // previsualizador, o sea lo del area mas lo que mandaron las de abajo. Antes
+  // bajaba solo las fichas propias, asi que una secretaria se descargaba un
+  // documento vacio mientras en pantalla veia el de todas sus direcciones.
+  const { data: unidadesData } = await sb
+    .from("unidad_organizacional")
+    .select("id, nombre, nombre_corto, parent_id")
+    .eq("activa", true);
+  const unidades = (unidadesData ?? []) as UnidadOrganizacional[];
+
+  const ids: string[] = [];
+  if (perfil.unidad_id) {
+    ids.push(perfil.unidad_id);
+    const bajar = (id: string) => {
+      for (const u of unidades.filter((x) => x.parent_id === id)) {
+        ids.push(u.id);
+        bajar(u.id);
+      }
+    };
+    bajar(perfil.unidad_id);
+  }
+
   let query = sb
     .from("ficha_prisma")
     .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto)")
     .is("deleted_at", null)
     .order("created_at");
-  if (perfil.unidad_id) query = query.eq("unidad_id", perfil.unidad_id);
+  if (ids.length > 0) query = query.in("unidad_id", ids);
 
   const { data } = await query;
   const fichas = (data ?? []) as (FichaPrisma & { unidad?: UnidadOrganizacional })[];
 
-  const direccionNombre = fichas[0]?.unidad?.nombre ?? "Dirección";
+  // El titulo es el area de quien descarga, no la del primer proyecto que salga:
+  // el documento de una secretaria lleva su nombre aunque abra con una ficha de
+  // una direccion.
+  const propia = unidades.find((u) => u.id === perfil.unidad_id);
+  const direccionNombre = propia?.nombre ?? fichas[0]?.unidad?.nombre ?? "Área";
   const fecha = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
 
   const filas = [

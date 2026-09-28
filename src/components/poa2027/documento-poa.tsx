@@ -1,0 +1,126 @@
+import type { AreaDelPoa } from "@/lib/poa-2027";
+import { CampoEditable } from "./campo-editable";
+
+/**
+ * El POA 2027 como se va a ver el documento — 28.09.
+ *
+ * "Sería piola que se vea el pdf que se va a mandar y poder editar ahí en el
+ * previsualizador."
+ *
+ * Es el documento, no un formulario: se lee de corrido, con la tabla PRISMA de
+ * cada ficha agrupada por área. Los campos de las fichas PROPIAS se editan
+ * haciendo clic encima; las de otras áreas se muestran y no se tocan, porque
+ * "la secretaría no puede corregir, pero puede hacer observaciones" (25.09).
+ *
+ * Las filas son las seis letras de PRISMA. La S de "Secretaría" no se edita
+ * acá: sale del organigrama, que es de donde tiene que salir.
+ */
+
+const FILAS = [
+  { letra: "P", rotulo: "Programa / Proyecto", campo: "programa" as const },
+  { letra: "R", rotulo: "Relevancia (descripción y objetivo)", campo: "relevancia" as const },
+  { letra: "I", rotulo: "Indicador", campo: "indicador" as const },
+  { letra: "M", rotulo: "Meta anual", campo: "meta_anual" as const },
+  { letra: "A", rotulo: "Ancla (línea de base)", campo: "ancla" as const },
+];
+
+export function DocumentoPoa({
+  propia,
+  recibidas,
+  anio,
+}: {
+  propia: AreaDelPoa;
+  recibidas: AreaDelPoa[];
+  anio: number;
+}) {
+  // El área propia primero y después las de abajo, que es el orden del
+  // documento: la secretaría abre con lo suyo.
+  const bloques = [
+    { area: propia, editable: true },
+    ...recibidas.map((a) => ({ area: a, editable: false })),
+  ].filter((b) => b.area.fichas.length > 0);
+
+  const total = bloques.reduce((a, b) => a + b.area.fichas.length, 0);
+
+  if (total === 0) {
+    return (
+      <div className="hoja rounded-xl border border-border bg-surface p-8 text-center">
+        <p className="text-sm text-muted">
+          Todavía no hay ninguna ficha cargada, ni tuya ni de las áreas que dependen de{" "}
+          {propia.nombre}.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <article className="hoja space-y-8">
+      <header className="space-y-1 border-b border-border pb-4">
+        <h1 className="text-xl font-bold text-foreground uppercase">
+          Plan Operativo Anual {anio}
+        </h1>
+        <p className="text-sm font-semibold text-primary">{propia.nombre}</p>
+        <p className="text-[11px] text-muted">
+          Municipalidad de San Miguel de Tucumán · {total}{" "}
+          {total === 1 ? "ficha" : "fichas"} en {bloques.length}{" "}
+          {bloques.length === 1 ? "área" : "áreas"}
+        </p>
+      </header>
+
+      {bloques.map(({ area, editable }) => (
+        <section key={area.id} className="space-y-4">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap border-b border-border pb-1">
+            <h2 className="text-base font-bold text-foreground">{area.nombre}</h2>
+            {!editable && (
+              <span className="text-[10px] text-muted uppercase tracking-wider no-imprimir">
+                {area.enviado ? "enviado" : "sin enviar"} · solo lectura
+              </span>
+            )}
+          </div>
+
+          {area.fichas.map((f, i) => (
+            <div key={f.id} className="space-y-1">
+              <p className="text-[11px] text-muted uppercase tracking-wider">
+                Ficha {i + 1}
+                {f.codigo ? ` · ${f.codigo}` : ""}
+              </p>
+              <div className="tabla-envoltorio">
+                <table className="tabla-reporte">
+                  <tbody>
+                    {FILAS.map((fila) => (
+                      <tr key={fila.campo}>
+                        <td className="izq w-8 font-bold text-primary">{fila.letra}</td>
+                        <td className="izq w-56 text-muted">{fila.rotulo}</td>
+                        <td className="izq">
+                          <CampoEditable
+                            fichaId={f.id}
+                            campo={fila.campo}
+                            valor={f[fila.campo] ?? null}
+                            editable={editable}
+                            placeholder={editable ? "Hacé clic para completar" : "—"}
+                            className="text-sm text-foreground/90 whitespace-pre-wrap"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td className="izq w-8 font-bold text-primary">S</td>
+                      <td className="izq w-56 text-muted">Secretaría</td>
+                      <td className="izq text-sm text-foreground/90">{area.nombre}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              {f.observaciones > 0 && (
+                <p className="text-[11px] text-warning no-imprimir">
+                  Tiene {f.observaciones} observación{f.observaciones === 1 ? "" : "es"} sin
+                  resolver.
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      ))}
+    </article>
+  );
+}

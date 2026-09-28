@@ -1,82 +1,85 @@
-import { getPerfilActual } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase/server";
-import { BackButton } from "@/components/layout/back-button";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import type { FichaPrisma, UnidadOrganizacional } from "@/types/database";
+import { getPerfilActual } from "@/lib/auth";
+import { getPoaDelArea, ANIO_POA } from "@/lib/poa-2027";
+import { DocumentoPoa } from "@/components/poa2027/documento-poa";
+import { BackButton } from "@/components/layout/back-button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const revalidate = 0;
 
-export default async function ExportarPage() {
+/**
+ * El previsualizador del POA 2027 — 28.09.
+ *
+ * "Sería piola que se vea el pdf que se va a mandar y poder editar ahí en el
+ * previsualizador."
+ *
+ * Antes esta pantalla era una tarjeta con un botón de descarga. Ahora muestra el
+ * documento entero —lo propio más lo que mandaron las áreas de abajo— y los
+ * campos de las fichas propias se editan haciendo clic encima.
+ */
+export default async function PrevisualizadorPage() {
   const perfil = await getPerfilActual();
   if (!perfil) redirect("/login");
 
-  const sb = await getSupabaseServer();
-  let query = sb
-    .from("ficha_prisma")
-    .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto)")
-    .is("deleted_at", null)
-    .order("created_at");
-  if (perfil.unidad_id) query = query.eq("unidad_id", perfil.unidad_id);
-  const { data } = await query;
-  const fichas = (data ?? []) as (FichaPrisma & { unidad?: UnidadOrganizacional })[];
-  const direccionNombre = fichas[0]?.unidad?.nombre ?? "tu dirección";
+  if (!perfil.unidad_id) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <BackButton fallback="/poa-2027" />
+        <EmptyState
+          title="Tu perfil no tiene un área asignada"
+          description="Sin área no se puede armar un POA. Escribile a Planificación Estratégica."
+          icon="◫"
+        />
+      </div>
+    );
+  }
+
+  let circuito: Awaited<ReturnType<typeof getPoaDelArea>> | null = null;
+  let error: string | null = null;
+  try {
+    circuito = await getPoaDelArea(perfil.unidad_id);
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-6 max-w-4xl">
+      <div className="no-imprimir space-y-4">
         <BackButton fallback="/poa-2027" />
-      </div>
 
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Generar POA 2027</h1>
-        <p className="text-sm text-muted mt-1">
-          Documento editable (Word) que reúne todas las fichas PRISMA de {direccionNombre}.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-border bg-surface p-6">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center text-2xl">
-            📄
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">POA {ANIO_POA}</h1>
+            <p className="text-sm text-muted mt-1">
+              Así se va a ver el documento. Hacé clic sobre cualquier texto de tus fichas para
+              corregirlo acá mismo; lo de las otras áreas se ve pero no se toca.
+            </p>
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">
-              POA 2027 — {direccionNombre}
-            </p>
-            <p className="text-xs text-muted mt-0.5">
-              {fichas.length} {fichas.length === 1 ? "ficha PRISMA" : "fichas PRISMA"} · formato .doc editable en Word
-            </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="/api/poa-2027/exportar"
+              className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"
+            >
+              Descargar Word
+            </a>
           </div>
         </div>
-
-        {fichas.length === 0 ? (
-          <div className="mt-5 rounded-lg bg-border/20 p-4 text-center">
-            <p className="text-sm text-muted">
-              Todavía no hay fichas para exportar.
-            </p>
-            <Link
-              href="/poa-2027/cargar"
-              className="inline-block mt-2 text-xs text-primary hover:text-primary-light"
-            >
-              Cargar la primera ficha →
-            </Link>
-          </div>
-        ) : (
-          <a
-            href="/api/poa-2027/exportar"
-            className="mt-5 inline-flex items-center gap-2 text-sm bg-primary text-white rounded-lg px-5 py-2.5 hover:bg-primary/90"
-          >
-            📥 Descargar documento POA 2027
-          </a>
-        )}
-
-        <p className="text-[10px] text-muted mt-4 leading-relaxed">
-          El archivo se descarga en formato <strong>.doc</strong> y se abre directamente en Microsoft
-          Word (o Google Docs), donde podés editarlo libremente antes de presentarlo como la POA 2027
-          de tu dirección.
-        </p>
       </div>
+
+      {error ? (
+        <div className="no-imprimir rounded-xl border border-danger/30 bg-danger/5 p-4">
+          <p className="text-sm font-semibold text-danger">No se pudo armar el documento</p>
+          <p className="text-xs text-muted mt-1 font-mono break-all">{error}</p>
+        </div>
+      ) : (
+        circuito?.propia && (
+          <DocumentoPoa
+            propia={circuito.propia}
+            recibidas={circuito.recibidas}
+            anio={ANIO_POA}
+          />
+        )
+      )}
     </div>
   );
 }
