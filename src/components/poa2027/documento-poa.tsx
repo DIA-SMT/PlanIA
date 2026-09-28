@@ -1,5 +1,7 @@
 import type { AreaDelPoa } from "@/lib/poa-2027";
+import type { Observacion } from "@/lib/poa-2027";
 import { CampoEditable } from "./campo-editable";
+import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
 
 /**
  * El POA 2027 como se va a ver el documento — 28.09.
@@ -28,10 +30,15 @@ export function DocumentoPoa({
   propia,
   recibidas,
   anio,
+  observaciones = [],
+  puedeObservar = false,
 }: {
   propia: AreaDelPoa;
   recibidas: AreaDelPoa[];
   anio: number;
+  observaciones?: Observacion[];
+  /** Deja observar las fichas de las areas de abajo. No las propias. */
+  puedeObservar?: boolean;
 }) {
   // El área propia primero y después las de abajo, que es el orden del
   // documento: la secretaría abre con lo suyo.
@@ -111,16 +118,54 @@ export function DocumentoPoa({
                   </tbody>
                 </table>
               </div>
-              {f.observaciones > 0 && (
-                <p className="text-[11px] text-warning no-imprimir">
-                  Tiene {f.observaciones} observación{f.observaciones === 1 ? "" : "es"} sin
-                  resolver.
-                </p>
-              )}
+              {/* Las observaciones cuelgan de la ficha, en el documento mismo:
+                  quien revisa no tiene que irse a otra pantalla para decir que
+                  algo hay que mirarlo. No se imprimen: son de trabajo interno,
+                  el documento que se manda no las lleva. */}
+              <Observaciones
+                fichaId={f.id}
+                observaciones={observaciones.filter((o) => o.ficha_id === f.id && !o.resuelta_at)}
+                puedeObservar={puedeObservar && !editable}
+              />
             </div>
           ))}
         </section>
       ))}
     </article>
+  );
+}
+
+/**
+ * Las observaciones de una ficha, dentro del documento.
+ *
+ * Solo se puede observar una ficha AJENA: sobre la propia no tiene sentido
+ * —se corrige y listo— y ademas el area duena es la que las tiene que leer.
+ */
+function Observaciones({
+  fichaId,
+  observaciones,
+  puedeObservar,
+}: {
+  fichaId: string;
+  observaciones: Observacion[];
+  puedeObservar: boolean;
+}) {
+  if (observaciones.length === 0 && !puedeObservar) return null;
+  return (
+    <div className="no-imprimir space-y-1 pl-3 border-l-2 border-warning/30">
+      {observaciones.map((o) => (
+        <div key={o.id} className="flex items-start gap-2">
+          <p className="text-[11px] text-foreground/80 flex-1">
+            {o.texto}
+            <span className="text-muted/70">
+              {" "}
+              — {o.autor_email ?? "alguien"}, {new Date(o.created_at).toLocaleDateString("es-AR")}
+            </span>
+          </p>
+          <ResolverObservacion id={o.id} />
+        </div>
+      ))}
+      {puedeObservar && <ObservarFicha fichaId={fichaId} cuantas={observaciones.length} />}
+    </div>
   );
 }
