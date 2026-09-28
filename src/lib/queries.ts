@@ -375,10 +375,18 @@ export const getIndicadores = cache(async function getIndicadores(): Promise<Ind
   return traerPaginado<IndicadorConMeta>((desde, hasta) =>
     supabase
       .from("indicador")
-      .select("*, meta:meta(id, nombre, proyecto:proyecto(id, nombre, codigo, unidad_id))", {
-        count: "exact",
-      })
+      .select(
+        "*, meta:meta!inner(id, nombre, deleted_at, proyecto:proyecto!inner(id, nombre, codigo, unidad_id, estado, deleted_at))",
+        { count: "exact" }
+      )
       .is("deleted_at", null)
+      // 28.09: el join pasa a ser `!inner` para poder exigir que la meta y el
+      // proyecto sigan vivos. Con el join suelto, filtrar el embebido deja la
+      // fila igual y solo vacía la meta, que es peor: el indicador aparece sin
+      // saberse de qué proyecto es.
+      .is("meta.deleted_at", null)
+      .is("meta.proyecto.deleted_at", null)
+      .eq("meta.proyecto.estado", "activo")
       .order("orden")
       .order("id") // desempate: "orden" no es único y el paginado se correría
       .range(desde, hasta) as unknown as PromiseLike<Pagina<IndicadorConMeta>>
@@ -425,6 +433,13 @@ export const getIndicadoresAvance = cache(async function getIndicadoresAvance(
       )
       .eq("meta.proyecto.periodo_id", periodoId)
       .is("deleted_at", null)
+      // 28.09: no alcanza con que el INDICADOR no esté borrado; su meta y su
+      // proyecto también tienen que estar vivos. Sin esto se contaban los
+      // indicadores de metas y proyectos dados de baja: 1957 en vez de 1462 en
+      // todo el municipio, y en Contaduría 59 donde hay 18.
+      .is("meta.deleted_at", null)
+      .is("meta.proyecto.deleted_at", null)
+      .eq("meta.proyecto.estado", "activo")
       .order("orden")
       .order("id") // ídem: desempate para que el paginado no se corra
       .range(desde, hasta) as unknown as PromiseLike<Pagina<IndicadorAvance>>
@@ -448,7 +463,11 @@ export async function getIndicadoresStats(
         { count: "exact", head: true }
       )
       .eq("meta.proyecto.periodo_id", periodoId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      // Misma corrección que en getIndicadoresAvance (28.09).
+      .is("meta.deleted_at", null)
+      .is("meta.proyecto.deleted_at", null)
+      .eq("meta.proyecto.estado", "activo");
     if (unidadIds && unidadIds.length > 0) {
       q = q.in("meta.proyecto.unidad_id", unidadIds);
     }
@@ -509,6 +528,10 @@ export const getMetasDelPeriodo = cache(async function getMetasDelPeriodo(
       .select("*, proyecto:proyecto!inner(id, periodo_id)", { count: "exact" })
       .eq("proyecto.periodo_id", periodoId)
       .is("deleted_at", null)
+      // 28.09: una meta viva de un proyecto dado de baja no es una meta viva.
+      // Eran 7 en todo el municipio.
+      .is("proyecto.deleted_at", null)
+      .eq("proyecto.estado", "activo")
       .order("id")
       .range(desde, hasta)
   );
