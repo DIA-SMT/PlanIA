@@ -62,17 +62,10 @@ export default async function Poa2027Page() {
         {puedeCargar && (
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/poa-2027/cargar"
+              href="/poa-2027/mis-fichas"
               className="text-sm bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
             >
-              + Cargar ficha
-            </Link>
-            <Link
-              href="/poa-2027/mis-fichas"
-              className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"
-            >
-              Mis fichas
-              {propia ? ` (${propia.fichas.length})` : ""}
+              Editar mi POA
             </Link>
             <a
               href="/api/poa-2027/exportar"

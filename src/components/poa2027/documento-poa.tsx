@@ -18,12 +18,22 @@ import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
  * acá: sale del organigrama, que es de donde tiene que salir.
  */
 
-const FILAS = [
-  { letra: "P", rotulo: "Programa / Proyecto", campo: "programa" as const },
-  { letra: "R", rotulo: "Relevancia (descripción y objetivo)", campo: "relevancia" as const },
-  { letra: "I", rotulo: "Indicador", campo: "indicador" as const },
-  { letra: "M", rotulo: "Meta anual", campo: "meta_anual" as const },
-  { letra: "A", rotulo: "Ancla (línea de base)", campo: "ancla" as const },
+/**
+ * Los párrafos de cada proyecto, con los nombres del POA real.
+ *
+ * 28.09: "fijate que el formato en el que aparecen los proyectos no son fichas,
+ * están como redactados". Medido sobre los 366 proyectos de los ocho libros de
+ * 2026, cada uno se lee así: título, descripción y objetivo, período de trabajo,
+ * línea de base y meta. Las letras de PRISMA quedaron atrás — son la misma
+ * información con otro nombre.
+ */
+const PARRAFOS = [
+  { rotulo: "Descripción y objetivo", campo: "relevancia" as const },
+  { rotulo: "Período de trabajo", campo: "periodo" as const },
+  { rotulo: "Hito", campo: "hito" as const },
+  { rotulo: "Línea de base", campo: "ancla" as const },
+  { rotulo: "Meta", campo: "meta_anual" as const },
+  { rotulo: "Indicador", campo: "indicador" as const },
 ];
 
 export function DocumentoPoa({
@@ -86,38 +96,39 @@ export function DocumentoPoa({
           </div>
 
           {area.fichas.map((f, i) => (
-            <div key={f.id} className="space-y-1">
-              <p className="text-[11px] text-muted uppercase tracking-wider">
-                Ficha {i + 1}
-                {f.codigo ? ` · ${f.codigo}` : ""}
-              </p>
-              <div className="tabla-envoltorio">
-                <table className="tabla-reporte">
-                  <tbody>
-                    {FILAS.map((fila) => (
-                      <tr key={fila.campo}>
-                        <td className="izq w-8 font-bold text-primary">{fila.letra}</td>
-                        <td className="izq w-56 text-muted">{fila.rotulo}</td>
-                        <td className="izq">
-                          <CampoEditable
-                            fichaId={f.id}
-                            campo={fila.campo}
-                            valor={f[fila.campo] ?? null}
-                            editable={editable}
-                            placeholder={editable ? "Hacé clic para completar" : "—"}
-                            className="text-sm text-foreground/90 whitespace-pre-wrap"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td className="izq w-8 font-bold text-primary">S</td>
-                      <td className="izq w-56 text-muted">Secretaría</td>
-                      <td className="izq text-sm text-foreground/90">{area.nombre}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div key={f.id} className="space-y-2">
+              <h3 className="text-sm font-bold text-foreground">
+                Proyecto {i + 1}:{" "}
+                <CampoEditable
+                  fichaId={f.id}
+                  campo="programa"
+                  valor={f.programa}
+                  editable={editable}
+                  placeholder="Nombre del proyecto"
+                  className="font-bold"
+                />
+              </h3>
+
+              {PARRAFOS.map((parrafo) => {
+                const valor = f[parrafo.campo] ?? null;
+                // Un párrafo vacío no se dibuja, salvo que se pueda completar:
+                // en el POA de 2026 solo 1 de cada 6 proyectos tiene hito, y
+                // poner "Hito: —" en los otros cinco ensucia el documento.
+                if (!valor?.trim() && !editable) return null;
+                return (
+                  <p key={parrafo.campo} className="text-sm text-foreground/90 leading-relaxed">
+                    <span className="font-semibold">{parrafo.rotulo}:</span>{" "}
+                    <CampoEditable
+                      fichaId={f.id}
+                      campo={parrafo.campo}
+                      valor={valor}
+                      editable={editable}
+                      placeholder="Hacé clic para completar"
+                      className="whitespace-pre-wrap"
+                    />
+                  </p>
+                );
+              })}
               {/* Las observaciones cuelgan de la ficha, en el documento mismo:
                   quien revisa no tiene que irse a otra pantalla para decir que
                   algo hay que mirarlo. No se imprimen: son de trabajo interno,

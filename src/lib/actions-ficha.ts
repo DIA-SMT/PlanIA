@@ -21,7 +21,17 @@ import { getSupabaseServer } from "./supabase/server";
  */
 
 /** Los campos de la ficha que se pueden tocar desde el documento. */
-const CAMPOS = ["programa", "relevancia", "indicador", "meta_anual", "ancla", "codigo"] as const;
+const CAMPOS = [
+  "programa",
+  "relevancia",
+  "indicador",
+  "meta_anual",
+  "ancla",
+  "codigo",
+  // 28.09: los dos que el POA real usa y PRISMA no tenia.
+  "periodo",
+  "hito",
+] as const;
 export type CampoFicha = (typeof CAMPOS)[number];
 
 export async function editarCampoFicha(
