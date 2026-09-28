@@ -23,6 +23,35 @@ export const getPerfilActual = cache(async function getPerfilActual(): Promise<P
     .maybeSingle();
 
   if (error || !data) return null;
+
+  // 28.09: "ver la aplicación como…". Si el usuario está habilitado y eligió un
+  // área, el perfil sale con ESA área y ESE rol, para que las pantallas decidan
+  // como decidirían para esa persona. La comprobación de quién puede vive en
+  // `aplicarVista`, no acá, así no queda una segunda copia de la regla.
+  const { aplicarVista } = await import("./ver-como");
+  return aplicarVista(data as PerfilUsuario);
+});
+
+/**
+ * El perfil REAL, sin el "ver como".
+ *
+ * Lo usan la barra de arriba —para saber quién está de verdad y ofrecer el
+ * selector— y cualquier cosa que tenga que responder por la persona y no por el
+ * papel que está mirando.
+ */
+export const getPerfilReal = cache(async function getPerfilReal(): Promise<PerfilUsuario | null> {
+  const supabase = await getSupabaseServer();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return null;
+
+  const { data, error } = await supabase
+    .from("perfil_usuario")
+    .select("*, unidad:unidad_organizacional(*)")
+    .eq("user_id", userData.user.id)
+    .eq("activo", true)
+    .maybeSingle();
+
+  if (error || !data) return null;
   return data as PerfilUsuario;
 });
 

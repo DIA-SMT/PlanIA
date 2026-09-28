@@ -43,11 +43,14 @@ export function Topbar({
   rol,
   alertas = [],
   porVencer = [],
+  verComo,
 }: {
   perfilNombre: string | null;
   rol: RolUsuario | null;
   alertas?: AlertaConLectura[];
   porVencer?: IndicadorPorVencer[];
+  /** El selector de "ver como", solo para la cuenta habilitada (28.09). */
+  verComo?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -92,6 +95,7 @@ export function Topbar({
         </div>
 
         <div className="flex items-center gap-3">
+          {verComo}
           <span className="text-xs text-muted hidden sm:inline">
             {new Date().toLocaleDateString("es-AR", {
               weekday: "long",
