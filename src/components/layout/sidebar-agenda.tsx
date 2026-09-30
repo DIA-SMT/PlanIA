@@ -29,7 +29,7 @@ type Item = {
 const items: Item[] = [
   { href: "/territorio", label: "Inicio", icon: "◎" },
   { href: "/territorio/agenda", label: "Agenda", icon: "📅" },
-  { href: "/territorio/mapa", label: "Mapa Territorial", icon: "🗺", pronto: true },
+  { href: "/territorio/mapa", label: "Mapa Territorial", icon: "🗺" },
   { href: "/territorio/actividades", label: "Actividades", icon: "▦" },
   { href: "/territorio/briefing", label: "Briefing", icon: "◫", pronto: true },
   { href: "/territorio/actualidad", label: "Actualidad", icon: "◈", pronto: true },

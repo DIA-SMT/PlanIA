@@ -1,8 +1,7 @@
 import Link from "next/link";
-import type { Actividad } from "@/lib/agenda-geo-comun";
+import type { Actividad, VistaAgenda } from "@/lib/agenda-geo-comun";
 import { tipoDe, estadoDe } from "@/lib/agenda-geo-comun";
 import { estiloChip } from "@/lib/colores-agenda";
-import type { VistaAgenda } from "./agenda-toolbar";
 
 const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 

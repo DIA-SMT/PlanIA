@@ -7,13 +7,12 @@ import type { Actividad } from "@/lib/agenda-geo";
 import {
   rangoDeVista,
   filtrarActividades,
-  filtrosEnUrl,
   esIso,
   esVista,
 } from "@/lib/agenda-periodo";
 import { AgendaToolbar } from "@/components/territorio/agenda-toolbar";
-import { AgendaVista } from "@/components/territorio/agenda-vista";
 import { ContadoresAgenda } from "@/components/territorio/contadores-agenda";
+import { MapaCliente } from "@/components/territorio/mapa-cliente";
 import type { UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
@@ -32,23 +31,20 @@ interface Props {
 }
 
 /**
- * La agenda de la Agenda Georreferenciada — etapa 2 del plan del 22.09.
+ * El Mapa Territorial — etapa 3 del plan del 22.09.
  *
- * Mes, semana y día con los filtros por área, tipo, fecha y estado. Todo vive
- * en la URL: la vista se comparte por enlace y la página se sigue renderizando
- * en el servidor. El período y los filtros salen de `agenda-periodo.ts`, que
- * comparte con el mapa para que "los mismos filtros" siga siendo cierto.
+ * Los pines por tipo de actividad, con los mismos filtros que la agenda. Son
+ * literalmente los mismos: la barra y el cálculo del período son el mismo
+ * código, y lo único que cambia es que acá los cambios de filtro vuelven al
+ * mapa en vez de a la agenda.
  *
- * A diferencia de la agenda de PlanIA, acá NO se recorta por el área del
- * usuario: la política `actividad_select_todos` de la migración 052 deja leer
- * todo a cualquiera que haya iniciado sesión, porque el sentido del producto es
- * que cada área cargue lo suyo y lo vea el municipio entero.
+ * El período importa tanto como en la agenda: un mapa con todas las actividades
+ * de la historia es una mancha de puntos. Se mira un mes, una semana o un día,
+ * igual que allá.
  */
-export default async function AgendaTerritorioPage({ searchParams }: Props) {
+export default async function MapaTerritorioPage({ searchParams }: Props) {
   const params = await searchParams;
 
-  // `hoyLocal()` y no `new Date().toISOString()`: a la noche de Tucumán el UTC
-  // ya está en el día siguiente y "hoy" se corría un día.
   const hoy = hoyLocal();
   const vista = esVista(params.vista);
   const fecha = esIso(params.fecha) ? params.fecha : hoy;
@@ -65,32 +61,36 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
       getResumen(hoy),
     ]);
   } catch (e) {
-    // La migración 052 puede no estar aplicada todavía: el código se despliega
-    // solo y las migraciones las aplica una persona.
     error = e instanceof Error ? e.message : String(e);
     unidades = await getUnidades().catch(() => []);
   }
 
   const actividades = filtrarActividades(delRango, unidades, params);
 
-  // Leyenda: solo los tipos que de verdad aparecen en lo que se está mirando.
-  const tiposPresentes = TIPOS.filter((t) => actividades.some((a) => a.tipo === t.clave));
+  // La diferencia que manda en esta pantalla: una actividad sin coordenadas no
+  // se puede dibujar. No es un error —la carga rápida no pide la ubicación— y
+  // esconderla en silencio sería peor que contarla, porque quien mira el mapa
+  // creería que ya está todo.
+  const conPin = actividades.filter((a) => a.lat != null && a.lng != null);
+  const sinPin = actividades.length - conPin.length;
+
+  const tiposPresentes = TIPOS.filter((t) => conPin.some((a) => a.tipo === t.clave));
 
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Agenda</h1>
+          <h1 className="text-2xl font-bold text-foreground">Mapa Territorial</h1>
           <p className="text-sm text-muted mt-1">
-            Las actividades de todas las áreas del municipio, por mes, semana o día.
+            Dónde pasan las actividades del municipio, con el color de su tipo.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start">
           <Link
-            href="/territorio/mapa"
+            href="/territorio/agenda"
             className="text-xs text-foreground border border-border hover:border-primary/40 rounded-lg px-3 py-1.5"
           >
-            🗺 Ver en el mapa
+            📅 Ver en la agenda
           </Link>
           <Link
             href="/territorio/actividades"
@@ -128,19 +128,13 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
               anterior={periodo.anterior}
               siguiente={periodo.siguiente}
               hoy={hoy}
+              ruta="/territorio/mapa"
             />
           </Suspense>
 
-          <AgendaVista
-            vista={vista}
-            dias={periodo.dias}
-            actividades={actividades}
-            mesReferencia={periodo.mesReferencia}
-            hoy={hoy}
-            paramsActuales={filtrosEnUrl(params)}
-          />
+          <MapaCliente actividades={conPin} />
 
-          {tiposPresentes.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {tiposPresentes.map((t) => (
                 <span
@@ -152,20 +146,32 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
                 </span>
               ))}
             </div>
-          )}
+            <p className="text-[11px] text-muted">
+              {conPin.length} {conPin.length === 1 ? "actividad ubicada" : "actividades ubicadas"}
+              {sinPin > 0 && (
+                <>
+                  {" · "}
+                  <Link
+                    href={{
+                      pathname: "/territorio/agenda",
+                      query: { ...params, vista, fecha },
+                    }}
+                    className="text-warning hover:underline"
+                  >
+                    {sinPin} sin ubicación en el mapa
+                  </Link>
+                </>
+              )}
+            </p>
+          </div>
 
-          {/* Que el período esté vacío es distinto de que los filtros lo hayan
-              dejado sin nada. Decirlo mal manda a buscar el problema donde no
-              está. */}
-          {actividades.length === 0 && (
-            <p className="text-sm text-muted text-center py-4">
-              {delRango.length > 0
+          {conPin.length === 0 && (
+            <p className="text-sm text-muted text-center py-2">
+              {actividades.length > 0
+                ? "Las actividades de este período todavía no tienen su punto en el mapa. Se les agrega al editarlas, escribiendo la dirección."
+                : delRango.length > 0
                 ? "Ninguna actividad de este período coincide con los filtros."
-                : "No hay actividades cargadas en este período."}{" "}
-              <Link href="/territorio/actividades" className="text-primary hover:underline">
-                Cargar una
-              </Link>
-              .
+                : "No hay actividades cargadas en este período."}
             </p>
           )}
         </>

@@ -3,9 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { UnidadOrganizacional } from "@/types/database";
-import { TIPOS, ESTADOS } from "@/lib/agenda-geo-comun";
+import { TIPOS, ESTADOS, type VistaAgenda } from "@/lib/agenda-geo-comun";
 
-export type VistaAgenda = "mes" | "semana" | "dia";
 
 interface Props {
   vista: VistaAgenda;
@@ -24,6 +23,12 @@ interface Props {
   anterior: string;
   siguiente: string;
   hoy: string;
+  /**
+   * A dónde navegan los cambios. La agenda y el mapa comparten esta barra
+   * porque el pedido es que tengan los mismos filtros; lo único que cambia
+   * entre las dos es la pantalla que los recibe.
+   */
+  ruta?: string;
 }
 
 /**
@@ -52,6 +57,7 @@ export function AgendaToolbar({
   anterior,
   siguiente,
   hoy,
+  ruta = "/territorio/agenda",
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,7 +69,7 @@ export function AgendaToolbar({
       if (v == null || v === "") params.delete(k);
       else params.set(k, v);
     }
-    router.push(`/territorio/agenda?${params.toString()}`, { scroll: false });
+    router.push(`${ruta}?${params.toString()}`, { scroll: false });
   };
 
   const ordenar = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>

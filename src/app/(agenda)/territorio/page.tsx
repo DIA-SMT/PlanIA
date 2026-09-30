@@ -3,6 +3,7 @@ import { getPerfilActual } from "@/lib/auth";
 import { hoyLocal } from "@/lib/utils";
 import { getResumen, contarActividades } from "@/lib/agenda-geo";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ContadoresAgenda } from "@/components/territorio/contadores-agenda";
 
 export const revalidate = 0;
 
@@ -29,17 +30,6 @@ export default async function TerritorioInicio() {
   }
   const perfil = await getPerfilActual();
 
-  const contadores = [
-    { rotulo: "Actividades de hoy", valor: resumen.hoy, a: { vista: "dia", fecha: hoy } },
-    { rotulo: "Próximas 48 hs", valor: resumen.proximas48, a: { vista: "semana", fecha: hoy } },
-    {
-      rotulo: "Pendientes de confirmación",
-      valor: resumen.porConfirmar,
-      a: { vista: "semana", fecha: hoy, estado: "programada" },
-    },
-    { rotulo: "Modificadas hoy", valor: resumen.modificadas, a: { vista: "dia", fecha: hoy } },
-  ];
-
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -54,26 +44,7 @@ export default async function TerritorioInicio() {
         </Link>
       </div>
 
-      {/* Cada contador lleva a la agenda ya filtrada por lo que cuenta: un
-          número que no se puede abrir obliga a rearmar el filtro a mano. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {contadores.map((c) => (
-          <Link
-            key={c.rotulo}
-            href={{ pathname: "/territorio/agenda", query: c.a }}
-            className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors"
-          >
-            <p className="text-xs text-muted">{c.rotulo}</p>
-            <p
-              className={`text-3xl font-bold mt-1 tabular-nums ${
-                c.valor === 0 ? "text-foreground/40" : "text-foreground"
-              }`}
-            >
-              {c.valor}
-            </p>
-          </Link>
-        ))}
-      </div>
+      <ContadoresAgenda resumen={resumen} hoy={hoy} />
 
       {error ? (
         <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">

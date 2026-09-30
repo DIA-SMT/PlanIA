@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { crearActividad } from "@/lib/actions-actividad";
 import { TIPOS, ESTADOS } from "@/lib/agenda-geo-comun";
 import type { UnidadOrganizacional } from "@/types/database";
+import { SelectorUbicacion } from "./selector-ubicacion";
 
 /**
  * Alta de una actividad, con los dos modos que pide el 22.09.
@@ -18,7 +19,8 @@ import type { UnidadOrganizacional } from "@/types/database";
  * dejaría de ser rápido y nadie cargaría lo que surge sobre la hora, que es
  * justamente lo que se quiere capturar.
  *
- * La ubicación es texto por ahora. El pin en el mapa llega con la etapa 3.
+ * La ubicación se escribe y el punto se marca en el mapa (etapa 3, 22.09). El
+ * punto es opcional: exigirlo en la carga rápida la volvería lenta.
  */
 export function FormActividad({
   unidades,
@@ -44,6 +46,8 @@ export function FormActividad({
     tipo: "otras",
     estado: "programada",
     lugar_texto: "",
+    lat: null as number | null,
+    lng: null as number | null,
     descripcion: "",
     requiere_confirmacion: false,
   };
@@ -192,20 +196,16 @@ export function FormActividad({
               </select>
             </div>
 
-            <div className="sm:col-span-2">
-              <label className={rotulo}>Dónde</label>
-              <input
-                value={v.lugar_texto}
-                onChange={(e) => set("lugar_texto", e.target.value)}
-                disabled={pendiente}
-                placeholder="Bº Ciudadela — Florida 1514"
-                className={campo}
-              />
-              <p className="text-[10px] text-muted/70 mt-1">
-                Por ahora se escribe. El punto en el mapa se va a poder marcar desde acá
-                cuando esté el mapa.
-              </p>
-            </div>
+            <SelectorUbicacion
+              lugar={v.lugar_texto}
+              lat={v.lat}
+              lng={v.lng}
+              onLugar={(x) => set("lugar_texto", x)}
+              onPunto={(la, ln) => setV((x) => ({ ...x, lat: la, lng: ln }))}
+              deshabilitado={pendiente}
+              claseCampo={campo}
+              claseRotulo={rotulo}
+            />
 
             <div className="sm:col-span-2">
               <label className={rotulo}>Detalle</label>
