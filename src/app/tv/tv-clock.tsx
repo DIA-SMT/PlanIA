@@ -33,7 +33,7 @@ export function TvClock() {
       <p className="text-4xl font-light text-foreground tabular-nums tracking-wider">
         {time}
       </p>
-      <p className="text-sm text-muted capitalize mt-1">{date}</p>
+      <p className="text-sm text-muted first-letter:uppercase mt-1">{date}</p>
     </div>
   );
 }

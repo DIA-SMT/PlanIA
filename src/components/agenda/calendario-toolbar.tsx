@@ -126,7 +126,7 @@ export function CalendarioToolbar({
             ›
           </button>
         </div>
-        <h2 className="text-base font-semibold text-foreground capitalize mx-1">{titulo}</h2>
+        <h2 className="text-base font-semibold text-foreground first-letter:uppercase mx-1">{titulo}</h2>
 
         {/* 18.09: "a la par del mes debería existir una sola opción que diga
             Evento". Prende y apaga los hitos del municipio dentro de la
