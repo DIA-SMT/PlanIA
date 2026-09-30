@@ -96,10 +96,29 @@ export function estadoVisualIndicador(ind: {
   return ind.estado_semaforo;
 }
 
+/**
+ * Una fecha, leída para mostrarla acá.
+ *
+ * `new Date("2026-09-30")` —una fecha sola, sin hora— la interpreta JavaScript
+ * como medianoche UTC, que en Argentina cae a las 21:00 del DÍA ANTERIOR. Todo
+ * lo que sale de una columna `date` se mostraba corrido un día: el inicio y el
+ * fin de cada proyecto, el vencimiento de cada hito, la fecha del corte
+ * trimestral, la fecha de cada actividad de la agenda. Se veía claro en
+ * `/territorio/actividades`, que rotulaba "29 de sept" con el cartel "hoy" al
+ * lado un 30 de septiembre.
+ *
+ * Con la hora explícita se lee como medianoche local y la fecha es la que dice.
+ * Un timestamp completo ya trae su hora y su zona, así que no entra por acá y
+ * se sigue leyendo como antes.
+ */
+function aFechaLocal(fecha: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? new Date(fecha + "T00:00:00") : new Date(fecha);
+}
+
 export function formatFechaRelativa(fecha: string | null): string {
   if (!fecha) return "Sin fecha";
   const ahora = new Date();
-  const target = new Date(fecha);
+  const target = aFechaLocal(fecha);
   const diffMs = ahora.getTime() - target.getTime();
   const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
@@ -120,7 +139,7 @@ export function formatFechaRelativa(fecha: string | null): string {
 
 export function formatFecha(fecha: string | null): string {
   if (!fecha) return "—";
-  return new Date(fecha).toLocaleDateString("es-AR", {
+  return aFechaLocal(fecha).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -136,7 +155,7 @@ export function formatFecha(fecha: string | null): string {
  */
 export function formatFechaHora(fecha: string | null): string {
   if (!fecha) return "—";
-  return new Date(fecha).toLocaleString("es-AR", {
+  return aFechaLocal(fecha).toLocaleString("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
