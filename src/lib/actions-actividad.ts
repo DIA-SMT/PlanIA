@@ -33,6 +33,7 @@ interface DatosActividad {
   lng?: number | null;
   requiere_confirmacion?: boolean;
   briefing?: string | null;
+  proyecto_id?: string | null;
 }
 
 const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -114,7 +115,7 @@ export async function editarActividad(
   for (const campo of ["hora_desde", "hora_hasta", "lugar_texto", "descripcion", "briefing"] as const) {
     if (datos[campo] !== undefined) cambios[campo] = (datos[campo] as string)?.trim() || null;
   }
-  for (const campo of ["unidad_id", "tipo", "estado", "lat", "lng", "requiere_confirmacion"] as const) {
+  for (const campo of ["unidad_id", "tipo", "estado", "lat", "lng", "requiere_confirmacion", "proyecto_id"] as const) {
     if (datos[campo] !== undefined) cambios[campo] = datos[campo];
   }
   if (Object.keys(cambios).length === 0) return { success: true, id };

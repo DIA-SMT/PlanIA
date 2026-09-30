@@ -169,10 +169,7 @@ function Grupo({
                 />
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={{
-                      pathname: "/territorio/agenda",
-                      query: { vista: "dia", fecha: a.fecha },
-                    }}
+                    href={`/territorio/actividades/${a.id}`}
                     className="text-sm font-medium text-foreground hover:text-primary"
                   >
                     {a.titulo}

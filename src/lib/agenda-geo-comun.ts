@@ -67,6 +67,8 @@ export interface Actividad {
   lng: number | null;
   requiere_confirmacion: boolean;
   proyecto_id: string | null;
+  /** Codigo y nombre del proyecto del POA. Solo lo trae la consulta de la ficha. */
+  proyecto_nombre?: string | null;
   briefing: string | null;
   created_at: string;
   updated_at: string;
@@ -150,3 +152,16 @@ export const CAMPOS_HISTORIAL: Record<string, string> = {
   requiere_confirmacion: "Requiere confirmacion",
   deleted_at: "Baja",
 };
+
+/**
+ * El bucket de Storage donde viven los adjuntos de una actividad.
+ *
+ * Vive aca y no en `actions-documento.ts` por una regla de Next: en un archivo
+ * "use server" solo se pueden exportar funciones async. Una constante exportada
+ * ahi rompe el build entero, y con un mensaje que apunta al componente que la
+ * importa y no al archivo que la declara.
+ */
+export const BUCKET_DOCUMENTOS = "actividad-documentos";
+
+/** 10 MB. Un briefing con fotos entra; un video no, y no es lo que se pidio. */
+export const TAMANO_MAXIMO_DOCUMENTO = 10 * 1024 * 1024;
