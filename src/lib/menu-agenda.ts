@@ -27,6 +27,7 @@ export const MENU_AGENDA: ItemMenu[] = [
   { href: "/territorio/agenda", label: "Agenda", icon: "📅" },
   { href: "/territorio/mapa", label: "Mapa Territorial", icon: "🗺" },
   { href: "/territorio/actividades", label: "Actividades", icon: "▦" },
+  { href: "/territorio/atencion", label: "Requiere atención", icon: "⚠" },
   { href: "/territorio/briefing", label: "Briefing", icon: "◫", pronto: true },
   { href: "/territorio/actualidad", label: "Actualidad", icon: "◈", pronto: true },
   {

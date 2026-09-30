@@ -107,3 +107,46 @@ export function enTucuman(lat: number, lng: number): boolean {
  * este modulo es el unico que pueden importar los dos.
  */
 export type VistaAgenda = "mes" | "semana" | "dia";
+
+/**
+ * Que le falta a una actividad para estar completa.
+ *
+ * La lista sale del propio formulario de carga rapida, que al guardar avisa
+ * "cuando puedas, completa el horario, el lugar y el tipo". El punto en el mapa
+ * se sumo con la etapa 3.
+ *
+ * El tipo cuenta como faltante cuando quedo en `otras` porque ese es el valor
+ * por defecto: desde afuera no hay forma de distinguir "es una actividad de
+ * otro tipo" de "nadie lo eligio". Se prefiere preguntar de mas y que lo
+ * confirmen, antes que dejar todo el mapa de un solo color.
+ */
+export function faltantesDe(a: {
+  hora_desde: string | null;
+  lugar_texto: string | null;
+  tipo: string;
+  lat: number | null;
+  lng: number | null;
+}): string[] {
+  const faltan: string[] = [];
+  if (!a.hora_desde) faltan.push("horario");
+  if (!a.lugar_texto) faltan.push("lugar");
+  if (a.tipo === "otras") faltan.push("tipo");
+  if (a.lat == null || a.lng == null) faltan.push("punto en el mapa");
+  return faltan;
+}
+
+/** Los rotulos de los campos del historial, que en la base son nombres de columna. */
+export const CAMPOS_HISTORIAL: Record<string, string> = {
+  fecha: "Fecha",
+  hora_desde: "Hora de inicio",
+  hora_hasta: "Hora de fin",
+  titulo: "Titulo",
+  estado: "Estado",
+  lugar_texto: "Lugar",
+  lat: "Ubicacion (latitud)",
+  lng: "Ubicacion (longitud)",
+  unidad_id: "Area responsable",
+  tipo: "Tipo",
+  requiere_confirmacion: "Requiere confirmacion",
+  deleted_at: "Baja",
+};

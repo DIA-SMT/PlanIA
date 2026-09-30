@@ -80,6 +80,9 @@ export async function crearActividad(datos: DatosActividad): Promise<ResultadoAc
   if (error) return { success: false, error: error.message };
   revalidatePath("/territorio");
   revalidatePath("/territorio/actividades");
+  revalidatePath("/territorio/agenda");
+  revalidatePath("/territorio/mapa");
+  revalidatePath("/territorio/atencion");
   return { success: true, id: (data as { id: string }).id };
 }
 
@@ -120,6 +123,9 @@ export async function editarActividad(
   if (error) return { success: false, error: error.message };
   revalidatePath("/territorio");
   revalidatePath("/territorio/actividades");
+  revalidatePath("/territorio/agenda");
+  revalidatePath("/territorio/mapa");
+  revalidatePath("/territorio/atencion");
   return { success: true, id };
 }
 
@@ -152,5 +158,8 @@ export async function borrarActividad(id: string): Promise<ResultadoActividad> {
   if (error) return { success: false, error: error.message };
   revalidatePath("/territorio");
   revalidatePath("/territorio/actividades");
+  revalidatePath("/territorio/agenda");
+  revalidatePath("/territorio/mapa");
+  revalidatePath("/territorio/atencion");
   return { success: true, id };
 }

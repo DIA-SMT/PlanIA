@@ -17,13 +17,20 @@ export function ContadoresAgenda({
   resumen: { hoy: number; proximas48: number; porConfirmar: number; modificadas: number };
   hoy: string;
 }) {
-  const contadores = [
+  const contadores: {
+    rotulo: string;
+    valor: number;
+    a?: Record<string, string>;
+    href?: string;
+  }[] = [
     { rotulo: "Actividades de hoy", valor: resumen.hoy, a: { vista: "dia", fecha: hoy } },
     { rotulo: "Próximas 48 hs", valor: resumen.proximas48, a: { vista: "semana", fecha: hoy } },
     {
       rotulo: "Pendientes de confirmación",
       valor: resumen.porConfirmar,
-      a: { vista: "semana", fecha: hoy, estado: "programada" },
+      // Este no va a la agenda filtrada sino a "requiere atención", que desde
+      // la etapa 5 responde exactamente esa pregunta y ademas dice por que.
+      href: "/territorio/atencion",
     },
     { rotulo: "Modificadas hoy", valor: resumen.modificadas, a: { vista: "dia", fecha: hoy } },
   ];
@@ -33,7 +40,7 @@ export function ContadoresAgenda({
       {contadores.map((c) => (
         <Link
           key={c.rotulo}
-          href={{ pathname: "/territorio/agenda", query: c.a }}
+          href={c.href ?? { pathname: "/territorio/agenda", query: c.a }}
           className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors"
         >
           <p className="text-xs text-muted">{c.rotulo}</p>
