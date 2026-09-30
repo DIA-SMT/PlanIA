@@ -106,10 +106,14 @@ export default function MapaActividades({ actividades, alto = "600px" }: Props) 
             position={[a.lat!, a.lng!]}
             icon={iconoDe(t.hex, a.estado === "suspendida")}
           >
-            {/* La ficha llega con la etapa 4. Hasta entonces el globo muestra
-                lo que se sabe, que es mejor que un enlace a ninguna parte. */}
             <Popup>
-              <p className="text-sm font-semibold">{a.titulo}</p>
+              {/* El titulo abre la ficha, que llego con la etapa 4. */}
+              <a
+                href={`/territorio/actividades/${a.id}`}
+                className="text-sm font-semibold underline"
+              >
+                {a.titulo}
+              </a>
               <p className="text-xs">
                 {a.hora_desde ? `${a.hora_desde.slice(0, 5)} · ` : ""}
                 {a.unidad_nombre ?? "—"}

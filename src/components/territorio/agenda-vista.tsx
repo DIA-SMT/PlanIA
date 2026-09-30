@@ -194,12 +194,7 @@ export function AgendaVista({
   );
 }
 
-/**
- * Una actividad en la vista de día.
- *
- * Todavía no es un enlace: la ficha llega con la etapa 4 y hasta entonces no
- * hay a dónde ir. Cuando exista, el enlace va acá y en `ActividadChip`.
- */
+/** Una actividad en la vista de día. El título abre su ficha (etapa 4). */
 function ActividadFila({ actividad: a }: { actividad: Actividad }) {
   const t = tipoDe(a.tipo);
   const e = estadoDe(a.estado);
@@ -212,7 +207,12 @@ function ActividadFila({ actividad: a }: { actividad: Actividad }) {
       />
       <span className="w-24 shrink-0 text-xs text-muted tabular-nums">{horario(a) ?? "—"}</span>
       <span className="flex-1 min-w-0">
-        <span className="block text-sm text-foreground">{a.titulo}</span>
+        <Link
+          href={`/territorio/actividades/${a.id}`}
+          className="block text-sm text-foreground hover:text-primary"
+        >
+          {a.titulo}
+        </Link>
         <span className="block text-[11px] text-muted">
           {a.unidad_nombre ?? "—"}
           {a.lugar_texto ? ` · ${a.lugar_texto}` : ""}
@@ -249,12 +249,13 @@ function ActividadChip({
   const t = tipoDe(a.tipo);
   const e = estadoDe(a.estado);
   return (
-    <div
+    <Link
+      href={`/territorio/actividades/${a.id}`}
       title={`${horario(a) ? horario(a) + " · " : ""}${a.titulo}${
         a.lugar_texto ? ` · ${a.lugar_texto}` : ""
       } — ${a.unidad_nombre ?? "—"} · ${t.rotulo} · ${e.rotulo}`}
       style={estiloChip(t.hex)}
-      className={`rounded border px-1.5 py-1 ${
+      className={`block rounded border px-1.5 py-1 hover:brightness-125 transition ${
         // Una suspendida sigue estando —se avisó que iba a pasar— pero no puede
         // pesar lo mismo que una que sigue en pie.
         a.estado === "suspendida" ? "opacity-50 line-through" : ""
@@ -267,7 +268,7 @@ function ActividadChip({
       {!compacto && (
         <p className="text-[9px] opacity-70 line-clamp-1">{a.unidad_nombre ?? "—"}</p>
       )}
-    </div>
+    </Link>
   );
 }
 

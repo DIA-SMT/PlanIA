@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Actividad } from "@/lib/agenda-geo-comun";
-import { faltantesDe } from "@/lib/agenda-geo-comun";
+import { faltantesDe, BUCKET_DOCUMENTOS } from "@/lib/agenda-geo-comun";
 
 /**
  * Las consultas de la Agenda Georreferenciada.
@@ -48,11 +48,25 @@ export async function getActividades(opciones: {
   return (data ?? []).map(aActividad);
 }
 
+/**
+ * Una actividad con todo lo que necesita su ficha.
+ *
+ * Suma el nombre del proyecto del POA al que esta vinculada -la ficha lo
+ * muestra, no un uuid- y descarta las dadas de baja: una actividad borrada no
+ * tiene ficha, y devolverla haria que la pantalla la dejara editar.
+ */
 export async function getActividad(id: string): Promise<Actividad | null> {
   const sb = await getSupabaseServer();
-  const { data, error } = await sb.from("actividad").select(COLUMNAS).eq("id", id).single();
+  const { data, error } = await sb
+    .from("actividad")
+    .select(COLUMNAS + ", proyecto:proyecto(id, nombre, codigo)")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
   if (error) return null;
-  return aActividad(data);
+  const a = aActividad(data);
+  const p = (data as any).proyecto;
+  return { ...a, proyecto_nombre: p ? [p.codigo, p.nombre].filter(Boolean).join(" · ") : null };
 }
 
 export interface CambioActividad {
@@ -240,4 +254,52 @@ export async function getHistorialDeVarias(
     salida.set(fila.actividad_id, lista);
   }
   return salida;
+}
+
+export interface DocumentoActividad {
+  id: string;
+  nombre: string;
+  ruta: string;
+  tipo_mime: string | null;
+  tamano_bytes: number | null;
+  subido_por_email: string | null;
+  created_at: string;
+  /** Enlace firmado que vence. Null si no se pudo generar. */
+  url: string | null;
+}
+
+/**
+ * Los documentos de una actividad, con su enlace para bajarlos.
+ *
+ * El bucket es privado, asi que no hay URL publica: cada archivo se sirve con
+ * un enlace firmado que vence en una hora. Un briefing de una actividad de la
+ * Intendenta no puede quedar accesible para cualquiera que adivine la
+ * direccion.
+ *
+ * Los enlaces se piden todos juntos con `createSignedUrls`, que acepta una
+ * lista: uno por archivo serian ocho viajes para mostrar ocho renglones.
+ *
+ * Devuelve lista vacia ante cualquier error en vez de tirar: la migracion 055
+ * puede no estar aplicada todavia, y que falte el adjunto no tiene que voltear
+ * la ficha entera.
+ */
+export async function getDocumentos(actividadId: string): Promise<DocumentoActividad[]> {
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb
+    .from("actividad_documento")
+    .select("id, nombre, ruta, tipo_mime, tamano_bytes, subido_por_email, created_at")
+    .eq("actividad_id", actividadId)
+    .order("created_at", { ascending: false });
+  if (error || !data || data.length === 0) return [];
+
+  const filas = data as Omit<DocumentoActividad, "url">[];
+  const firmados = await sb.storage
+    .from(BUCKET_DOCUMENTOS)
+    .createSignedUrls(filas.map((f) => f.ruta), 3600);
+
+  const porRuta = new Map<string, string>();
+  for (const f of firmados.data ?? []) {
+    if (f.path && f.signedUrl) porRuta.set(f.path, f.signedUrl);
+  }
+  return filas.map((f) => ({ ...f, url: porRuta.get(f.ruta) ?? null }));
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getPerfilActual } from "@/lib/auth";
 import { getUnidades } from "@/lib/queries";
 import { unidadesQuePuedeCargar, hoyLocal, formatFecha } from "@/lib/utils";
@@ -96,7 +97,12 @@ export default async function ActividadesPage() {
                         title={t.rotulo}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground">{a.titulo}</p>
+                        <Link
+                          href={`/territorio/actividades/${a.id}`}
+                          className="text-sm font-medium text-foreground hover:text-primary"
+                        >
+                          {a.titulo}
+                        </Link>
                         <p className="text-xs text-muted mt-0.5">
                           {a.hora_desde ? `${a.hora_desde.slice(0, 5)} · ` : ""}
                           {a.unidad_nombre ?? "—"}
