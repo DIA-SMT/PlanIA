@@ -1,38 +1,8 @@
 import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
 import { avanceIndicador, indicadorCumplido } from "./utils";
-import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, Indicador, IndicadorHistorial, AgendaSemana, AgendaActividad, Alerta, AlertaConLectura, IndicadorPorVencer } from "@/types/database";
+import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, Indicador, IndicadorHistorial, Alerta, AlertaConLectura, IndicadorPorVencer } from "@/types/database";
 
-// Devuelve el lunes ISO (YYYY-MM-DD) de la semana de una fecha dada
-export function lunesDeSemana(fecha: Date = new Date()): string {
-  const d = new Date(fecha);
-  const day = d.getDay(); // 0=Sun, 1=Mon, ...
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
-}
-
-export async function getAgendaSemana(
-  unidadId: string,
-  fechaLunes: string
-): Promise<(AgendaSemana & { actividades: AgendaActividad[] }) | null> {
-  const supabase = await getSupabaseServer();
-  const { data, error } = await supabase
-    .from("agenda_semana")
-    .select("*, actividades:agenda_actividad(*)")
-    .eq("unidad_id", unidadId)
-    .eq("fecha_lunes", fechaLunes)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const sem = data as AgendaSemana & { actividades: AgendaActividad[] };
-  sem.actividades = (sem.actividades ?? []).sort((a, b) =>
-    a.dia_semana === b.dia_semana ? a.orden - b.orden : a.dia_semana - b.dia_semana
-  );
-  return sem;
-}
-
-// Suma días a una fecha ISO (YYYY-MM-DD) sin tocar zonas horarias.
 export function sumarDias(fechaIso: string, dias: number): string {
   const d = new Date(fechaIso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + dias);
@@ -46,30 +16,6 @@ export function lunesIso(fechaIso: string): string {
   return sumarDias(fechaIso, day === 0 ? -6 : 1 - day);
 }
 
-// Un evento del calendario: una actividad de la agenda ya resuelta a su fecha
-// concreta (fecha_lunes + dia_semana), con la unidad que la cargó.
-export interface EventoAgenda {
-  id: string;
-  fecha: string; // YYYY-MM-DD
-  unidad_id: string;
-  unidad_nombre: string;
-  fecha_lunes: string;
-  dia_semana: number;
-  orden: number;
-  horario: string | null;
-  actividad: string;
-  lugar: string | null;
-  observacion: string | null;
-  es_feriado: boolean;
-  /** Clave de color propia de la actividad (06.08); null ⇒ color de la unidad. */
-  color: string | null;
-}
-
-/**
- * Eventos del calendario (30.07) entre dos fechas inclusive. La agenda se
- * guarda por semana (lunes) + día de la semana, así que se traen las semanas
- * que solapan el rango y después se expande cada actividad a su fecha real.
- */
 export interface HitoCalendario {
   id: string;
   fecha_desde: string;
@@ -134,60 +80,6 @@ export async function getHitosDelRango(desde: string, hasta: string): Promise<Hi
         a.fecha_desde.localeCompare(b.fecha_desde) ||
         a.nombre.localeCompare(b.nombre, "es")
     );
-}
-
-export async function getEventosAgenda(desde: string, hasta: string): Promise<EventoAgenda[]> {
-  const supabase = await getSupabaseServer();
-  const { data, error } = await supabase
-    .from("agenda_semana")
-    .select("*, unidad:unidad_organizacional(*), actividades:agenda_actividad(*)")
-    .gte("fecha_lunes", lunesIso(desde))
-    .lte("fecha_lunes", hasta);
-  if (error) throw error;
-
-  const eventos: EventoAgenda[] = [];
-  for (const sem of (data ?? []) as (AgendaSemana & {
-    unidad?: UnidadOrganizacional;
-    actividades?: AgendaActividad[];
-  })[]) {
-    for (const act of sem.actividades ?? []) {
-      const fecha = sumarDias(sem.fecha_lunes, act.dia_semana - 1);
-      if (fecha < desde || fecha > hasta) continue;
-      eventos.push({
-        id: act.id,
-        fecha,
-        unidad_id: sem.unidad_id,
-        unidad_nombre: sem.unidad?.nombre_corto ?? sem.unidad?.nombre ?? "—",
-        fecha_lunes: sem.fecha_lunes,
-        dia_semana: act.dia_semana,
-        orden: act.orden,
-        horario: act.horario,
-        actividad: act.actividad,
-        lugar: act.lugar,
-        observacion: act.observacion,
-        es_feriado: act.es_feriado,
-        color: act.color ?? null,
-      });
-    }
-  }
-
-  // El horario es texto libre ("09:00", "Mañana"), así que ordena como texto y
-  // deja el `orden` de carga como desempate.
-  return eventos.sort((a, b) =>
-    a.fecha !== b.fecha
-      ? a.fecha.localeCompare(b.fecha)
-      : (a.horario ?? "~").localeCompare(b.horario ?? "~") || a.orden - b.orden
-  );
-}
-
-export async function getAgendasSemana(fechaLunes: string): Promise<AgendaSemana[]> {
-  const supabase = await getSupabaseServer();
-  const { data, error } = await supabase
-    .from("agenda_semana")
-    .select("*, unidad:unidad_organizacional(*), actividades:agenda_actividad(*)")
-    .eq("fecha_lunes", fechaLunes);
-  if (error) throw error;
-  return (data ?? []) as AgendaSemana[];
 }
 
 // -------------------------------------------------------

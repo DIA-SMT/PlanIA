@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getUnidades } from "@/lib/queries";
+import { getUnidades, getHitosDelRango, type HitoCalendario } from "@/lib/queries";
 import { hoyLocal } from "@/lib/utils";
 import { getActividades, getResumen, TIPOS } from "@/lib/agenda-geo";
 import type { Actividad } from "@/lib/agenda-geo";
@@ -29,6 +29,8 @@ interface Props {
     tipo?: string;
     estado?: string;
     q?: string;
+    /** "0" apaga los hitos del municipio dentro de la cuadrícula (18.09). */
+    eventos?: string;
   }>;
 }
 
@@ -58,12 +60,18 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
   let unidades: UnidadOrganizacional[] = [];
   let delRango: Actividad[] = [];
   let resumen = { hoy: 0, proximas48: 0, porConfirmar: 0, modificadas: 0 };
+  let hitos: HitoCalendario[] = [];
   let error: string | null = null;
+  // Los hitos del municipio los ve todo el mundo, sin filtro por área ni por
+  // rol (15.09, párrafo 803). Vinieron de la agenda de PlanIA cuando esa
+  // pantalla se fue.
+  const verHitos = params.eventos !== "0";
   try {
-    [unidades, delRango, resumen] = await Promise.all([
+    [unidades, delRango, resumen, hitos] = await Promise.all([
       getUnidades(),
       getActividades({ desde: periodo.desde, hasta: periodo.hasta }),
       getResumen(hoy),
+      getHitosDelRango(periodo.desde, periodo.hasta).catch(() => []),
     ]);
   } catch (e) {
     // La migración 052 puede no estar aplicada todavía: el código se despliega
@@ -129,6 +137,8 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
               anterior={periodo.anterior}
               siguiente={periodo.siguiente}
               hoy={hoy}
+              eventos={verHitos}
+              cantidadEventos={hitos.length}
             />
           </Suspense>
 
@@ -139,6 +149,7 @@ export default async function AgendaTerritorioPage({ searchParams }: Props) {
             mesReferencia={periodo.mesReferencia}
             hoy={hoy}
             paramsActuales={filtrosEnUrl(params)}
+            hitos={verHitos ? hitos : []}
           />
 
           {tiposPresentes.length > 0 && (
