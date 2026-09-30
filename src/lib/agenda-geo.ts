@@ -113,3 +113,20 @@ export async function getResumen(hoy: string): Promise<{
     modificadas: vivas.filter((f) => String(f.updated_at).slice(0, 10) === hoy).length,
   };
 }
+
+/**
+ * Cuántas actividades hay cargadas, sin traerlas.
+ *
+ * Sirve para distinguir "todavía no cargó nadie nada" de "hoy no hay nada",
+ * que en la pantalla de inicio son dos carteles distintos: el primero manda a
+ * cargar la primera actividad y el segundo sería un error.
+ */
+export async function contarActividades(): Promise<number> {
+  const sb = await getSupabaseServer();
+  const { count, error } = await sb
+    .from("actividad")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
+  if (error) return 0;
+  return count ?? 0;
+}
