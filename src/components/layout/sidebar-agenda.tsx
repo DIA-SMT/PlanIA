@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { RolUsuario } from "@/types/database";
 import { PieInstitucional } from "./pie-institucional";
+import { MENU_AGENDA, type ItemMenu } from "@/lib/menu-agenda";
 
 /**
  * La barra lateral de la Agenda Georreferenciada.
@@ -13,38 +14,15 @@ import { PieInstitucional } from "./pie-institucional";
  * productos distintos que se eligen al entrar, y mezclarlos en un solo menú es
  * justamente lo que pidieron evitar.
  *
- * Las secciones son las de la maqueta del 22.09. Las que todavía no existen se
- * muestran apagadas, con su fecha estimada, en vez de esconderse: así se ve a
- * dónde va la cosa y nadie pregunta si se olvidaron de algo.
+ * Las secciones viven en `menu-agenda.ts`, compartidas con el menú de celular
+ * de la barra de arriba: son el mismo menú visto en dos anchos, y tenerlas dos
+ * veces es lo que hizo que el 09.09 sacaran algo de uno y quedara en el otro.
+ * Las que todavía no existen se muestran apagadas en vez de esconderse: así se
+ * ve a dónde va la cosa y nadie pregunta si se olvidaron de algo.
  */
-type Item = {
-  href: string;
-  label: string;
-  icon: string;
-  roles?: RolUsuario[];
-  /** Todavía no construido: se muestra apagado y no navega. */
-  pronto?: boolean;
-};
-
-const items: Item[] = [
-  { href: "/territorio", label: "Inicio", icon: "◎" },
-  { href: "/territorio/agenda", label: "Agenda", icon: "📅" },
-  { href: "/territorio/mapa", label: "Mapa Territorial", icon: "🗺" },
-  { href: "/territorio/actividades", label: "Actividades", icon: "▦" },
-  { href: "/territorio/briefing", label: "Briefing", icon: "◫", pronto: true },
-  { href: "/territorio/actualidad", label: "Actualidad", icon: "◈", pronto: true },
-  {
-    href: "/territorio/configuracion",
-    label: "Configuración",
-    icon: "⚙",
-    roles: ["admin_funcional", "admin_tecnico"],
-    pronto: true,
-  },
-];
-
 export function SidebarAgenda({ rol }: { rol: RolUsuario | null }) {
   const pathname = usePathname();
-  const visibles = items.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
+  const visibles = MENU_AGENDA.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-surface min-h-screen">
@@ -66,7 +44,7 @@ export function SidebarAgenda({ rol }: { rol: RolUsuario | null }) {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {visibles.map((item) =>
+        {visibles.map((item: ItemMenu) =>
           item.pronto ? (
             <span
               key={item.href}

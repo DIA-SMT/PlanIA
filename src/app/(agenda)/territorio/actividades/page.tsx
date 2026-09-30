@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BackButton } from "@/components/layout/back-button";
 
 export const revalidate = 0;
+export const metadata = { title: "Actividades" };
 
 /**
  * Actividades — la carga y el listado (etapa 1 del plan del 22.09).

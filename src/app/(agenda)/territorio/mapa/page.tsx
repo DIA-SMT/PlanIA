@@ -16,6 +16,7 @@ import { MapaCliente } from "@/components/territorio/mapa-cliente";
 import type { UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
+export const metadata = { title: "Mapa Territorial" };
 
 interface Props {
   searchParams: Promise<{

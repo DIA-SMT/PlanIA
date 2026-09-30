@@ -17,6 +17,7 @@ import { ContadoresAgenda } from "@/components/territorio/contadores-agenda";
 import type { UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
+export const metadata = { title: "Agenda" };
 
 interface Props {
   searchParams: Promise<{
