@@ -1,30 +1,27 @@
 import Image from "next/image";
-import Link from "next/link";
+
 import { TvClock } from "./tv-clock";
 import { TvPanel } from "./tv-panel";
-import { TvCalendarioMes } from "./tv-calendario";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { getPeriodoActivo } from "@/lib/queries";
 
 export const revalidate = 30;
-
-type VistaTv = "panel" | "calendario";
 
 interface Props {
   searchParams: Promise<{ vista?: string; fecha?: string; unidad?: string }>;
 }
 
 /**
- * Modo TV (pantalla de sala, sin login). Dos vistas:
- *   /tv                    → panel ejecutivo (mismo formato que /dashboard)
- *   /tv?vista=calendario   → agenda del mes en grilla mensual
+ * Modo TV (pantalla de sala, sin login): el panel ejecutivo, en el mismo
+ * formato que /dashboard.
  *
- * El encabezado, el pie y el refresco automático son comunes a las dos; cada
- * vista trae sus propios datos.
+ * Tuvo una segunda vista con el calendario del mes, que se fue el 30.09 junto
+ * con la agenda de PlanIA. Los parametros vista, fecha y unidad se siguen
+ * aceptando y se ignoran: hay pantallas de sala con la URL vieja guardada y es
+ * mejor que muestren el panel a que muestren un error.
  */
 export default async function TvPage({ searchParams }: Props) {
-  const params = await searchParams;
-  const vista: VistaTv = params.vista === "calendario" ? "calendario" : "panel";
+  await searchParams;
   const periodo = await getPeriodoActivo();
 
   return (
@@ -48,17 +45,10 @@ export default async function TvPage({ searchParams }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          <VistaSwitch vista={vista} unidad={params.unidad ?? null} />
-          <TvClock />
-        </div>
+        <TvClock />
       </div>
 
-      {vista === "calendario" ? (
-        <TvCalendarioMes fecha={params.fecha ?? null} unidadId={params.unidad ?? null} />
-      ) : (
-        <TvPanel periodoId={periodo.id} periodoNombre={periodo.nombre} />
-      )}
+      <TvPanel periodoId={periodo.id} periodoNombre={periodo.nombre} />
 
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between text-xs text-muted/50">
@@ -74,39 +64,6 @@ export default async function TvPage({ searchParams }: Props) {
         </div>
         <AutoRefresh intervalSegundos={60} />
       </div>
-    </div>
-  );
-}
-
-/**
- * Selector de vista. En la TV nadie hace click, pero deja el modo calendario a
- * un click desde la propia pantalla y hace visible que existe.
- */
-function VistaSwitch({ vista, unidad }: { vista: VistaTv; unidad: string | null }) {
-  const opciones = [
-    { key: "panel" as const, label: "Panel", href: "/tv" },
-    {
-      key: "calendario" as const,
-      label: "Calendario",
-      href: unidad ? `/tv?vista=calendario&unidad=${unidad}` : "/tv?vista=calendario",
-    },
-  ];
-
-  return (
-    <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1">
-      {opciones.map((o) => (
-        <Link
-          key={o.key}
-          href={o.href}
-          className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
-            vista === o.key
-              ? "bg-primary/15 text-primary font-semibold"
-              : "text-muted hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </Link>
-      ))}
     </div>
   );
 }

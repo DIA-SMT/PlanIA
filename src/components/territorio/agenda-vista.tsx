@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Actividad, VistaAgenda } from "@/lib/agenda-geo-comun";
 import { tipoDe, estadoDe } from "@/lib/agenda-geo-comun";
 import { estiloChip } from "@/lib/colores-agenda";
+import type { HitoCalendario } from "@/lib/queries";
 
 const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -20,6 +21,18 @@ interface Props {
    * entero sin filtrar, que es justo lo contrario de lo que uno pidió.
    */
   paramsActuales: Record<string, string>;
+  /**
+   * Los hitos del municipio, pintados DENTRO de la cuadrícula.
+   *
+   * Vienen de la agenda de PlanIA, que se fue el 30.09. Se conserva la
+   * corrección del 18.09 al pie de la letra: "los hitos están arriba y no
+   * propiamente en el calendario, necesitamos trasladarlos a la cuadrícula".
+   * Antes de eso eran una banda aparte y pidieron que no lo fueran; moverlos de
+   * producto no es motivo para devolverlos a donde no los querían.
+   *
+   * Los ve todo el mundo sin filtro por área ni por rol (15.09, párrafo 803).
+   */
+  hitos?: HitoCalendario[];
 }
 
 /**
@@ -44,10 +57,29 @@ export function AgendaVista({
   mesReferencia,
   hoy,
   paramsActuales,
+  hitos = [],
 }: Props) {
   const porDia = new Map<string, Actividad[]>();
   for (const a of actividades) {
     (porDia.get(a.fecha) ?? porDia.set(a.fecha, []).get(a.fecha)!).push(a);
+  }
+
+  // Un hito con rango entra en todos los días que cubre. Se recorren los días
+  // que la vista muestra y no el rango del hito, que puede ser de meses.
+  const hitosPorDia = new Map<string, HitoCalendario[]>();
+  for (const h of hitos) {
+    for (const d of dias) {
+      if (d >= h.fecha_desde && d <= h.fecha_hasta) {
+        (hitosPorDia.get(d) ?? hitosPorDia.set(d, []).get(d)!).push(h);
+      }
+    }
+  }
+  // Primero los que EMPIEZAN o TERMINAN ese día, después los que vienen
+  // corriendo. Sin esto los hitos que duran todo el año encabezan las 31
+  // casillas del mes y empujan abajo lo que de verdad pasa ese día.
+  for (const [d, lista] of hitosPorDia) {
+    const propio = (h: HitoCalendario) => (h.fecha_desde === d || h.fecha_hasta === d ? 0 : 1);
+    lista.sort((a, b) => propio(a) - propio(b) || a.nombre.localeCompare(b.nombre, "es"));
   }
 
   /** Enlace al día, conservando los filtros que estén puestos. */
@@ -67,6 +99,15 @@ export function AgendaVista({
             {delDia.length} {delDia.length === 1 ? "actividad" : "actividades"}
           </p>
         </div>
+        {(hitosPorDia.get(fecha) ?? []).length > 0 && (
+          <ul className="divide-y divide-border border-b border-border">
+            {(hitosPorDia.get(fecha) ?? []).map((h) => (
+              <li key={h.id} className="p-3">
+                <HitoChip hito={h} />
+              </li>
+            ))}
+          </ul>
+        )}
         {delDia.length === 0 ? (
           <p className="p-6 text-sm text-muted text-center">
             Sin actividades cargadas para este día.
@@ -109,10 +150,13 @@ export function AgendaVista({
                 </p>
               </Link>
               <div className="p-1.5 space-y-1 flex-1">
+                {(hitosPorDia.get(fecha) ?? []).map((h) => (
+                  <HitoChip key={h.id} hito={h} compacto />
+                ))}
                 {delDia.map((a) => (
                   <ActividadChip key={a.id} actividad={a} />
                 ))}
-                {delDia.length === 0 && (
+                {delDia.length === 0 && (hitosPorDia.get(fecha) ?? []).length === 0 && (
                   <p className="text-[10px] text-muted/50 text-center pt-4">—</p>
                 )}
               </div>
@@ -172,6 +216,17 @@ export function AgendaVista({
                     </Link>
                   </div>
                   <div className="space-y-1">
+                    {(hitosPorDia.get(fecha) ?? []).slice(0, 2).map((h) => (
+                      <HitoChip key={h.id} hito={h} compacto />
+                    ))}
+                    {(hitosPorDia.get(fecha) ?? []).length > 2 && (
+                      <Link
+                        href={alDia(fecha)}
+                        className="block text-[10px] text-muted hover:text-primary pl-1"
+                      >
+                        +{(hitosPorDia.get(fecha) ?? []).length - 2} hitos
+                      </Link>
+                    )}
                     {visibles.map((a) => (
                       <ActividadChip key={a.id} actividad={a} compacto />
                     ))}
@@ -190,6 +245,33 @@ export function AgendaVista({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Un hito del municipio dentro de una casilla.
+ *
+ * Se distingue de una actividad a propósito: las actividades son de un área y
+ * llevan el color de su tipo; los hitos son de todos y llevan siempre el mismo,
+ * con un punto lleno adelante. Si no se diferenciaran, un día con tres hitos
+ * parecería un día con tres actividades del área que uno está mirando.
+ */
+function HitoChip({ hito, compacto = false }: { hito: HitoCalendario; compacto?: boolean }) {
+  const varios = hito.fecha_desde !== hito.fecha_hasta;
+  return (
+    <div
+      title={`${hito.nombre}${hito.tipo ? ` · ${hito.tipo}` : ""}${
+        varios ? ` · del ${hito.fecha_desde} al ${hito.fecha_hasta}` : ""
+      }${hito.secretaria ? ` · ${hito.secretaria}` : ""}`}
+      className={`flex items-center gap-1 rounded border border-accent/30 bg-accent/10 ${
+        compacto ? "px-1 py-0.5" : "px-1.5 py-1"
+      }`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+      <span className={`${compacto ? "text-[10px]" : "text-xs"} text-accent truncate`}>
+        {hito.nombre}
+      </span>
     </div>
   );
 }

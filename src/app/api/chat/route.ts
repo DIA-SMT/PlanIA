@@ -31,7 +31,6 @@ const TOOLS_HABILITADAS = new Set<string>([
   "listar_unidades",
   "obtener_indicadores_de_meta",
   "listar_avances_pendientes_validacion",
-  "obtener_agenda_semana",
   "actualizar_indicador",
 ]);
 
@@ -79,12 +78,6 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       return tools.validarAvanceChat(input as Parameters<typeof tools.validarAvanceChat>[0]);
     case "observar_avance_chat":
       return tools.observarAvanceChat(input as Parameters<typeof tools.observarAvanceChat>[0]);
-    case "obtener_agenda_semana":
-      return tools.obtenerAgendaSemana(input as Parameters<typeof tools.obtenerAgendaSemana>[0]);
-    case "proponer_actividad_agenda":
-      return tools.proponerActividadAgenda(input as Parameters<typeof tools.proponerActividadAgenda>[0]);
-    case "confirmar_actividad_agenda":
-      return tools.confirmarActividadAgenda(input as Parameters<typeof tools.confirmarActividadAgenda>[0]);
     default:
       return { error: `Tool desconocida: ${name}` };
   }

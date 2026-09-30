@@ -18,7 +18,6 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
   { href: "/reportes", label: "Reportes", icon: "▢" },
-  { href: "/agenda", label: "Agenda", icon: "▤" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   {
     href: "/validaciones",

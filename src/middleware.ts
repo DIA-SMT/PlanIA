@@ -5,10 +5,12 @@ import { createServerClient } from "@supabase/ssr";
  * Middleware: refresca la sesión de Supabase en cada request,
  * y redirige a /login si el usuario intenta acceder a rutas protegidas sin sesión.
  *
- * Rutas públicas: /login, /tv (visualización pública), /agenda/totem
- * (las pantallas de tótem suelen ir en computadoras compartidas sin login).
+ * Rutas públicas: /login y /tv (visualización pública en pantalla de sala).
+ *
+ * El tótem de la agenda estaba acá —las pantallas de tótem van en computadoras
+ * compartidas sin login— y se fue el 30.09 junto con la agenda de PlanIA.
  */
-const RUTAS_PUBLICAS = ["/login", "/tv", "/agenda/totem", "/auth"];
+const RUTAS_PUBLICAS = ["/login", "/tv", "/auth"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

@@ -94,13 +94,15 @@ export default async function TerritorioInicio() {
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-sm font-semibold text-foreground">Qué viene</p>
           <ol className="text-xs text-muted mt-2 space-y-1 list-decimal pl-5 leading-relaxed">
-            <li>El mapa con los pines por tipo de actividad.</li>
-            <li>La ficha de cada actividad, con documentos y briefing.</li>
-            <li>Las alertas de confirmación y el historial de cambios.</li>
-            <li>El módulo de actualidad.</li>
+            <li>
+              El módulo de actualidad. Está frenado hasta que digan de dónde salen las
+              noticias: leídas solas de los medios, o cargadas a mano.
+            </li>
           </ol>
           <p className="text-[11px] text-muted/70 mt-2">
-            Hechas: la carga de actividades y la agenda por mes, semana y día.
+            Hechas al 30.09: la carga de actividades, la agenda por mes, semana y día, el
+            mapa territorial, la ficha con briefing y documentos, y “requiere atención” con
+            el historial de cambios.
           </p>
         </div>
       )}

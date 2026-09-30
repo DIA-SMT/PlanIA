@@ -55,7 +55,6 @@ const navItems: NavItem[] = [
   // Reporte trimestral (pedido del 01.09). Lo ve cualquiera: cada uno accede
   // solo al de su alcance, y eso lo controla la capa de datos.
   { href: "/reportes", label: "Reportes", icon: "▢" },
-  { href: "/agenda", label: "Agenda", icon: "📅" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   {
     href: "/validaciones",
