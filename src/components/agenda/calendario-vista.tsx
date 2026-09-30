@@ -91,7 +91,7 @@ export function CalendarioVista({
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-border/20 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-foreground capitalize">
+            <p className="text-sm font-semibold text-foreground first-letter:uppercase">
               {legibleLargo(fecha)}
             </p>
             <p className="text-[11px] text-muted">

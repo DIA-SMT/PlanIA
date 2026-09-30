@@ -38,12 +38,21 @@ const rolLabels: Record<RolUsuario, string> = {
   admin_tecnico: "Sistemas",
 };
 
+/** El producto al que pertenece esta barra. Por defecto, PlanIA. */
+const PLANIA = {
+  nombre: "Plan",
+  destacado: "IA",
+  subtitulo: "Planificación Operativa Anual 2026",
+};
+
 export function Topbar({
   perfilNombre,
   rol,
   alertas = [],
   porVencer = [],
   verComo,
+  producto = PLANIA,
+  items = navItems,
 }: {
   perfilNombre: string | null;
   rol: RolUsuario | null;
@@ -51,10 +60,26 @@ export function Topbar({
   porVencer?: IndicadorPorVencer[];
   /** El selector de "ver como", solo para la cuenta habilitada (28.09). */
   verComo?: React.ReactNode;
+  /**
+   * Quién firma la barra. La Agenda Georreferenciada comparte este componente
+   * —son los mismos avisos para la misma persona— pero no es PlanIA: decir
+   * "PlanIA · Planificación Operativa Anual 2026" estando en el otro sistema
+   * contradice la pantalla que eligió entre los dos.
+   */
+  producto?: { nombre: string; destacado: string; subtitulo: string };
+  /**
+   * Las secciones del menú de celular.
+   *
+   * Es el SEGUNDO menú del producto, el de abajo de 1024px. Sin esta prop la
+   * Agenda Georreferenciada mostraba las secciones de PlanIA —Panel, Proyectos,
+   * Reportes, POA 2027— y no había forma de llegar a las suyas: en un teléfono
+   * el producto entero quedaba inalcanzable.
+   */
+  items?: NavItem[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const visibles = navItems.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
+  const visibles = items.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
 
   const logout = async () => {
     const sb = getSupabaseBrowser();
@@ -66,31 +91,32 @@ export function Topbar({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
       <div className="flex items-center justify-between h-14 px-4 lg:px-6">
-        <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex items-center gap-2 lg:hidden min-w-0">
           <Image
             src="/logos/logoMuni-sm.png"
-            alt="PlanIA"
+            alt="Municipalidad de San Miguel de Tucumán"
             width={28}
             height={28}
-            className="h-7 w-7"
+            className="h-7 w-7 shrink-0"
           />
-          <span className="text-base font-bold tracking-tight">
-            <span>Plan</span><span className="text-primary">IA</span>
+          <span className="text-base font-bold tracking-tight truncate">
+            <span>{producto.nombre}</span>
+            <span className="text-primary">{producto.destacado}</span>
           </span>
         </div>
 
         <div className="hidden lg:flex items-center gap-2">
           <Image
             src="/logos/logoMuni-sm.png"
-            alt="PlanIA"
+            alt="Municipalidad de San Miguel de Tucumán"
             width={28}
             height={28}
             className="h-7 w-7"
           />
           <h2 className="text-sm font-medium text-foreground">
-            <span className="font-bold">Plan</span>
-            <span className="font-bold text-primary">IA</span>
-            <span className="text-muted ml-2 font-normal">· Planificación Operativa Anual 2026</span>
+            <span className="font-bold">{producto.nombre}</span>
+            <span className="font-bold text-primary">{producto.destacado}</span>
+            <span className="text-muted ml-2 font-normal">· {producto.subtitulo}</span>
           </h2>
         </div>
 

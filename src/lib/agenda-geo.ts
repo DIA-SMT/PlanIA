@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Actividad } from "@/lib/agenda-geo-comun";
+import { faltantesDe } from "@/lib/agenda-geo-comun";
 
 /**
  * Las consultas de la Agenda Georreferenciada.
@@ -95,21 +96,148 @@ export async function getResumen(hoy: string): Promise<{
     return d.toISOString().slice(0, 10);
   };
 
-  const { data, error } = await sb
-    .from("actividad")
-    .select("fecha, estado, requiere_confirmacion, updated_at")
-    .is("deleted_at", null)
-    .gte("fecha", hoy)
-    .lte("fecha", enDias(2));
+  // Dos consultas: los tres contadores de la izquierda salen de lo que viene,
+  // pero "modificadas hoy" no puede salir de ahi. Una actividad de marzo que
+  // alguien toco recien tambien se modifico hoy, y con la ventana de tres dias
+  // el numero no coincidia con la lista de "requiere atencion", que mira todo.
+  // Dos carteles con el mismo rotulo y distinto numero se reportan como bug.
+  const [propias, tocadas] = await Promise.all([
+    sb
+      .from("actividad")
+      .select("fecha, estado, requiere_confirmacion")
+      .is("deleted_at", null)
+      .gte("fecha", hoy)
+      .lte("fecha", enDias(2)),
+    sb
+      .from("actividad")
+      .select("created_at, updated_at, estado")
+      .is("deleted_at", null)
+      .gte("updated_at", hoy)
+      .limit(200),
+  ]);
+  const { data, error } = propias;
   if (error) return { hoy: 0, proximas48: 0, porConfirmar: 0, modificadas: 0 };
 
   const filas = (data ?? []) as any[];
   const vivas = filas.filter((f) => f.estado !== "suspendida");
+  const modificadas = tocadas.error
+    ? 0
+    : ((tocadas.data ?? []) as any[]).filter(
+        (f) => f.estado !== "suspendida" && f.updated_at > f.created_at
+      ).length;
   return {
     hoy: vivas.filter((f) => f.fecha === hoy).length,
     proximas48: vivas.filter((f) => f.fecha > hoy).length,
     // "Pendientes de confirmación": las que lo piden y todavía no se confirmaron.
     porConfirmar: vivas.filter((f) => f.requiere_confirmacion && f.estado === "programada").length,
-    modificadas: vivas.filter((f) => String(f.updated_at).slice(0, 10) === hoy).length,
+    modificadas,
   };
+}
+
+/**
+ * Cuántas actividades hay cargadas, sin traerlas.
+ *
+ * Sirve para distinguir "todavía no cargó nadie nada" de "hoy no hay nada",
+ * que en la pantalla de inicio son dos carteles distintos: el primero manda a
+ * cargar la primera actividad y el segundo sería un error.
+ */
+export async function contarActividades(): Promise<number> {
+  const sb = await getSupabaseServer();
+  const { count, error } = await sb
+    .from("actividad")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+/**
+ * Lo que requiere atencion — etapa 5 del plan del 22.09.
+ *
+ * No se guarda en ninguna tabla: se calcula cada vez. Es el mismo criterio que
+ * la alerta de indicadores por vencer, y por la misma razon —una actividad deja
+ * de estar pendiente en el momento en que alguien la confirma, y una fila
+ * guardada seguiria diciendo que si—.
+ *
+ * Dos consultas y no tres: "pendientes" e "incompletas" son dos recortes del
+ * mismo conjunto, lo que viene de hoy en adelante. "Modificadas hoy" es otro
+ * conjunto, porque una actividad de marzo que alguien toco recien tambien
+ * cuenta.
+ *
+ * Lo pendiente y lo incompleto se miran de hoy en adelante a proposito: que a
+ * una actividad de hace tres meses le falte el horario ya no lo arregla nadie, y
+ * ponerla en una lista de tareas solo hace que la lista se ignore.
+ */
+export async function getRequierenAtencion(hoy: string): Promise<{
+  pendientes: Actividad[];
+  modificadas: Actividad[];
+  incompletas: Actividad[];
+}> {
+  const sb = await getSupabaseServer();
+
+  const [proximas, tocadas] = await Promise.all([
+    sb
+      .from("actividad")
+      .select(COLUMNAS)
+      .is("deleted_at", null)
+      .gte("fecha", hoy)
+      .neq("estado", "suspendida")
+      .order("fecha")
+      .order("hora_desde", { nullsFirst: true })
+      .limit(500),
+    sb
+      .from("actividad")
+      .select(COLUMNAS)
+      .is("deleted_at", null)
+      .gte("updated_at", hoy)
+      .order("updated_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  if (proximas.error) throw proximas.error;
+
+  const futuras = (proximas.data ?? []).map(aActividad);
+  // `updated_at > created_at` separa lo modificado de lo recien creado. En un
+  // alta las dos columnas quedan con el mismo now(), y solo el trigger
+  // BEFORE UPDATE mueve la segunda. Sin esta linea una actividad cargada hoy
+  // aparecia como "modificada hoy" y abajo decia "sin cambios registrados",
+  // que es la propia pantalla desmintiendose.
+  const modificadas = tocadas.error
+    ? []
+    : (tocadas.data ?? []).map(aActividad).filter((a) => a.updated_at > a.created_at);
+
+  return {
+    pendientes: futuras.filter((a) => a.requiere_confirmacion && a.estado === "programada"),
+    modificadas,
+    incompletas: futuras.filter((a) => faltantesDe(a).length > 0),
+  };
+}
+
+/**
+ * El historial de varias actividades de una sola vez.
+ *
+ * Una consulta con `in` en vez de una por actividad: la lista de modificadas
+ * puede traer veinte y serian veinte viajes para mostrar una columna.
+ */
+export async function getHistorialDeVarias(
+  ids: string[]
+): Promise<Map<string, CambioActividad[]>> {
+  const salida = new Map<string, CambioActividad[]>();
+  if (ids.length === 0) return salida;
+
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb
+    .from("actividad_historial")
+    .select("id, actividad_id, campo, valor_anterior, valor_nuevo, cambiado_por_email, created_at")
+    .in("actividad_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) return salida;
+
+  for (const fila of (data ?? []) as (CambioActividad & { actividad_id: string })[]) {
+    const lista = salida.get(fila.actividad_id) ?? [];
+    lista.push(fila);
+    salida.set(fila.actividad_id, lista);
+  }
+  return salida;
 }

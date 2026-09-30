@@ -71,3 +71,82 @@ export interface Actividad {
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * El centro del mapa cuando no hay pines que encuadrar: San Miguel de Tucuman.
+ *
+ * Con actividades cargadas el mapa se ajusta solo al conjunto; esto es para el
+ * arranque en frio y para la posicion inicial del pin al cargar una actividad
+ * nueva, que casi siempre cae en la ciudad.
+ */
+export const CENTRO_SMT: [number, number] = [-26.8241, -65.2226];
+export const ZOOM_CIUDAD = 13;
+
+/**
+ * El recuadro de Tucuman, para pedirle al geocodificador que priorice de aca.
+ *
+ * Sin esto "Florida 1514" devuelve la Florida de Estados Unidos, que es la
+ * respuesta correcta a la pregunta equivocada.
+ */
+export const RECUADRO_TUCUMAN = {
+  oeste: -65.45,
+  sur: -27.0,
+  este: -65.0,
+  norte: -26.65,
+};
+
+/** Si un punto cae dentro del recuadro de Tucuman. */
+export function enTucuman(lat: number, lng: number): boolean {
+  const r = RECUADRO_TUCUMAN;
+  return lat >= r.sur && lat <= r.norte && lng >= r.oeste && lng <= r.este;
+}
+
+/**
+ * Las tres vistas del periodo. Vive aca y no en la barra de filtros porque lo
+ * necesitan tanto los componentes de cliente como las pantallas de servidor, y
+ * este modulo es el unico que pueden importar los dos.
+ */
+export type VistaAgenda = "mes" | "semana" | "dia";
+
+/**
+ * Que le falta a una actividad para estar completa.
+ *
+ * La lista sale del propio formulario de carga rapida, que al guardar avisa
+ * "cuando puedas, completa el horario, el lugar y el tipo". El punto en el mapa
+ * se sumo con la etapa 3.
+ *
+ * El tipo cuenta como faltante cuando quedo en `otras` porque ese es el valor
+ * por defecto: desde afuera no hay forma de distinguir "es una actividad de
+ * otro tipo" de "nadie lo eligio". Se prefiere preguntar de mas y que lo
+ * confirmen, antes que dejar todo el mapa de un solo color.
+ */
+export function faltantesDe(a: {
+  hora_desde: string | null;
+  lugar_texto: string | null;
+  tipo: string;
+  lat: number | null;
+  lng: number | null;
+}): string[] {
+  const faltan: string[] = [];
+  if (!a.hora_desde) faltan.push("horario");
+  if (!a.lugar_texto) faltan.push("lugar");
+  if (a.tipo === "otras") faltan.push("tipo");
+  if (a.lat == null || a.lng == null) faltan.push("punto en el mapa");
+  return faltan;
+}
+
+/** Los rotulos de los campos del historial, que en la base son nombres de columna. */
+export const CAMPOS_HISTORIAL: Record<string, string> = {
+  fecha: "Fecha",
+  hora_desde: "Hora de inicio",
+  hora_hasta: "Hora de fin",
+  titulo: "Titulo",
+  estado: "Estado",
+  lugar_texto: "Lugar",
+  lat: "Ubicacion (latitud)",
+  lng: "Ubicacion (longitud)",
+  unidad_id: "Area responsable",
+  tipo: "Tipo",
+  requiere_confirmacion: "Requiere confirmacion",
+  deleted_at: "Baja",
+};

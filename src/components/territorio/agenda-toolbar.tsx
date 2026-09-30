@@ -3,38 +3,47 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { UnidadOrganizacional } from "@/types/database";
+import { TIPOS, ESTADOS, type VistaAgenda } from "@/lib/agenda-geo-comun";
 
-export type VistaCalendario = "mes" | "semana" | "dia";
 
 interface Props {
-  vista: VistaCalendario;
+  vista: VistaAgenda;
   /** Fecha de referencia de la vista (YYYY-MM-DD). */
   fecha: string;
-  /** Título del período mostrado ("Agosto 2026", "4 – 10 de agosto", …). */
+  /** Título del período mostrado ("septiembre 2026", "28 – 4 de octubre", …). */
   titulo: string;
   unidades: UnidadOrganizacional[];
-  /** Filtros activos (ids de unidad). */
   sec: string | null;
   sub: string | null;
   dir: string | null;
+  tipo: string | null;
+  estado: string | null;
   q: string;
   /** Fechas a las que llevan las flechas ‹ ›, ya calculadas en el server. */
   anterior: string;
   siguiente: string;
   hoy: string;
-  /** Si los hitos del municipio se pintan dentro de la cuadrícula. */
-  eventos: boolean;
-  /** Cuántos hitos hay en el período, para no ofrecer un interruptor vacío. */
-  cantidadEventos: number;
+  /**
+   * A dónde navegan los cambios. La agenda y el mapa comparten esta barra
+   * porque el pedido es que tengan los mismos filtros; lo único que cambia
+   * entre las dos es la pantalla que los recibe.
+   */
+  ruta?: string;
 }
 
 /**
- * Barra del calendario (30.07): cambio de vista mes/semana/día, navegación
- * ‹ hoy ›, y los filtros en cascada Secretaría → Subsecretaría → Dirección,
- * más un buscador por texto. Todo vive en la URL para que la vista sea
- * compartible y el render siga siendo server-side.
+ * Barra de la Agenda Georreferenciada (etapa 2 del plan del 22.09).
+ *
+ * Hermana de `agenda/calendario-toolbar.tsx` y no la misma: aquella navega a
+ * `/agenda`, tiene el interruptor de hitos —que acá no existen— y le faltan los
+ * dos filtros que este producto necesita, tipo y estado. Generalizarla pedía
+ * seis props de configuración para que las dos pantallas siguieran andando, y
+ * la de PlanIA la usan 73 personas todos los días.
+ *
+ * Como allá, todo vive en la URL: la vista se comparte por enlace y la página
+ * sigue renderizándose en el servidor.
  */
-export function CalendarioToolbar({
+export function AgendaToolbar({
   vista,
   fecha,
   titulo,
@@ -42,12 +51,13 @@ export function CalendarioToolbar({
   sec,
   sub,
   dir,
+  tipo,
+  estado,
   q,
   anterior,
   siguiente,
   hoy,
-  eventos,
-  cantidadEventos,
+  ruta = "/territorio/agenda",
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,7 +69,7 @@ export function CalendarioToolbar({
       if (v == null || v === "") params.delete(k);
       else params.set(k, v);
     }
-    router.push(`/agenda?${params.toString()}`, { scroll: false });
+    router.push(`${ruta}?${params.toString()}`, { scroll: false });
   };
 
   const ordenar = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
@@ -69,8 +79,9 @@ export function CalendarioToolbar({
   const subsecretarias = unidades
     .filter((u) => u.nivel === 1 && (!sec || u.parent_id === sec))
     .sort(ordenar);
+
   // Direcciones: las que cuelgan de la subsecretaría elegida, o —si solo hay
-  // secretaría— todas las de su árbol (incluidas las que cuelgan directo).
+  // secretaría— todas las de su árbol, incluidas las que cuelgan directo.
   const idsDe = (raizId: string): Set<string> => {
     const out = new Set<string>();
     const walk = (id: string) => {
@@ -87,7 +98,7 @@ export function CalendarioToolbar({
     .filter((u) => u.nivel >= 2 && (!ambito || ambito.has(u.id)))
     .sort(ordenar);
 
-  const btnVista = (v: VistaCalendario, label: string) => (
+  const btnVista = (v: VistaAgenda, label: string) => (
     <button
       key={v}
       onClick={() => navegar({ vista: v })}
@@ -100,6 +111,8 @@ export function CalendarioToolbar({
       {label}
     </button>
   );
+
+  const hayFiltros = !!(sec || sub || dir || tipo || estado || q);
 
   return (
     <div className="space-y-3">
@@ -128,31 +141,6 @@ export function CalendarioToolbar({
         </div>
         <h2 className="text-base font-semibold text-foreground first-letter:uppercase mx-1">{titulo}</h2>
 
-        {/* 18.09: "a la par del mes debería existir una sola opción que diga
-            Evento". Prende y apaga los hitos del municipio dentro de la
-            cuadrícula. Vive en la URL, así el que prefiere ver solo la agenda de
-            su área se guarda el enlace con los hitos apagados. */}
-        {cantidadEventos > 0 && (
-          <button
-            onClick={() => navegar({ eventos: eventos ? "0" : null })}
-            aria-pressed={eventos}
-            title={
-              eventos
-                ? "Ocultar los hitos del municipio"
-                : "Mostrar los hitos del municipio en el calendario"
-            }
-            className={`text-xs rounded-lg px-2.5 py-1.5 border inline-flex items-center gap-1.5 transition-colors ${
-              eventos
-                ? "border-accent/40 bg-accent/10 text-accent"
-                : "border-border text-muted hover:text-foreground"
-            }`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${eventos ? "bg-accent" : "bg-muted/50"}`} />
-            Evento
-            <span className="tabular-nums opacity-70">{cantidadEventos}</span>
-          </button>
-        )}
-
         <div className="ml-auto flex items-center rounded-lg border border-border overflow-hidden">
           {btnVista("mes", "Mes")}
           {btnVista("semana", "Semana")}
@@ -163,6 +151,7 @@ export function CalendarioToolbar({
           type="date"
           value={fecha}
           onChange={(e) => e.target.value && navegar({ fecha: e.target.value })}
+          aria-label="Ir a una fecha"
           className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground"
         />
       </div>
@@ -171,6 +160,7 @@ export function CalendarioToolbar({
         <select
           value={sec ?? ""}
           onChange={(e) => navegar({ sec: e.target.value || null, sub: null, dir: null })}
+          aria-label="Filtrar por secretaría"
           className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground max-w-[220px]"
         >
           <option value="">Todas las secretarías</option>
@@ -182,6 +172,7 @@ export function CalendarioToolbar({
         <select
           value={sub ?? ""}
           onChange={(e) => navegar({ sub: e.target.value || null, dir: null })}
+          aria-label="Filtrar por subsecretaría"
           className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground max-w-[220px]"
         >
           <option value="">Todas las subsecretarías</option>
@@ -193,11 +184,39 @@ export function CalendarioToolbar({
         <select
           value={dir ?? ""}
           onChange={(e) => navegar({ dir: e.target.value || null })}
+          aria-label="Filtrar por dirección"
           className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground max-w-[220px]"
         >
           <option value="">Todas las direcciones</option>
           {direcciones.map((u) => (
             <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+          ))}
+        </select>
+
+        {/* El punto de color repite el de la leyenda del calendario y el que
+            después va a llevar el pin en el mapa: es el mismo tipo en los tres
+            lados, definido una sola vez en `agenda-geo-comun.ts`. */}
+        <select
+          value={tipo ?? ""}
+          onChange={(e) => navegar({ tipo: e.target.value || null })}
+          aria-label="Filtrar por tipo de actividad"
+          className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground max-w-[220px]"
+        >
+          <option value="">Todos los tipos</option>
+          {TIPOS.map((t) => (
+            <option key={t.clave} value={t.clave}>{t.rotulo}</option>
+          ))}
+        </select>
+
+        <select
+          value={estado ?? ""}
+          onChange={(e) => navegar({ estado: e.target.value || null })}
+          aria-label="Filtrar por estado"
+          className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground max-w-[200px]"
+        >
+          <option value="">Todos los estados</option>
+          {ESTADOS.map((e) => (
+            <option key={e.clave} value={e.clave}>{e.rotulo}</option>
           ))}
         </select>
 
@@ -212,6 +231,7 @@ export function CalendarioToolbar({
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Buscar actividad, lugar…"
+            aria-label="Buscar"
             className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground w-52"
           />
           <button
@@ -222,11 +242,11 @@ export function CalendarioToolbar({
           </button>
         </form>
 
-        {(sec || sub || dir || q) && (
+        {hayFiltros && (
           <button
             onClick={() => {
               setTexto("");
-              navegar({ sec: null, sub: null, dir: null, q: null });
+              navegar({ sec: null, sub: null, dir: null, tipo: null, estado: null, q: null });
             }}
             className="text-xs text-muted hover:text-foreground underline"
           >
