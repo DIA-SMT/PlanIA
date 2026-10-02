@@ -7,6 +7,7 @@ import {
 } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { GaugeCumplimiento } from "@/components/ui/gauge-cumplimiento";
+import { MedidaSelector } from "@/components/dashboard/medida-selector";
 import { EstadoProyectos } from "@/components/dashboard/estado-proyectos";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
@@ -17,7 +18,8 @@ import {
   calcularPorcentajeMeta,
   avanceMetaEnPlazo,
   avanceAgregado,
-  avanceGlobalPorConteo,
+  porcentajeDeMedida,
+  medidaDe,
   totalDistribucion,
   perfilVeTodo,
   type AvanceNivel,
@@ -30,7 +32,13 @@ import Link from "next/link";
 export const revalidate = 0; // sin cache mientras estamos cargando data
 
 interface Props {
-  searchParams: Promise<{ unidad?: string; estado?: string; scope?: string }>;
+  searchParams: Promise<{
+    unidad?: string;
+    estado?: string;
+    scope?: string;
+    /** Qué mide el velocímetro (01.10). Ver MEDIDAS_PANEL en utils. */
+    medida?: string;
+  }>;
 }
 
 export default async function DashboardPage({ searchParams }: Props) {
@@ -154,7 +162,20 @@ export default async function DashboardPage({ searchParams }: Props) {
   // número, ni a los KPI, ni a las tarjetas de estado. Todo el bloque de
   // arriba mide siempre el ámbito completo; el filtro solo acota la lista.
   const totalAmbito = totalDistribucion(distribucionProyectos);
-  const porcentajeGlobal = avanceGlobalPorConteo(distribucionProyectos);
+
+  // 01.10: el medidor dejó de medir una sola cosa. Por defecto muestra lo que
+  // está EN EJECUCIÓN; con el selector pasa a finalizados, no iniciados, sin
+  // datos, o el índice compuesto que mostraba antes.
+  //
+  // El parámetro es `medida` y no `estado` a propósito: `estado` recorta la
+  // lista de proyectos de abajo, y el 06.08 se pidió que eso NO tocara este
+  // número. Son dos controles distintos y siguen siéndolo.
+  //
+  // `avanceGlobalPorConteo` sigue sin cambios: la usan el informe trimestral y
+  // el correo a los responsables, que no pueden depender de lo que alguien
+  // eligió en un desplegable.
+  const medida = medidaDe(params.medida);
+  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave);
 
   // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
   const tieneSeguimiento =
@@ -239,14 +260,24 @@ export default async function DashboardPage({ searchParams }: Props) {
       {/* Cumplimiento global + cómo se calcula + leyenda (06.08) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-2xl border border-border bg-surface p-6">
-          <p className="text-sm font-semibold text-foreground uppercase tracking-wider">
-            Cumplimiento global del POA
-          </p>
-          <p className="text-xs text-muted mt-1">
-            Grado de avance de los proyectos sobre el total de proyectos registrados del ámbito.
-          </p>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                Cumplimiento global del POA
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Proyectos {medida.rotulo.toLowerCase()} sobre el total registrado del ámbito.
+              </p>
+            </div>
+            <Suspense>
+              <MedidaSelector medida={medida.clave} />
+            </Suspense>
+          </div>
           <div className="mt-4">
-            <GaugeCumplimiento value={tieneSeguimiento ? porcentajeGlobal : null} />
+            <GaugeCumplimiento
+              value={tieneSeguimiento ? porcentajeGlobal : null}
+              label={medida.rotulo}
+            />
           </div>
           {!tieneSeguimiento && (
             <p className="text-sm text-muted/70 text-center">Aguardando primer reporte</p>
@@ -259,13 +290,18 @@ export default async function DashboardPage({ searchParams }: Props) {
               ¿Cómo se calcula?
             </p>
             <p className="text-xs text-muted leading-relaxed mt-2">
-              El cumplimiento global corresponde a la proporción de proyectos del POA que ya
-              están en marcha sobre el total de proyectos registrados del ámbito.
+              El número del medidor es {medida.explica}
             </p>
             <p className="text-xs text-muted leading-relaxed mt-2">
-              Un proyecto finalizado y uno en ejecución cuentan como avance; los no iniciados y
-              los que todavía no tienen datos cargados aportan 0 %.
+              Se mide por conteo de proyectos, no por su porcentaje de avance: cada proyecto
+              cuenta uno. Lo que queda fuera de la medida elegida aporta 0 %.
             </p>
+            {medida.clave !== "cumplimiento" && (
+              <p className="text-xs text-muted/70 leading-relaxed mt-2">
+                El informe trimestral no sigue este selector: siempre usa “finalizados + en
+                ejecución”, para que un documento ya emitido no cambie de número.
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-5">

@@ -8,7 +8,7 @@ import { getPeriodoActivo } from "@/lib/queries";
 export const revalidate = 30;
 
 interface Props {
-  searchParams: Promise<{ vista?: string; fecha?: string; unidad?: string }>;
+  searchParams: Promise<{ vista?: string; fecha?: string; unidad?: string; medida?: string }>;
 }
 
 /**
@@ -21,7 +21,7 @@ interface Props {
  * mejor que muestren el panel a que muestren un error.
  */
 export default async function TvPage({ searchParams }: Props) {
-  await searchParams;
+  const params = await searchParams;
   const periodo = await getPeriodoActivo();
 
   return (
@@ -48,7 +48,7 @@ export default async function TvPage({ searchParams }: Props) {
         <TvClock />
       </div>
 
-      <TvPanel periodoId={periodo.id} periodoNombre={periodo.nombre} />
+      <TvPanel periodoId={periodo.id} periodoNombre={periodo.nombre} medida={params.medida} />
 
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between text-xs text-muted/50">

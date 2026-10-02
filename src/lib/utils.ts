@@ -372,16 +372,79 @@ export function avanceGlobalPorConteo(d: DistribucionEstados): number | null {
   return Math.round(((d.verde + d.amarillo) / total) * 100);
 }
 
-// Porcentaje que representa UN estado sobre el total del ámbito. Se usa cuando
-// hay un filtro de estado aplicado: el anillo muestra solo ese color y el
-// número del centro pasa a ser el porcentaje de ese color.
-export function porcentajeDeEstado(
+/**
+ * Qué puede medir el velocímetro del Panel (01.10).
+ *
+ * Hasta hoy el medidor mostraba una sola cosa, finalizados + en ejecución sobre
+ * el total. Ahora se elige, y por defecto muestra lo que está EN EJECUCIÓN.
+ *
+ * `cumplimiento` no repite la cuenta: llama a `avanceGlobalPorConteo`, que es la
+ * misma función que usan el informe trimestral y el correo a los responsables.
+ * Es a propósito. El 21.09 se pidió "que tome el mismo porcentaje del panel
+ * ejecutivo para los reportes", así que si esa fórmula alguna vez cambia, tienen
+ * que moverse juntos. Las otras medidas son solo de pantalla y el informe no
+ * las mira: un documento que se emite y se firma no puede depender de lo que
+ * alguien eligió en un desplegable.
+ */
+export const MEDIDAS_PANEL = [
+  {
+    clave: "ejecucion",
+    rotulo: "En ejecución",
+    estados: ["amarillo"] as (keyof DistribucionEstados)[],
+    explica: "la proporción de proyectos que están en marcha sobre el total del ámbito.",
+  },
+  {
+    clave: "cumplimiento",
+    rotulo: "Finalizados + en ejecución",
+    estados: ["verde", "amarillo"] as (keyof DistribucionEstados)[],
+    explica:
+      "la proporción de proyectos finalizados o en marcha sobre el total del ámbito. Es la medida que usa el informe trimestral.",
+  },
+  {
+    clave: "finalizados",
+    rotulo: "Finalizados",
+    estados: ["verde"] as (keyof DistribucionEstados)[],
+    explica: "la proporción de proyectos ya terminados sobre el total del ámbito.",
+  },
+  {
+    clave: "no_iniciados",
+    rotulo: "No iniciados",
+    estados: ["rojo"] as (keyof DistribucionEstados)[],
+    explica: "la proporción de proyectos que todavía no arrancaron sobre el total del ámbito.",
+  },
+  {
+    clave: "sin_datos",
+    rotulo: "Sin datos",
+    estados: ["sin_datos"] as (keyof DistribucionEstados)[],
+    explica:
+      "la proporción de proyectos sin ningún avance cargado sobre el total del ámbito. No dice que estén parados: dice que no se sabe.",
+  },
+] as const;
+
+export type MedidaPanel = (typeof MEDIDAS_PANEL)[number]["clave"];
+
+/** La medida elegida, o la de por defecto si llega cualquier otra cosa. */
+export function medidaDe(clave: string | null | undefined) {
+  return MEDIDAS_PANEL.find((m) => m.clave === clave) ?? MEDIDAS_PANEL[0];
+}
+
+/**
+ * El número del velocímetro para una medida.
+ *
+ * No existe una medida "todos": sería el total sobre el total, 100 % siempre,
+ * que no dice nada. Lo más parecido a "todo junto" es `cumplimiento`, que es
+ * el índice que el Panel mostraba antes de que esto se pudiera elegir.
+ */
+export function porcentajeDeMedida(
   d: DistribucionEstados,
-  estado: keyof DistribucionEstados
+  clave: string | null | undefined
 ): number | null {
+  const medida = medidaDe(clave);
+  if (medida.clave === "cumplimiento") return avanceGlobalPorConteo(d);
   const total = totalDistribucion(d);
   if (total === 0) return null;
-  return Math.round((d[estado] / total) * 100);
+  const parte = medida.estados.reduce((acc, e) => acc + d[e], 0);
+  return Math.round((parte / total) * 100);
 }
 
 // ---------------------------------------------------------------------------
