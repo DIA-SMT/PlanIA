@@ -12,7 +12,8 @@ import {
   semaforoColor,
   avanceMetaEnPlazo,
   avanceAgregado,
-  avanceGlobalPorConteo,
+  porcentajeDeMedida,
+  medidaDe,
   totalDistribucion,
   type AvanceNivel,
   type DistribucionEstados,
@@ -30,9 +31,18 @@ import type { EstadoSemaforo, Meta } from "@/types/database";
 export async function TvPanel({
   periodoId,
   periodoNombre,
+  medida: claveMedida,
 }: {
   periodoId: string;
   periodoNombre: string;
+  /**
+   * Que mide el velocimetro. Por defecto, lo mismo que el Panel (01.10).
+   *
+   * Una pantalla de sala no tiene a nadie que elija, asi que se fija por URL:
+   * /tv?medida=finalizados deja esa pantalla midiendo eso. Sin parametro,
+   * muestra lo mismo que ve cualquiera que abra el Panel.
+   */
+  medida?: string;
 }) {
   const [resumen, unidades, indicadores] = await Promise.all([
     getResumenDashboard(periodoId),
@@ -73,7 +83,8 @@ export async function TvPanel({
     else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
   }
   const totalAmbito = totalDistribucion(distribucionProyectos);
-  const porcentajeGlobal = avanceGlobalPorConteo(distribucionProyectos);
+  const medida = medidaDe(claveMedida);
+  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave);
   const tieneSeguimiento =
     distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
   const pctSinDatos =
@@ -105,11 +116,12 @@ export async function TvPanel({
           Cumplimiento global del POA
         </p>
         <p className="text-xs text-muted mt-1">
-          Proyectos en marcha sobre el total registrado · {periodoNombre}
+          Proyectos {medida.rotulo.toLowerCase()} sobre el total registrado · {periodoNombre}
         </p>
         <div className="flex-1 flex items-center justify-center min-h-0">
           <GaugeCumplimiento
             value={tieneSeguimiento ? porcentajeGlobal : null}
+            label={medida.rotulo}
             size={360}
             grosor={28}
             claseSvg="w-full max-w-[420px] h-auto"
