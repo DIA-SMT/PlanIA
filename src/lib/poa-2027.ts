@@ -212,3 +212,99 @@ export async function getMisFichas(unidadId: string): Promise<FichaConArea[]> {
     observaciones: obs.get(f.id) ?? 0,
   }));
 }
+
+export interface ResumenAreaPoa {
+  unidad_id: string;
+  nombre: string;
+  /** Proyectos activos del 2026 que tiene el área. */
+  proyectos2026: number;
+  aceptadas: number;
+  propuestas: number;
+  /** Proyectos del 2026 que todavía no se trajeron como propuesta. */
+  sinTraer: number;
+}
+
+/**
+ * Cómo está el POA 2027 de cada área, para Planificación Estratégica — 05.10.
+ *
+ * "Desde allí deberíamos poder ver todas las áreas." Es lo que ve Planificación
+ * al entrar al POA 2027, que hasta hoy le mostraba "tu perfil no tiene un área
+ * asignada" y le pedía que le escribiera a Planificación Estratégica.
+ *
+ * Solo cuenta; no trae el texto de las fichas. Las áreas sin un solo proyecto
+ * del 2026 y sin fichas no aparecen: no tienen nada que mostrar.
+ */
+export async function getResumenPoaParaPlanificacion(): Promise<{
+  areas: ResumenAreaPoa[];
+  sinTraer: number;
+  areasSinTraer: number;
+}> {
+  const sb = await getSupabaseServer();
+
+  // Paginado: PostgREST corta en 1000 filas.
+  const proyectos: { id: string; unidad_id: string | null }[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await sb
+      .from("proyecto")
+      .select("id, unidad_id")
+      .eq("estado", "activo")
+      .is("deleted_at", null)
+      .range(desde, desde + 999);
+    if (error) throw error;
+    proyectos.push(...((data ?? []) as typeof proyectos));
+    if (!data || data.length < 1000) break;
+  }
+
+  const [{ data: fichas, error: eF }, { data: unidades, error: eU }] = await Promise.all([
+    sb
+      .from("ficha_prisma")
+      .select("unidad_id, estado, proyecto_origen_id")
+      .eq("anio", ANIO_POA)
+      .is("deleted_at", null),
+    sb.from("unidad_organizacional").select("id, nombre, nombre_corto"),
+  ]);
+  if (eF) throw eF;
+  if (eU) throw eU;
+
+  const nombre = new Map(
+    ((unidades ?? []) as { id: string; nombre: string; nombre_corto: string | null }[]).map(
+      (u) => [u.id, u.nombre_corto ?? u.nombre]
+    )
+  );
+  const traidos = new Set(
+    ((fichas ?? []) as { proyecto_origen_id: string | null }[])
+      .map((f) => f.proyecto_origen_id)
+      .filter(Boolean)
+  );
+
+  const porArea = new Map<string, ResumenAreaPoa>();
+  const de = (id: string) => {
+    let a = porArea.get(id);
+    if (!a) {
+      a = { unidad_id: id, nombre: nombre.get(id) ?? "(área desconocida)", proyectos2026: 0, aceptadas: 0, propuestas: 0, sinTraer: 0 };
+      porArea.set(id, a);
+    }
+    return a;
+  };
+  for (const p of proyectos) {
+    if (!p.unidad_id) continue;
+    const a = de(p.unidad_id);
+    a.proyectos2026++;
+    if (!traidos.has(p.id)) a.sinTraer++;
+  }
+  for (const f of (fichas ?? []) as { unidad_id: string; estado: string }[]) {
+    const a = de(f.unidad_id);
+    if (f.estado === "aceptada") a.aceptadas++;
+    else a.propuestas++;
+  }
+
+  // Primero las que tienen algo pendiente, de más a menos; después el resto.
+  const areas = [...porArea.values()].sort(
+    (a, b) => b.sinTraer - a.sinTraer || a.nombre.localeCompare(b.nombre, "es")
+  );
+  return {
+    areas,
+    sinTraer: areas.reduce((s, a) => s + a.sinTraer, 0),
+    areasSinTraer: areas.filter((a) => a.sinTraer > 0).length,
+  };
+}
