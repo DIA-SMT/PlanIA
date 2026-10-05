@@ -1,4 +1,4 @@
-import { partirEnItems } from "@/lib/items-texto";
+import { partirEnItems, conMayusculas } from "@/lib/items-texto";
 
 /**
  * Un texto del POA con sus ítems uno debajo del otro — 05.10.
@@ -17,8 +17,11 @@ export function TextoConItems({
   texto: string | null | undefined;
   placeholder?: string;
 }) {
-  const p = partirEnItems(texto);
-  if (!p) return <>{texto?.trim() || placeholder}</>;
+  // 05.10: "todo debe estar iniciado con Mayúscula". Se corrige al mostrar, el
+  // campo y cada ítem; lo guardado no se toca.
+  const corregido = texto ? conMayusculas(texto) : texto;
+  const p = partirEnItems(corregido);
+  if (!p) return <>{corregido?.trim() || placeholder}</>;
   return (
     <>
       {p.intro && <span className="block">{p.intro}</span>}

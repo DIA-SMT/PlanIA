@@ -61,3 +61,28 @@ export function conRenglones(texto: string): string {
   if (!p) return texto;
   return [p.intro, ...p.items.map((i) => `● ${i}`)].filter(Boolean).join("\n");
 }
+
+/**
+ * El texto con mayúscula al empezar, y al empezar cada ítem — 05.10.
+ *
+ * "Todo debe estar iniciado con Mayúscula." El texto de los libros se cortó
+ * después del rótulo —"Descripción y objetivo: el Tráiler…"— y la oración siguió
+ * en minúscula. Medido el 05.10: 165 de 326 fichas del 2026 y 52 de 93 del 2027
+ * tienen algún campo así.
+ *
+ * Solo toca la PRIMERA letra, y solo si es minúscula y no hay otra cosa antes
+ * que espacios, comillas o signos de apertura. "2025 fue el año…" queda igual:
+ * no se busca una letra más adelante para subir. Una sigla o un nombre que ya
+ * vienen en mayúscula no cambian.
+ *
+ * Se aplica al mostrar. Lo guardado queda como está hasta que alguien edite el
+ * campo; ahí se guarda ya corregido.
+ *
+ * Aplicarla dos veces da lo mismo que una.
+ */
+export function conMayusculas(texto: string): string {
+  return texto.replace(
+    /(^|[●•▪◦‣])([\s"'«“(¿¡]*)(\p{Ll})/gu,
+    (_, antes: string, signos: string, letra: string) => antes + signos + letra.toUpperCase()
+  );
+}

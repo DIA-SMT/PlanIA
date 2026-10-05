@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { editarCampoFicha } from "@/lib/actions-ficha";
-import { partirEnItems, conRenglones } from "@/lib/items-texto";
+import { partirEnItems, conRenglones, conMayusculas } from "@/lib/items-texto";
 import { TextoConItems } from "@/components/ui/texto-con-items";
 
 /**
@@ -40,7 +40,7 @@ export function CampoEditable({
   // las viñetas en el medio del párrafo—. Es lo que abre el cuadro, y también
   // contra lo que se compara para saber si hubo cambios: si se comparara contra
   // el original, con solo hacer clic y salir se reescribiría la ficha.
-  const inicial = conRenglones(valor ?? "");
+  const inicial = conMayusculas(conRenglones(valor ?? ""));
   const [texto, setTexto] = useState(inicial);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
@@ -54,7 +54,7 @@ export function CampoEditable({
   const [valorVisto, setValorVisto] = useState(valor);
   if (!editando && valor !== valorVisto) {
     setValorVisto(valor);
-    setTexto(conRenglones(valor ?? ""));
+    setTexto(conMayusculas(conRenglones(valor ?? "")));
   }
 
   // El cuadro crece con el texto: un campo de descripción de diez renglones no

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getPerfilActual } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { FichaPrisma, UnidadOrganizacional } from "@/types/database";
-import { partirEnItems } from "@/lib/items-texto";
+import { partirEnItems, conMayusculas } from "@/lib/items-texto";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +24,10 @@ function esc(s: string | null | undefined): string {
  * no "todo de corrido".
  */
 function escConItems(s: string | null | undefined): string {
-  const p = partirEnItems(s);
-  if (!p) return esc(s);
+  // Con mayúscula al empezar, igual que en pantalla (05.10).
+  const corregido = s ? conMayusculas(s) : s;
+  const p = partirEnItems(corregido);
+  if (!p) return esc(corregido);
   const intro = p.intro ? '<p style="margin:0 0 4px 0;">' + esc(p.intro) + "</p>" : "";
   const items = p.items.map((i) => '<li style="margin-bottom:4px;">' + esc(i) + "</li>").join("");
   return intro + '<ul style="margin:0 0 0 18px;padding:0;">' + items + "</ul>";
