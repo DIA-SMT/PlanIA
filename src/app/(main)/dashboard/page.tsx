@@ -163,19 +163,19 @@ export default async function DashboardPage({ searchParams }: Props) {
   // arriba mide siempre el ámbito completo; el filtro solo acota la lista.
   const totalAmbito = totalDistribucion(distribucionProyectos);
 
-  // 01.10: el medidor dejó de medir una sola cosa. Por defecto muestra lo que
-  // está EN EJECUCIÓN; con el selector pasa a finalizados, no iniciados, sin
-  // datos, o el índice compuesto que mostraba antes.
+  // 01.10: el medidor dejó de medir una sola cosa. 05.10: por defecto muestra
+  // el GRADO DE AVANCE, que es el mismo número del informe trimestral ("deben
+  // ser iguales"). Ver MEDIDAS_PANEL en utils.
   //
   // El parámetro es `medida` y no `estado` a propósito: `estado` recorta la
   // lista de proyectos de abajo, y el 06.08 se pidió que eso NO tocara este
   // número. Son dos controles distintos y siguen siéndolo.
   //
-  // `avanceGlobalPorConteo` sigue sin cambios: la usan el informe trimestral y
-  // el correo a los responsables, que no pueden depender de lo que alguien
-  // eligió en un desplegable.
+  // El avance de cada proyecto, para el grado de avance. Los sin datos llegan
+  // con null y `promedioDeProyectos` los deja afuera, que es lo que se pidió.
+  const pctsProyectos = proyectosActivos.map((py) => avancePorProyecto.get(py.id)?.pct ?? null);
   const medida = medidaDe(params.medida);
-  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave);
+  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave, pctsProyectos);
 
   // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
   const tieneSeguimiento =
@@ -265,9 +265,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               <p className="text-sm font-semibold text-foreground uppercase tracking-wider">
                 Cumplimiento global del POA
               </p>
-              <p className="text-xs text-muted mt-1">
-                Proyectos {medida.rotulo.toLowerCase()} sobre el total registrado del ámbito.
-              </p>
+              <p className="text-xs text-muted mt-1">{medida.subtitulo}</p>
             </div>
             <Suspense>
               <MedidaSelector medida={medida.clave} />
@@ -292,14 +290,16 @@ export default async function DashboardPage({ searchParams }: Props) {
             <p className="text-xs text-muted leading-relaxed mt-2">
               El número del medidor es {medida.explica}
             </p>
-            <p className="text-xs text-muted leading-relaxed mt-2">
-              Se mide por conteo de proyectos, no por su porcentaje de avance: cada proyecto
-              cuenta uno. Lo que queda fuera de la medida elegida aporta 0 %.
-            </p>
-            {medida.clave !== "cumplimiento" && (
+            {medida.clave !== "avance" && (
+              <p className="text-xs text-muted leading-relaxed mt-2">
+                Esta medida cuenta proyectos, no su avance: cada proyecto cuenta uno, sin
+                importar cuánto avanzó.
+              </p>
+            )}
+            {medida.clave !== "avance" && (
               <p className="text-xs text-muted/70 leading-relaxed mt-2">
-                El informe trimestral no sigue este selector: siempre usa “finalizados + en
-                ejecución”, para que un documento ya emitido no cambie de número.
+                El informe trimestral no sigue este selector: siempre usa el grado de avance,
+                para que un documento ya emitido no cambie de número.
               </p>
             )}
           </div>
