@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPerfilActual } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { FichaPrisma, UnidadOrganizacional } from "@/types/database";
+import { partirEnItems } from "@/lib/items-texto";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,22 @@ function esc(s: string | null | undefined): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br/>");
+}
+
+/**
+ * Un campo con sus ítems como lista de Word — 05.10.
+ *
+ * Es la misma regla que la pantalla (partirEnItems): el documento que se baja
+ * tiene que verse igual que el que se edita. Word dibuja un <ul> como lista con
+ * viñetas, así que en el archivo los ítems también quedan uno debajo del otro y
+ * no "todo de corrido".
+ */
+function escConItems(s: string | null | undefined): string {
+  const p = partirEnItems(s);
+  if (!p) return esc(s);
+  const intro = p.intro ? '<p style="margin:0 0 4px 0;">' + esc(p.intro) + "</p>" : "";
+  const items = p.items.map((i) => '<li style="margin-bottom:4px;">' + esc(i) + "</li>").join("");
+  return intro + '<ul style="margin:0 0 0 18px;padding:0;">' + items + "</ul>";
 }
 
 export async function GET() {
@@ -76,7 +93,7 @@ export async function GET() {
         <tr>
           <td style="width:40px;background:#e8eef7;font-weight:bold;color:#1f4e9c;text-align:center;border:1px solid #9cb3d6;padding:6px;">${fila.letra}</td>
           <td style="width:200px;font-weight:bold;border:1px solid #9cb3d6;padding:6px;">${fila.label}</td>
-          <td style="border:1px solid #9cb3d6;padding:6px;">${esc(f[fila.key])}</td>
+          <td style="border:1px solid #9cb3d6;padding:6px;">${escConItems(f[fila.key])}</td>
         </tr>`
         )
         .join("");
