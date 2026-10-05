@@ -8,7 +8,6 @@ import {
   type ConteoEstados,
 } from "./reporte-trimestral";
 import { calcularFotoCorte } from "./corte-trimestral";
-import { avanceGlobalPorConteo } from "./utils";
 
 /**
  * Manda el informe de avance por correo a cada responsable de área.
@@ -49,7 +48,9 @@ const ROLES_QUE_RECIBEN = ["secretario", "subsecretario", "director"];
 function resumen(t: ConteoEstados): string {
   const pct = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
   return [
-    `Avance: ${avanceGlobalPorConteo({ verde: t.finalizados, amarillo: t.en_ejecucion, rojo: t.no_iniciados, sin_datos: t.sin_datos }) ?? 0} % — proyectos finalizados y en ejecución sobre el total (${t.finalizados + t.en_ejecucion} de ${t.proyectos})`,
+    // El mismo numero que el informe y que el velocimetro del Panel (05.10).
+    `Grado de avance: ${t.pct == null ? "sin datos" : `${t.pct} %`} — promedio del avance de cada proyecto` +
+      (t.sin_datos > 0 ? ` con datos cargados (${t.proyectos - t.sin_datos} de ${t.proyectos})` : ` (${t.proyectos})`),
     `Proyectos registrados en SIPEM: ${t.proyectos}`,
     `  Finalizados: ${t.finalizados} (${pct(t.finalizados)} %)`,
     `  En ejecución: ${t.en_ejecucion} (${pct(t.en_ejecucion)} %)`,

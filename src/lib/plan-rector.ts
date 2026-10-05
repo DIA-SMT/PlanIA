@@ -521,34 +521,82 @@ export async function getCoberturaPlanRector(periodoId: string): Promise<{
   const ids = new Set((proyectos ?? []).map((p) => (p as { id: string }).id));
   if (ids.size === 0) return { activos: 0, imputados: 0, excluidos: 0, pendientes: 0, pct: 0 };
 
-  const [vinculosRes, exclusionesRes] = await Promise.all([
-    supabase.from("proyecto_plan_rector").select("proyecto_id").eq("estado", "confirmado"),
-    supabase.from("proyecto_pr_exclusion").select("proyecto_id"),
-  ]);
-
-  if (tablaInexistente(vinculosRes.error) || tablaInexistente(exclusionesRes.error)) {
+  const estados = await estadosPlanRector([...ids]);
+  if (!estados) {
     return { activos: ids.size, imputados: 0, excluidos: 0, pendientes: ids.size, pct: 0 };
   }
 
-  // Un proyecto puede tener varias imputaciones confirmadas: para cobertura
-  // cuenta una sola vez.
-  const imputadosSet = new Set(
-    ((vinculosRes.data ?? []) as { proyecto_id: string }[])
-      .map((v) => v.proyecto_id)
-      .filter((id) => ids.has(id))
-  );
-  const excluidosSet = new Set(
-    ((exclusionesRes.data ?? []) as { proyecto_id: string }[])
-      .map((v) => v.proyecto_id)
-      .filter((id) => ids.has(id) && !imputadosSet.has(id))
-  );
-
-  const resueltos = imputadosSet.size + excluidosSet.size;
+  let imputados = 0, excluidos = 0;
+  for (const e of estados.values()) {
+    if (e === "imputado") imputados++;
+    else if (e === "excluido") excluidos++;
+  }
+  const resueltos = imputados + excluidos;
   return {
     activos: ids.size,
-    imputados: imputadosSet.size,
-    excluidos: excluidosSet.size,
+    imputados,
+    excluidos,
     pendientes: ids.size - resueltos,
     pct: Math.round((resueltos / ids.size) * 100),
   };
+}
+
+export type EstadoPlanRector = "imputado" | "excluido" | "pendiente";
+
+/**
+ * En qué quedó cada proyecto respecto del Plan Rector.
+ *
+ *   imputado   tiene al menos una imputación confirmada.
+ *   excluido   se marcó "fuera del plan" y no tiene imputación.
+ *   pendiente  ninguna de las dos: está sin resolver.
+ *
+ * La imputación manda sobre la exclusión: un proyecto con las dos está en el
+ * plan. Es la misma regla de la cobertura, que también la usa, para que el
+ * número de arriba del Plan Rector y lo que dice cada fila de proyectos no
+ * puedan discrepar.
+ *
+ * 05.10: "¿Podrán poner una columna que diga si está o no asignado el proyecto
+ * al plan rector? Si no hay que abrir uno por uno y demoramos mucho."
+ *
+ * Devuelve null si las tablas todavía no existen (migración 044 sin aplicar).
+ */
+async function estadosPlanRector(ids: string[]): Promise<Map<string, EstadoPlanRector> | null> {
+  const supabase = await getSupabaseServer();
+
+  // Paginado: PostgREST corta en 1000 filas y un proyecto puede tener varias
+  // imputaciones. Hoy son unas 340, pero cortar en silencio es justo lo que no
+  // puede pasar en una columna que dice "sin asignar".
+  const leerTodo = async (tabla: string, confirmados: boolean) => {
+    const filas: { proyecto_id: string }[] = [];
+    for (let desde = 0; ; desde += 1000) {
+      let q = supabase.from(tabla).select("proyecto_id").range(desde, desde + 999);
+      if (confirmados) q = q.eq("estado", "confirmado");
+      const { data, error } = await q;
+      if (error) return { error, filas };
+      filas.push(...((data ?? []) as { proyecto_id: string }[]));
+      if (!data || data.length < 1000) break;
+    }
+    return { error: null, filas };
+  };
+
+  const [vinculos, exclusiones] = await Promise.all([
+    leerTodo("proyecto_plan_rector", true),
+    leerTodo("proyecto_pr_exclusion", false),
+  ]);
+  if (tablaInexistente(vinculos.error) || tablaInexistente(exclusiones.error)) return null;
+
+  const imputados = new Set(vinculos.filas.map((v) => v.proyecto_id));
+  const excluidos = new Set(exclusiones.filas.map((v) => v.proyecto_id));
+  const salida = new Map<string, EstadoPlanRector>();
+  for (const id of ids) {
+    salida.set(id, imputados.has(id) ? "imputado" : excluidos.has(id) ? "excluido" : "pendiente");
+  }
+  return salida;
+}
+
+/** El estado de Plan Rector de varios proyectos, para listarlos. */
+export async function getEstadoPlanRectorPorProyecto(
+  ids: string[]
+): Promise<Map<string, EstadoPlanRector>> {
+  return (await estadosPlanRector(ids)) ?? new Map();
 }

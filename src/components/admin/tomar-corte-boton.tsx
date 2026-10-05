@@ -15,19 +15,29 @@ export function TomarCorteBoton({
   ultimoCierre,
   proximoCierre,
   hoy,
+  pendiente = null,
 }: {
   /** El cierre de trimestre que ya pasó: la fecha que sirve para rescatarlo. */
   ultimoCierre: string;
   /** El cierre que viene. Solo informativo: fechar ahí sería futuro. */
   proximoCierre: string;
   hoy: string;
+  /**
+   * Un cierre que quedó sin foto y todavía se puede rescatar.
+   *
+   * 05.10: con la fecha vacía, "Tomar" fecha la foto HOY. El 5 de octubre eso es
+   * el cuarto trimestre: en vez de rescatar el T3 se creaba un corte de T4 con
+   * datos de octubre, el T3 seguía pendiente, y los correos salían rotulados
+   * "4° trimestre". Cuando hay un cierre pendiente, la fecha viene puesta.
+   */
+  pendiente?: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
-  const [fecha, setFecha] = useState("");
+  const [fecha, setFecha] = useState(pendiente ?? "");
 
   const tomar = () => {
     setError(null);
@@ -62,9 +72,16 @@ export function TomarCorteBoton({
         </button>
       ) : (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-          <p className="text-sm text-foreground">
-            Guarda cómo está el POA hoy. Se usa para el reporte del trimestre.
-          </p>
+          {pendiente ? (
+            <p className="text-sm text-foreground">
+              Rescata la foto del cierre del <strong>{pendiente}</strong>, que quedó sin
+              tomar. La fecha ya viene puesta: dejala así.
+            </p>
+          ) : (
+            <p className="text-sm text-foreground">
+              Guarda cómo está el POA hoy. Se usa para el reporte del trimestre.
+            </p>
+          )}
           <div>
             <label className="text-[10px] text-muted uppercase tracking-wider">
               Fecha del corte (vacío = hoy)

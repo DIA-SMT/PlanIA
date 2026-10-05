@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getPerfilActual } from "@/lib/auth";
-import { getPoaDelArea, getObservaciones, ANIO_POA } from "@/lib/poa-2027";
+import {
+  getPoaDelArea,
+  getObservaciones,
+  getResumenPoaParaPlanificacion,
+  ANIO_POA,
+} from "@/lib/poa-2027";
+import { TraerTodasBoton } from "@/components/poa2027/traer-todas-boton";
 import { DocumentoPoa } from "@/components/poa2027/documento-poa";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
 
@@ -46,6 +52,20 @@ export default async function Poa2027Page() {
     }
   }
 
+  // 05.10: Planificación Estratégica no tiene área, así que acá no veía nada y
+  // el cartel le pedía que le escribiera a Planificación Estratégica. Ahora ve
+  // todas las áreas, y desde acá puede traer los proyectos del 2026 de las que
+  // todavía no lo hicieron: "la idea es que ustedes carguen y nosotros editamos".
+  const esPlanificacion = perfil?.rol === "admin_funcional";
+  let resumen: Awaited<ReturnType<typeof getResumenPoaParaPlanificacion>> | null = null;
+  if (esPlanificacion) {
+    try {
+      resumen = await getResumenPoaParaPlanificacion();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   const propia = circuito?.propia;
   return (
     <div className="space-y-6 max-w-4xl">
@@ -59,7 +79,7 @@ export default async function Poa2027Page() {
           </p>
         </div>
 
-        {puedeCargar && (
+        {puedeCargar && perfil?.unidad_id && (
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/poa-2027/mis-fichas"
@@ -102,6 +122,61 @@ export default async function Poa2027Page() {
             Si dice que no existe la tabla, falta aplicar la migración 053.
           </p>
         </div>
+      ) : esPlanificacion && resumen ? (
+        <section className="rounded-xl border border-border bg-surface p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Todas las áreas</h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              {resumen.sinTraer > 0
+                ? `Hay ${resumen.sinTraer} proyectos del 2026 de ${resumen.areasSinTraer} ${resumen.areasSinTraer === 1 ? "área" : "áreas"} que todavía no están en el POA ${ANIO_POA}.`
+                : `Todos los proyectos del 2026 ya están en el POA ${ANIO_POA}, como fichas aceptadas o propuestas.`}{" "}
+              Las propuestas no entran en el documento de un área hasta que alguien las acepta.
+            </p>
+          </div>
+          <TraerTodasBoton sinTraer={resumen.sinTraer} areasSinTraer={resumen.areasSinTraer} />
+          <div className="overflow-x-auto border border-border rounded-lg">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-surface-hover/40 text-muted">
+                  <th className="text-left font-medium px-3 py-2">Área</th>
+                  <th className="text-right font-medium px-3 py-2" title="Proyectos activos del POA 2026">Proyectos 2026</th>
+                  <th className="text-right font-medium px-3 py-2" title="Entran en el documento">Aceptadas</th>
+                  <th className="text-right font-medium px-3 py-2" title="Esperando que el área las revise">Propuestas</th>
+                  <th className="text-right font-medium px-3 py-2" title="Proyectos del 2026 que todavía no se trajeron">Sin traer</th>
+                  <th className="px-3 py-2"><span className="sr-only">Editar</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {resumen.areas.map((a) => (
+                  <tr key={a.unidad_id}>
+                    <td className="px-3 py-1.5">
+                      <Link
+                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
+                        className="text-foreground hover:text-primary"
+                      >
+                        {a.nombre}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-muted">{a.proyectos2026}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{a.aceptadas || "—"}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{a.propuestas || "—"}</td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${a.sinTraer > 0 ? "text-warning" : "text-muted/50"}`}>
+                      {a.sinTraer || "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <Link
+                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
+                        className="text-primary hover:underline whitespace-nowrap"
+                      >
+                        Editar →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : !perfil?.unidad_id ? (
         <div className="rounded-xl border border-border bg-surface p-6 text-center">
           <p className="text-sm text-muted">

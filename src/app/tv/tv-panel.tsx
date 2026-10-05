@@ -84,7 +84,9 @@ export async function TvPanel({
   }
   const totalAmbito = totalDistribucion(distribucionProyectos);
   const medida = medidaDe(claveMedida);
-  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave);
+  // La misma cuenta que el Panel: con la medida por defecto, el grado de avance.
+  const pctsProyectos = proyectosActivos.map((py) => avancePorProyecto.get(py.id)?.pct ?? null);
+  const porcentajeGlobal = porcentajeDeMedida(distribucionProyectos, medida.clave, pctsProyectos);
   const tieneSeguimiento =
     distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
   const pctSinDatos =
@@ -116,7 +118,7 @@ export async function TvPanel({
           Cumplimiento global del POA
         </p>
         <p className="text-xs text-muted mt-1">
-          Proyectos {medida.rotulo.toLowerCase()} sobre el total registrado · {periodoNombre}
+          {medida.subtitulo} · {periodoNombre}
         </p>
         <div className="flex-1 flex items-center justify-center min-h-0">
           <GaugeCumplimiento

@@ -1,4 +1,4 @@
-import { avanceGlobalPorConteo, formatFecha } from "@/lib/utils";
+import { formatFecha } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
 
 /**
@@ -43,13 +43,12 @@ export function InformeAvance({
   const r = rotulos(nivel);
   const pctDe = (n: number) => (t.proyectos === 0 ? 0 : Math.round((n / t.proyectos) * 100));
 
-  // El mismo numero del medidor del Panel Ejecutivo, con su misma funcion.
-  const avance = avanceGlobalPorConteo({
-    verde: t.finalizados,
-    amarillo: t.en_ejecucion,
-    rojo: t.no_iniciados,
-    sin_datos: t.sin_datos,
-  });
+  // El grado de avance: el promedio del avance de cada proyecto, sin los que no
+  // tienen datos. Ya viene calculado en `t.pct` por `promedioDeProyectos`, la
+  // misma funcion que usa el velocimetro del Panel con su medida por defecto.
+  const avance = t.pct;
+  // Los que entran en el promedio: los sin datos quedan afuera.
+  const evaluables = t.proyectos - t.sin_datos;
 
   const filas = [
     { icono: "🟢", nombre: "Finalizados", cantidad: t.finalizados },
@@ -100,30 +99,47 @@ export function InformeAvance({
         <h2 className="text-base font-bold text-foreground">
           1. Desempeño de la {r.titulo.toLowerCase()} en el contexto municipal
         </h2>
-        {/* DE DONDE SALE ESTE NUMERO, que se corrigio dos veces el mismo dia.
-            21.09: "aquí debería estar el 66 % que dice el panel ejecutivo".
-            Es el medidor del Panel —finalizados + en ejecución sobre el total—
-            y no el promedio de los porcentajes de cada proyecto. Son dos cuentas
-            distintas y para la Secretaría General del segundo trimestre daban
-            66 % y 45 %.
+        {/* DE DONDE SALE ESTE NUMERO. Cambio tres veces; esta es la historia.
 
-            Por eso llama a `avanceGlobalPorConteo`, la misma función del Panel y
-            de la pantalla de TV, en vez de repetir la division acá: el pedido es
-            que los dos digan lo mismo, y la unica forma de que eso se sostenga
-            es que sea la misma cuenta y no dos que hoy coinciden. */}
+            16.09: el promedio del avance de cada proyecto, sin los que no tienen
+            datos. Es la regla del Anexo metodologico del propio cliente.
+
+            21.09: "aquí debería estar el 66 % que dice el panel ejecutivo". Se
+            paso al conteo del Panel —finalizados + en ejecucion sobre el total—
+            para que los dos dijeran lo mismo.
+
+            05.10: el informe de Ambiente dijo 98 % y la respuesta fue "es
+            imposible que vayan un 98 % porque estamos en septiembre". Era
+            cierto: el conteo cuenta un proyecto en ejecucion como si estuviera
+            terminado, y los 40 de Ambiente van por la mitad. Se vuelve al
+            promedio: Ambiente pasa de 98 % a 60 %, el municipio de 67 % a 56 %.
+            Los sin datos siguen afuera: "no deben sumar nada, es como si no
+            existieran".
+
+            Lo que NO cambio desde el 21.09 es que Panel e informe sean la misma
+            cuenta ("deben ser iguales", 05.10). Por eso este numero no se
+            recalcula aca: es `t.pct`, la salida de `promedioDeProyectos`, la
+            misma funcion que usa el velocimetro del Panel. */}
         <p className="text-xs text-foreground/90 leading-relaxed">
           De acuerdo con los registros disponibles en SIPEM al momento del corte, {r.el}{" "}
           presenta un avance del{" "}
           <strong className="tabular-nums">{avance != null ? `${avance} %` : "—"}</strong>, que
-          corresponde a los proyectos finalizados y en ejecución sobre el total de los
-          proyectos planificados
-          {t.proyectos > 0 && (
-            <>
-              {" "}
-              (<span className="tabular-nums">{t.finalizados + t.en_ejecucion}</span> de{" "}
-              <span className="tabular-nums">{t.proyectos}</span>)
-            </>
-          )}
+          corresponde al promedio del avance de cada uno de sus proyectos
+          {t.proyectos > 0 &&
+            (t.sin_datos === 0 ? (
+              <>
+                {" "}
+                (<span className="tabular-nums">{t.proyectos}</span>{" "}
+                {t.proyectos === 1 ? "proyecto" : "proyectos"})
+              </>
+            ) : (
+              <>
+                {" "}
+                con datos cargados (<span className="tabular-nums">{evaluables}</span> de{" "}
+                <span className="tabular-nums">{t.proyectos}</span>; los que todavía no tienen
+                datos no entran en el cálculo)
+              </>
+            ))}
           .
         </p>
       </section>

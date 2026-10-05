@@ -1,3 +1,5 @@
+import { TextoConItems } from "@/components/ui/texto-con-items";
+
 /**
  * La ficha del proyecto tal como está escrita en el libro del POA.
  *
@@ -61,14 +63,20 @@ export function FichaDelLibroPOA({
       {descripcion && (
         <div className="space-y-1">
           <p className="text-[11px] text-muted uppercase tracking-wider">Descripción y objetivo</p>
-          <p className="text-sm text-foreground/90 leading-relaxed">{descripcion}</p>
+          <p className="text-sm text-foreground/90 leading-relaxed">
+            <TextoConItems texto={descripcion} />
+          </p>
         </div>
       )}
 
       {filas.map((f) => (
         <div key={f.rotulo} className="space-y-1">
           <p className="text-[11px] text-muted uppercase tracking-wider">{f.rotulo}</p>
-          <p className="text-sm text-foreground/90 leading-relaxed">{f.valor}</p>
+          {/* 05.10: el texto de los libros vino con las viñetas en el medio del
+              renglón; acá se muestran como lista, igual que en el POA 2027. */}
+          <p className="text-sm text-foreground/90 leading-relaxed">
+            <TextoConItems texto={f.valor} />
+          </p>
         </div>
       ))}
 

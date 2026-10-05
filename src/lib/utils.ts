@@ -373,48 +373,72 @@ export function avanceGlobalPorConteo(d: DistribucionEstados): number | null {
 }
 
 /**
- * Qué puede medir el velocímetro del Panel (01.10).
+ * Qué puede medir el velocímetro del Panel.
  *
- * Hasta hoy el medidor mostraba una sola cosa, finalizados + en ejecución sobre
- * el total. Ahora se elige, y por defecto muestra lo que está EN EJECUCIÓN.
+ * 01.10: se agregó el selector. 05.10: la medida por defecto pasa a ser el
+ * GRADO DE AVANCE, y es la misma que usa el informe trimestral.
  *
- * `cumplimiento` no repite la cuenta: llama a `avanceGlobalPorConteo`, que es la
- * misma función que usan el informe trimestral y el correo a los responsables.
- * Es a propósito. El 21.09 se pidió "que tome el mismo porcentaje del panel
- * ejecutivo para los reportes", así que si esa fórmula alguna vez cambia, tienen
- * que moverse juntos. Las otras medidas son solo de pantalla y el informe no
- * las mira: un documento que se emite y se firma no puede depender de lo que
- * alguien eligió en un desplegable.
+ * Por qué cambió la de por defecto. El informe de Ambiente decía 98 % y la
+ * respuesta fue "es imposible que vayan un 98 % porque estamos en septiembre".
+ * Tenían razón: con la cuenta por conteo, sus 40 proyectos en ejecución —que
+ * van por la mitad, 51 % en promedio— contaban como si estuvieran terminados.
+ * Con el grado de avance, cada proyecto aporta lo que de verdad avanzó y
+ * Ambiente da 60 %.
+ *
+ * Los proyectos sin datos quedan AFUERA de la cuenta, ni arriba ni abajo:
+ * "no deben sumar nada, es como si no existieran" (05.10). Es la regla del
+ * Anexo metodológico del propio cliente, que `promedioDeProyectos` ya aplica
+ * desde el 16.09. Dijeron "por ahora": si pasan a contar como cero, el cambio
+ * es usar `avanceAgregado` en vez de `promedioDeProyectos`, en un solo lugar.
+ *
+ * Panel e informe tienen que ser LA MISMA cuenta, no dos que coinciden: "deben
+ * ser iguales" (05.10), que es lo mismo que se pidió el 21.09. Por eso la medida
+ * `avance` y el informe llaman a la misma función con los mismos datos. Las
+ * demás medidas son solo de pantalla: el informe no las mira, porque un
+ * documento que se emite y se firma no puede depender de un desplegable.
  */
 export const MEDIDAS_PANEL = [
   {
+    clave: "avance",
+    rotulo: "Grado de avance",
+    subtitulo: "Promedio del avance de cada proyecto del ámbito.",
+    estados: [] as (keyof DistribucionEstados)[],
+    explica:
+      "el promedio del avance de cada proyecto: uno terminado aporta 100 %, uno que va por la mitad aporta 50 %, uno que no arrancó aporta 0 %. Los que no tienen ningún dato cargado no entran en la cuenta. Es la misma medida que usa el informe trimestral.",
+  },
+  {
     clave: "ejecucion",
     rotulo: "En ejecución",
+    subtitulo: "Proyectos en ejecución sobre el total del ámbito.",
     estados: ["amarillo"] as (keyof DistribucionEstados)[],
     explica: "la proporción de proyectos que están en marcha sobre el total del ámbito.",
   },
   {
     clave: "cumplimiento",
     rotulo: "Finalizados + en ejecución",
+    subtitulo: "Proyectos finalizados o en ejecución sobre el total del ámbito.",
     estados: ["verde", "amarillo"] as (keyof DistribucionEstados)[],
     explica:
-      "la proporción de proyectos finalizados o en marcha sobre el total del ámbito. Es la medida que usa el informe trimestral.",
+      "la proporción de proyectos finalizados o en marcha sobre el total del ámbito. Un proyecto en ejecución cuenta entero, vaya por donde vaya: por eso da más alto que el grado de avance.",
   },
   {
     clave: "finalizados",
     rotulo: "Finalizados",
+    subtitulo: "Proyectos finalizados sobre el total del ámbito.",
     estados: ["verde"] as (keyof DistribucionEstados)[],
     explica: "la proporción de proyectos ya terminados sobre el total del ámbito.",
   },
   {
     clave: "no_iniciados",
     rotulo: "No iniciados",
+    subtitulo: "Proyectos no iniciados sobre el total del ámbito.",
     estados: ["rojo"] as (keyof DistribucionEstados)[],
     explica: "la proporción de proyectos que todavía no arrancaron sobre el total del ámbito.",
   },
   {
     clave: "sin_datos",
     rotulo: "Sin datos",
+    subtitulo: "Proyectos sin ningún dato cargado sobre el total del ámbito.",
     estados: ["sin_datos"] as (keyof DistribucionEstados)[],
     explica:
       "la proporción de proyectos sin ningún avance cargado sobre el total del ámbito. No dice que estén parados: dice que no se sabe.",
@@ -431,15 +455,19 @@ export function medidaDe(clave: string | null | undefined) {
 /**
  * El número del velocímetro para una medida.
  *
+ * `pcts` es el avance de cada proyecto del ámbito (null = sin datos). Lo usa
+ * solo el grado de avance; las otras medidas cuentan proyectos por estado.
+ *
  * No existe una medida "todos": sería el total sobre el total, 100 % siempre,
- * que no dice nada. Lo más parecido a "todo junto" es `cumplimiento`, que es
- * el índice que el Panel mostraba antes de que esto se pudiera elegir.
+ * que no dice nada.
  */
 export function porcentajeDeMedida(
   d: DistribucionEstados,
-  clave: string | null | undefined
+  clave: string | null | undefined,
+  pcts: (number | null)[] = []
 ): number | null {
   const medida = medidaDe(clave);
+  if (medida.clave === "avance") return promedioDeProyectos(pcts).pct;
   if (medida.clave === "cumplimiento") return avanceGlobalPorConteo(d);
   const total = totalDistribucion(d);
   if (total === 0) return null;

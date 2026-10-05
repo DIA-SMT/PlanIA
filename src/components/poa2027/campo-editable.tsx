@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { editarCampoFicha } from "@/lib/actions-ficha";
+import { partirEnItems, conRenglones, conMayusculas } from "@/lib/items-texto";
+import { TextoConItems } from "@/components/ui/texto-con-items";
 
 /**
  * Un campo del documento que se edita en el lugar — 28.09.
@@ -34,7 +36,12 @@ export function CampoEditable({
 }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
-  const [texto, setTexto] = useState(valor ?? "");
+  // 05.10: al editar, cada ítem va en su renglón —el texto vino de los libros con
+  // las viñetas en el medio del párrafo—. Es lo que abre el cuadro, y también
+  // contra lo que se compara para saber si hubo cambios: si se comparara contra
+  // el original, con solo hacer clic y salir se reescribiría la ficha.
+  const inicial = conMayusculas(conRenglones(valor ?? ""));
+  const [texto, setTexto] = useState(inicial);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +54,7 @@ export function CampoEditable({
   const [valorVisto, setValorVisto] = useState(valor);
   if (!editando && valor !== valorVisto) {
     setValorVisto(valor);
-    setTexto(valor ?? "");
+    setTexto(conMayusculas(conRenglones(valor ?? "")));
   }
 
   // El cuadro crece con el texto: un campo de descripción de diez renglones no
@@ -60,7 +67,7 @@ export function CampoEditable({
   }, [editando, texto]);
 
   const guardar = () => {
-    if (texto === (valor ?? "")) {
+    if (texto === inicial) {
       setEditando(false);
       return;
     }
@@ -76,8 +83,14 @@ export function CampoEditable({
     });
   };
 
+  const bloque = partirEnItems(valor) ? "block" : "";
+
   if (!editable) {
-    return <span className={className}>{valor?.trim() || placeholder}</span>;
+    return (
+      <span className={`${className} ${bloque}`}>
+        <TextoConItems texto={valor} placeholder={placeholder} />
+      </span>
+    );
   }
 
   if (!editando) {
@@ -93,11 +106,11 @@ export function CampoEditable({
           }
         }}
         title="Hacé clic para editar"
-        className={`${className} cursor-text rounded px-0.5 -mx-0.5 hover:bg-primary/10 ${
+        className={`${className} ${bloque} cursor-text rounded px-0.5 -mx-0.5 hover:bg-primary/10 ${
           valor?.trim() ? "" : "text-muted/60 italic"
         }`}
       >
-        {valor?.trim() || placeholder}
+        <TextoConItems texto={valor} placeholder={placeholder} />
       </span>
     );
   }
@@ -111,7 +124,7 @@ export function CampoEditable({
         onBlur={guardar}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
-            setTexto(valor ?? "");
+            setTexto(inicial);
             setEditando(false);
           }
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) guardar();
