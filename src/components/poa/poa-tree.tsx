@@ -43,7 +43,40 @@ export interface PoaProyecto {
   estado: EstadoSemaforo;
   tieneSeguimiento: boolean;
   puedeCargar: boolean;
+  /**
+   * En qué quedó respecto del Plan Rector (05.10). Es la misma regla que la
+   * cobertura de la pantalla del Plan Rector: ver estadosPlanRector.
+   */
+  planRector?: "imputado" | "excluido" | "pendiente";
 }
+
+/**
+ * La etiqueta de Plan Rector de cada proyecto — 05.10.
+ *
+ * "¿Podrán poner una columna que diga si está o no asignado el proyecto al plan
+ * rector? Si no hay que abrir uno por uno y demoramos mucho."
+ *
+ * Son tres estados y no dos, porque "no está asignado" puede querer decir dos
+ * cosas distintas: que alguien decidió que va fuera del plan, o que todavía
+ * nadie lo miró. Lo segundo es lo que hay que ir a resolver.
+ */
+const PLAN_RECTOR = {
+  imputado: {
+    texto: "En el Plan Rector",
+    clase: "text-success border-success/30 bg-success/10",
+    titulo: "Está imputado al Plan Rector",
+  },
+  excluido: {
+    texto: "Fuera del plan",
+    clase: "text-muted border-border bg-border/30",
+    titulo: "Se marcó que no corresponde al Plan Rector",
+  },
+  pendiente: {
+    texto: "Sin asignar",
+    clase: "text-warning border-warning/40 bg-warning/10",
+    titulo: "Todavía no se imputó al Plan Rector ni se marcó fuera del plan",
+  },
+} as const;
 
 export interface PoaDireccion {
   unidad: UnidadOrganizacional;
@@ -270,6 +303,14 @@ function ProyectoNode({ py }: { py: PoaProyecto }) {
         >
           {py.nombre}
         </Link>
+        {py.planRector && (
+          <span
+            title={PLAN_RECTOR[py.planRector].titulo}
+            className={`text-[9px] uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap ${PLAN_RECTOR[py.planRector].clase}`}
+          >
+            {PLAN_RECTOR[py.planRector].texto}
+          </span>
+        )}
         <span className="text-[10px] text-muted shrink-0">{py.metas.length} metas</span>
         {py.tieneSeguimiento ? (
           <div className="flex items-center gap-2 shrink-0">

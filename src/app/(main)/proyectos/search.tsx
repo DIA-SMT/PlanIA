@@ -10,6 +10,7 @@ export function ProyectosSearch({ unidades }: { unidades: UnidadOrganizacional[]
   const currentQ = searchParams.get("q") ?? "";
   const currentDir = searchParams.get("dir") ?? "";
   const currentEstado = searchParams.get("estado") ?? "todos";
+  const currentPr = searchParams.get("pr") ?? "";
 
   const update = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -74,6 +75,19 @@ export function ProyectosSearch({ unidades }: { unidades: UnidadOrganizacional[]
             <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
           ))}
         </optgroup>
+      </select>
+      {/* 05.10: para encontrar los proyectos sin asignar al Plan Rector sin
+          abrir uno por uno. Con un filtro puesto el árbol se despliega solo. */}
+      <select
+        value={currentPr}
+        onChange={(e) => update("pr", e.target.value)}
+        aria-label="Filtrar por Plan Rector"
+        className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:border-primary/50"
+      >
+        <option value="">Plan Rector: todos</option>
+        <option value="pendiente">Sin asignar al Plan Rector</option>
+        <option value="imputado">En el Plan Rector</option>
+        <option value="excluido">Fuera del plan</option>
       </select>
       <div className="flex items-center gap-1">
         {estados.map((e) => {

@@ -21,13 +21,14 @@ import {
 import type { Meta, UnidadOrganizacional } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
+import { getEstadoPlanRectorPorProyecto } from "@/lib/plan-rector";
 import { NuevoProyectoForm } from "@/components/poa/nuevo-proyecto-form";
 import { Suspense } from "react";
 
 export const revalidate = 0;
 
 interface Props {
-  searchParams: Promise<{ q?: string; dir?: string; estado?: string }>;
+  searchParams: Promise<{ q?: string; dir?: string; estado?: string; pr?: string }>;
 }
 
 export default async function ProyectosPage({ searchParams }: Props) {
@@ -111,6 +112,12 @@ export default async function ProyectosPage({ searchParams }: Props) {
     return av.estado;
   };
 
+  // 05.10: en qué quedó cada proyecto respecto del Plan Rector, para la
+  // etiqueta de cada fila y para el filtro. Una sola lectura para todos.
+  const estadoPR = await getEstadoPlanRectorPorProyecto(proyectos.map((p) => p.id)).catch(
+    () => new Map()
+  );
+
   // Filtrado
   let proyectosFiltrados = proyectos;
   if (params.q) {
@@ -134,6 +141,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
   }
   if (params.estado && params.estado !== "todos") {
     proyectosFiltrados = proyectosFiltrados.filter((p) => estadoProyecto(p.id) === params.estado);
+  }
+  if (params.pr) {
+    proyectosFiltrados = proyectosFiltrados.filter((p) => estadoPR.get(p.id) === params.pr);
   }
 
   // Construir el árbol Sec → (Sub) → Dir → Proyectos
@@ -192,6 +202,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
           estado: estadoProyecto(py.id),
           tieneSeguimiento: (av?.conDatos ?? 0) > 0,
           puedeCargar: !!scopeUnidadesUsuario && scopeUnidadesUsuario.has(py.unidad_id),
+          planRector: estadoPR.get(py.id),
         });
       }
     }
@@ -262,7 +273,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
         arbol={arbol}
         autoExpand={
           !perfilVeTodo(perfil) ||
-          !!(params.dir || params.q || (params.estado && params.estado !== "todos"))
+          !!(params.dir || params.q || params.pr || (params.estado && params.estado !== "todos"))
         }
       />
     </div>
