@@ -143,17 +143,33 @@ export default async function Poa2027Page() {
                   <th className="text-right font-medium px-3 py-2" title="Entran en el documento">Aceptadas</th>
                   <th className="text-right font-medium px-3 py-2" title="Esperando que el área las revise">Propuestas</th>
                   <th className="text-right font-medium px-3 py-2" title="Proyectos del 2026 que todavía no se trajeron">Sin traer</th>
+                  <th className="px-3 py-2"><span className="sr-only">Editar</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {resumen.areas.map((a) => (
                   <tr key={a.unidad_id}>
-                    <td className="px-3 py-1.5 text-foreground">{a.nombre}</td>
+                    <td className="px-3 py-1.5">
+                      <Link
+                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
+                        className="text-foreground hover:text-primary"
+                      >
+                        {a.nombre}
+                      </Link>
+                    </td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-muted">{a.proyectos2026}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{a.aceptadas || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{a.propuestas || "—"}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${a.sinTraer > 0 ? "text-warning" : "text-muted/50"}`}>
                       {a.sinTraer || "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <Link
+                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
+                        className="text-primary hover:underline whitespace-nowrap"
+                      >
+                        Editar →
+                      </Link>
                     </td>
                   </tr>
                 ))}
