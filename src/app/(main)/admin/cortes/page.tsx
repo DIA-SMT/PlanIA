@@ -1,5 +1,12 @@
 import { getPerfilActual } from "@/lib/auth";
-import { listarCortes, finDeTrimestre, ultimoCierrePasado } from "@/lib/corte-trimestral";
+import {
+  listarCortes,
+  finDeTrimestre,
+  ultimoCierrePasado,
+  cierrePendiente,
+  DIAS_MAXIMOS_DE_RESCATE,
+} from "@/lib/corte-trimestral";
+import { sumarDias } from "@/lib/queries";
 import { TomarCorteBoton } from "@/components/admin/tomar-corte-boton";
 import { EnviarInformesBoton } from "@/components/admin/enviar-informes-boton";
 import { BackButton } from "@/components/layout/back-button";
@@ -40,12 +47,45 @@ export default async function CortesPage() {
     errorTabla = e instanceof Error ? e.message : String(e);
   }
 
+  // Si quedó un cierre de trimestre sin foto, cuánto falta para que ya no se
+  // pueda rescatar. 05.10: el del T3 no salió —el proceso programado falló la
+  // primera vez que le tocaba— y nadie lo sabía, porque esta pantalla no lo
+  // decía. Ahora lo dice arriba de todo, con la fecha límite.
+  const pendiente = errorTabla ? null : await cierrePendiente(hoy).catch(() => null);
+  const limite = pendiente?.fecha ? sumarDias(pendiente.fecha, DIAS_MAXIMOS_DE_RESCATE) : null;
+  const quedan = pendiente?.fecha ? DIAS_MAXIMOS_DE_RESCATE - pendiente.dias : 0;
+
   return (
     <div className="space-y-6 max-w-4xl">
       <BackButton fallback="/dashboard" />
 
+      {pendiente?.fecha && !pendiente.vencido && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
+          <p className="text-sm font-semibold text-warning">
+            El cierre del {formatFecha(pendiente.fecha)} todavía no tiene foto
+          </p>
+          <p className="text-xs text-foreground/80 mt-1 leading-relaxed">
+            Se puede rescatar hasta el <strong>{formatFecha(limite)}</strong>
+            {quedan > 0 ? ` — ${quedan === 1 ? "queda 1 día" : `quedan ${quedan} días`}` : ""}.
+            Después de esa fecha el sistema ya no deja tomarla, porque los datos de ese día
+            ya no serían los del cierre. Se toma con el botón de abajo, “Tomar la foto ahora”: la fecha del cierre ya viene puesta.
+          </p>
+        </div>
+      )}
+      {pendiente?.fecha && pendiente.vencido && (
+        <div className="rounded-xl border border-danger/30 bg-danger/5 p-4">
+          <p className="text-sm font-semibold text-danger">
+            El cierre del {formatFecha(pendiente.fecha)} quedó sin foto
+          </p>
+          <p className="text-xs text-muted mt-1">
+            Ya pasó la ventana para rescatarlo. El informe de ese trimestre no se puede
+            reconstruir con los datos de hoy.
+          </p>
+        </div>
+      )}
+
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Cortes trimestrales</h1>
+        <h1 className="text-2xl font-bold text-foreground">Cortes e informes</h1>
         <p className="text-sm text-muted mt-1">
           Cada corte guarda cómo estaba el POA ese día. Es lo que después lee el reporte
           trimestral de cumplimiento.
@@ -67,6 +107,7 @@ export default async function CortesPage() {
           ultimoCierre={ultimoCierrePasado(hoy)}
           proximoCierre={finDeTrimestre(hoy)}
           hoy={hoy}
+          pendiente={pendiente?.fecha && !pendiente.vencido ? pendiente.fecha : null}
         />
       </section>
 
@@ -82,7 +123,7 @@ export default async function CortesPage() {
       ) : cortes.length === 0 ? (
         <EmptyState
           title="Todavía no hay ningún corte"
-          description={`El último cierre fue el ${ultimoCierrePasado(hoy)} y el próximo es el ${finDeTrimestre(hoy)}. Podés tomar una foto ahora para probar.`}
+          description={`El último cierre fue el ${formatFecha(ultimoCierrePasado(hoy))} y el próximo es el ${formatFecha(finDeTrimestre(hoy))}. La foto se toma con el botón de arriba.`}
           icon="◷"
         />
       ) : (
@@ -149,6 +190,24 @@ export default async function CortesPage() {
           a cada secretario, subsecretario y director". Va acá y no en la
           pantalla del reporte, que quedó con solo tres botones, y se dispara a
           mano: son 68 correos y conviene que alguien decida cuándo salen. */}
+      {/* 02.10: "tengo entendido que Abril solicitó que se mande por mail a los
+          mails registrados y no tenemos esa opción". La opción existía desde el
+          18.09, pero esta sección solo se dibujaba cuando ya había un corte, y no
+          había ninguno: el correo era invisible. Ahora se ve siempre, y sin corte
+          explica qué falta. */}
+      {cortes.length === 0 && !errorTabla && (
+        <section className="rounded-xl border border-border bg-surface p-4 space-y-2">
+          <h2 className="text-sm font-bold text-foreground">
+            Enviar el informe a los responsables
+          </h2>
+          <p className="text-xs text-muted leading-relaxed">
+            A cada secretario, subsecretario y director le llega por correo el informe de
+            avance de <strong>su</strong> área. El informe sale de un corte, así que primero
+            hay que tomar la foto del trimestre con el botón de arriba; después aparece acá el
+            botón para enviarlo.
+          </p>
+        </section>
+      )}
       {cortes.length > 0 && (
         <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
           <div>

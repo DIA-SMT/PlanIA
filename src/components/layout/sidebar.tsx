@@ -63,6 +63,15 @@ const navItems: NavItem[] = [
     roles: ["subsecretario", "secretario", "admin_funcional"],
   },
   {
+    // 02.10: el envío del informe por mail estaba en esta pantalla desde el 18.09
+    // y no figuraba en ningún menú, así que nadie sabía que existía. Solo
+    // admin_funcional: la pantalla misma rechaza a cualquier otro rol.
+    href: "/admin/cortes",
+    label: "Cortes e informes",
+    icon: "◷",
+    roles: ["admin_funcional"],
+  },
+  {
     href: "/admin/alertas",
     label: "Avisos",
     icon: "◔",
