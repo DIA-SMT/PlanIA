@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { editarCampoFicha } from "@/lib/actions-ficha";
+import { editarCampoTextoPoa } from "@/lib/actions-poa-texto";
 import { partirEnItems, conRenglones, conMayusculas } from "@/lib/items-texto";
 import { TextoConItems } from "@/components/ui/texto-con-items";
 
@@ -17,16 +18,22 @@ import { TextoConItems } from "@/components/ui/texto-con-items";
  * Guarda al salir del campo y no mientras se escribe: escribir una frase son
  * cuarenta pulsaciones y no hacen falta cuarenta guardados. Con Escape se
  * cancela y con Ctrl+Enter se guarda sin tener que salir.
+ *
+ * Sirve para las fichas y, desde el 08.10, para las introducciones y el banco
+ * de ideas del área (`de="texto"`): se editan igual, en el documento mismo.
  */
 export function CampoEditable({
-  fichaId,
+  id,
+  de = "ficha",
   campo,
   valor,
   editable,
   placeholder = "—",
   className = "",
 }: {
-  fichaId: string;
+  id: string;
+  /** De qué tabla es el campo: una ficha o un texto del POA (introducción o idea). */
+  de?: "ficha" | "texto";
   campo: string;
   valor: string | null;
   /** false para las fichas de otras áreas: se muestran y no se tocan. */
@@ -73,7 +80,10 @@ export function CampoEditable({
     }
     setError(null);
     startTransition(async () => {
-      const r = await editarCampoFicha(fichaId, campo, texto);
+      const r =
+        de === "texto"
+          ? await editarCampoTextoPoa(id, campo, texto)
+          : await editarCampoFicha(id, campo, texto);
       if (!r.success) {
         setError(r.error ?? "No se pudo guardar");
         return;

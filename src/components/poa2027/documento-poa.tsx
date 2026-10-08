@@ -1,6 +1,6 @@
-import type { AreaDelPoa } from "@/lib/poa-2027";
-import type { Observacion } from "@/lib/poa-2027";
+import { PARRAFOS_POA as PARRAFOS, type AreaDelPoa, type Observacion } from "@/lib/poa-2027";
 import { CampoEditable } from "./campo-editable";
+import { TextosDelArea } from "./textos-del-area";
 import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
 
 /**
@@ -16,25 +16,10 @@ import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
  *
  * Las filas son las seis letras de PRISMA. La S de "Secretaría" no se edita
  * acá: sale del organigrama, que es de donde tiene que salir.
- */
-
-/**
- * Los párrafos de cada proyecto, con los nombres del POA real.
  *
- * 28.09: "fijate que el formato en el que aparecen los proyectos no son fichas,
- * están como redactados". Medido sobre los 366 proyectos de los ocho libros de
- * 2026, cada uno se lee así: título, descripción y objetivo, período de trabajo,
- * línea de base y meta. Las letras de PRISMA quedaron atrás — son la misma
- * información con otro nombre.
+ * 08.10: cada área abre con sus introducciones y cierra con su banco de ideas,
+ * como en el libro del POA.
  */
-const PARRAFOS = [
-  { rotulo: "Descripción y objetivo", campo: "relevancia" as const },
-  { rotulo: "Período de trabajo", campo: "periodo" as const },
-  { rotulo: "Hito", campo: "hito" as const },
-  { rotulo: "Línea de base", campo: "ancla" as const },
-  { rotulo: "Meta", campo: "meta_anual" as const },
-  { rotulo: "Indicador", campo: "indicador" as const },
-];
 
 export function DocumentoPoa({
   propia,
@@ -52,14 +37,20 @@ export function DocumentoPoa({
 }) {
   // El área propia primero y después las de abajo, que es el orden del
   // documento: la secretaría abre con lo suyo.
-  const bloques = [
+  const conAlgo = (a: AreaDelPoa) =>
+    a.fichas.length > 0 || a.introducciones.length > 0 || a.ideas.length > 0;
+  const todos = [
     { area: propia, editable: true },
     ...recibidas.map((a) => ({ area: a, editable: false })),
-  ].filter((b) => b.area.fichas.length > 0);
+  ];
+  const hayAlgo = todos.some((b) => conAlgo(b.area));
+  // La propia va siempre que el documento tenga algo: aunque no tenga fichas,
+  // ahí están los botones para agregar su introducción y su banco de ideas.
+  const bloques = todos.filter((b) => conAlgo(b.area) || (b.editable && hayAlgo));
 
   const total = bloques.reduce((a, b) => a + b.area.fichas.length, 0);
 
-  if (total === 0) {
+  if (!hayAlgo) {
     return (
       <div className="hoja rounded-xl border border-border bg-surface p-8 text-center">
         <p className="text-sm text-muted">
@@ -95,12 +86,19 @@ export function DocumentoPoa({
             )}
           </div>
 
+          <TextosDelArea
+            unidadId={area.id}
+            tipo="introduccion"
+            textos={area.introducciones}
+            editable={editable}
+          />
+
           {area.fichas.map((f, i) => (
             <div key={f.id} className="space-y-2">
               <h3 className="text-sm font-bold text-foreground">
                 Proyecto {i + 1}:{" "}
                 <CampoEditable
-                  fichaId={f.id}
+                  id={f.id}
                   campo="programa"
                   valor={f.programa}
                   editable={editable}
@@ -119,7 +117,7 @@ export function DocumentoPoa({
                   <p key={parrafo.campo} className="text-sm text-foreground/90 leading-relaxed">
                     <span className="font-semibold">{parrafo.rotulo}:</span>{" "}
                     <CampoEditable
-                      fichaId={f.id}
+                      id={f.id}
                       campo={parrafo.campo}
                       valor={valor}
                       editable={editable}
@@ -140,6 +138,8 @@ export function DocumentoPoa({
               />
             </div>
           ))}
+
+          <TextosDelArea unidadId={area.id} tipo="idea" textos={area.ideas} editable={editable} />
         </section>
       ))}
     </article>

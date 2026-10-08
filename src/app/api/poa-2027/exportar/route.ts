@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getPerfilActual } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase/server";
-import type { FichaPrisma, UnidadOrganizacional } from "@/types/database";
+import { getPoaDelArea, PARRAFOS_POA, ANIO_POA, type AreaDelPoa, type TextoPoa } from "@/lib/poa-2027";
 import { partirEnItems, conMayusculas } from "@/lib/items-texto";
 
 export const dynamic = "force-dynamic";
 
 function esc(s: string | null | undefined): string {
-  if (!s) return "—";
+  if (!s) return "";
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -16,122 +15,115 @@ function esc(s: string | null | undefined): string {
 }
 
 /**
- * Un campo con sus ítems como lista de Word — 05.10.
+ * Un párrafo del documento, con su rótulo y sus ítems como lista de Word —
+ * 05.10.
  *
  * Es la misma regla que la pantalla (partirEnItems): el documento que se baja
  * tiene que verse igual que el que se edita. Word dibuja un <ul> como lista con
  * viñetas, así que en el archivo los ítems también quedan uno debajo del otro y
- * no "todo de corrido".
+ * no "todo de corrido". El rótulo va en el mismo renglón que la introducción de
+ * la lista, como en el libro.
  */
-function escConItems(s: string | null | undefined): string {
+function parrafo(rotulo: string | null, valor: string | null | undefined): string {
+  if (!valor?.trim()) return "";
   // Con mayúscula al empezar, igual que en pantalla (05.10).
-  const corregido = s ? conMayusculas(s) : s;
+  const corregido = conMayusculas(valor.trim());
+  const r = rotulo ? `<b>${esc(rotulo)}:</b> ` : "";
   const p = partirEnItems(corregido);
-  if (!p) return esc(corregido);
-  const intro = p.intro ? '<p style="margin:0 0 4px 0;">' + esc(p.intro) + "</p>" : "";
-  const items = p.items.map((i) => '<li style="margin-bottom:4px;">' + esc(i) + "</li>").join("");
-  return intro + '<ul style="margin:0 0 0 18px;padding:0;">' + items + "</ul>";
+  if (!p) return `<p style="margin:0 0 6px 0;">${r}${esc(corregido)}</p>`;
+  const intro = r || p.intro ? `<p style="margin:0 0 4px 0;">${r}${esc(p.intro)}</p>` : "";
+  const items = p.items.map((i) => `<li style="margin-bottom:4px;">${esc(i)}</li>`).join("");
+  return `${intro}<ul style="margin:0 0 6px 18px;padding:0;">${items}</ul>`;
 }
 
-export async function GET() {
+const conTexto = (t: TextoPoa) => !!(t.titulo?.trim() || t.texto?.trim());
+
+/** Un área del documento: introducciones, proyectos y banco de ideas (08.10). */
+function bloque(area: AreaDelPoa): string {
+  const intros = area.introducciones
+    .filter(conTexto)
+    .map(
+      (t) =>
+        (t.titulo?.trim() ? `<h3 style="font-size:12pt;margin:12px 0 4px 0;">${esc(t.titulo)}</h3>` : "") +
+        parrafo(null, t.texto)
+    )
+    .join("");
+
+  const proyectos = area.fichas
+    .map(
+      (f, i) =>
+        `<h3 style="font-size:12pt;margin:14px 0 4px 0;">Proyecto ${i + 1}: ${esc(f.programa)}</h3>` +
+        PARRAFOS_POA.map((p) => parrafo(p.rotulo, f[p.campo])).join("")
+    )
+    .join("");
+
+  const ideas = area.ideas.filter(conTexto);
+  const banco =
+    ideas.length === 0
+      ? ""
+      : `<h3 style="font-size:12pt;margin:18px 0 4px 0;">Banco de ideas</h3>` +
+        ideas
+          .map(
+            (t) =>
+              `<h4 style="font-size:11pt;margin:10px 0 4px 0;">Proyecto: ${esc(t.titulo)}</h4>` +
+              parrafo(null, t.texto)
+          )
+          .join("");
+
+  return `<h2 style="font-size:14pt;color:#1f4e9c;border-bottom:1px solid #9cb3d6;margin:24px 0 8px 0;">${esc(area.nombre)}</h2>${intros}${proyectos}${banco}`;
+}
+
+/**
+ * El POA 2027 de un área en Word.
+ *
+ * 08.10: arma el MISMO documento que la pantalla, con la misma función que la
+ * arma (getPoaDelArea): lo del área y lo que mandaron las de abajo, solo las
+ * fichas ACEPTADAS, redactado como el libro y con las introducciones y el banco
+ * de ideas. Hasta hoy el Word iba por su lado: traía también las propuestas que
+ * nadie había aceptado y seguía en el formato de tabla PRISMA, que la pantalla
+ * dejó el 28.09 ("no son fichas, están como redactados").
+ *
+ * Planificación Estratégica no tiene área: pide la de cualquiera con ?unidad=.
+ * Para cualquier otro rol el parámetro se ignora, como en "Editar mi POA".
+ */
+export async function GET(req: NextRequest) {
   const perfil = await getPerfilActual();
   if (!perfil) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const sb = await getSupabaseServer();
-
-  // 28.09: el documento que se baja tiene que ser el MISMO que muestra el
-  // previsualizador, o sea lo del area mas lo que mandaron las de abajo. Antes
-  // bajaba solo las fichas propias, asi que una secretaria se descargaba un
-  // documento vacio mientras en pantalla veia el de todas sus direcciones.
-  const { data: unidadesData } = await sb
-    .from("unidad_organizacional")
-    .select("id, nombre, nombre_corto, parent_id")
-    .eq("activa", true);
-  const unidades = (unidadesData ?? []) as UnidadOrganizacional[];
-
-  const ids: string[] = [];
-  if (perfil.unidad_id) {
-    ids.push(perfil.unidad_id);
-    const bajar = (id: string) => {
-      for (const u of unidades.filter((x) => x.parent_id === id)) {
-        ids.push(u.id);
-        bajar(u.id);
-      }
-    };
-    bajar(perfil.unidad_id);
+  const pedida = req.nextUrl.searchParams.get("unidad");
+  const unidadId = perfil.rol === "admin_funcional" ? pedida : perfil.unidad_id;
+  if (!unidadId) {
+    return NextResponse.json({ error: "Elegí un área para descargar su POA." }, { status: 400 });
   }
 
-  let query = sb
-    .from("ficha_prisma")
-    .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto)")
-    .is("deleted_at", null)
-    .order("created_at");
-  if (ids.length > 0) query = query.in("unidad_id", ids);
+  const { propia, recibidas } = await getPoaDelArea(unidadId);
+  if (!propia) return NextResponse.json({ error: "No se encontró esa área." }, { status: 404 });
 
-  const { data } = await query;
-  const fichas = (data ?? []) as (FichaPrisma & { unidad?: UnidadOrganizacional })[];
-
-  // El titulo es el area de quien descarga, no la del primer proyecto que salga:
-  // el documento de una secretaria lleva su nombre aunque abra con una ficha de
-  // una direccion.
-  const propia = unidades.find((u) => u.id === perfil.unidad_id);
-  const direccionNombre = propia?.nombre ?? fichas[0]?.unidad?.nombre ?? "Área";
+  const conAlgo = (a: AreaDelPoa) =>
+    a.fichas.length > 0 || a.introducciones.some(conTexto) || a.ideas.some(conTexto);
+  const areas = [propia, ...recibidas].filter(conAlgo);
+  const total = areas.reduce((s, a) => s + a.fichas.length, 0);
   const fecha = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
-
-  const filas = [
-    { letra: "P", label: "PROGRAMA / PROYECTO", key: "programa" as const },
-    { letra: "R", label: "RELEVANCIA (descripción y objetivo)", key: "relevancia" as const },
-    { letra: "I", label: "INDICADOR", key: "indicador" as const },
-    { letra: "S", label: "SECRETARÍA", key: "secretaria" as const },
-    { letra: "M", label: "META ANUAL", key: "meta_anual" as const },
-    { letra: "A", label: "ANCLA (línea de base)", key: "ancla" as const },
-  ];
-
-  const fichasHtml = fichas
-    .map((f) => {
-      const filasHtml = filas
-        .map(
-          (fila) => `
-        <tr>
-          <td style="width:40px;background:#e8eef7;font-weight:bold;color:#1f4e9c;text-align:center;border:1px solid #9cb3d6;padding:6px;">${fila.letra}</td>
-          <td style="width:200px;font-weight:bold;border:1px solid #9cb3d6;padding:6px;">${fila.label}</td>
-          <td style="border:1px solid #9cb3d6;padding:6px;">${escConItems(f[fila.key])}</td>
-        </tr>`
-        )
-        .join("");
-      return `
-      <table style="border-collapse:collapse;width:100%;margin-bottom:24px;font-family:Arial,sans-serif;font-size:11pt;">
-        <tr>
-          <td colspan="3" style="background:#1f4e9c;color:#fff;font-weight:bold;text-align:center;border:1px solid #9cb3d6;padding:8px;">
-            Dirección: ${esc(f.unidad?.nombre)}
-          </td>
-        </tr>
-        <tr>
-          <td colspan="3" style="background:#d6e0f0;font-weight:bold;text-align:center;border:1px solid #9cb3d6;padding:6px;">
-            Código: ${esc(f.codigo)}
-          </td>
-        </tr>
-        ${filasHtml}
-      </table>`;
-    })
-    .join("");
 
   const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
 <head>
   <meta charset="utf-8" />
-  <title>POA 2027 — ${esc(direccionNombre)}</title>
+  <title>POA ${ANIO_POA} — ${esc(propia.nombre)}</title>
 </head>
-<body style="font-family:Arial,sans-serif;">
-  <h1 style="color:#1f4e9c;font-size:18pt;">Plan Operativo Anual 2027</h1>
-  <h2 style="font-size:14pt;">${esc(direccionNombre)}</h2>
-  <p style="font-size:10pt;color:#666;">Generado el ${fecha} · ${fichas.length} ficha(s) PRISMA</p>
+<body style="font-family:Arial,sans-serif;font-size:11pt;">
+  <h1 style="color:#1f4e9c;font-size:18pt;margin-bottom:2px;">PLAN OPERATIVO ANUAL ${ANIO_POA}</h1>
+  <p style="font-size:13pt;font-weight:bold;margin:0;">${esc(propia.nombre)}</p>
+  <p style="font-size:9pt;color:#666;">Municipalidad de San Miguel de Tucumán · ${total} ${total === 1 ? "proyecto" : "proyectos"} · generado el ${fecha}</p>
   <hr/>
-  ${fichas.length === 0 ? "<p>No hay fichas cargadas.</p>" : fichasHtml}
+  ${areas.length === 0 ? "<p>Todavía no hay nada cargado en este POA.</p>" : areas.map(bloque).join("")}
 </body>
 </html>`;
 
-  const filename = `POA2027_${(direccionNombre || "direccion").replace(/[^a-zA-Z0-9]/g, "_")}.doc`;
+  const filename = `POA${ANIO_POA}_${(propia.nombre || "area")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")}.doc`;
 
   return new NextResponse(html, {
     headers: {

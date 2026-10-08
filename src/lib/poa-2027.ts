@@ -15,6 +15,46 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 
 export const ANIO_POA = 2027;
 
+/**
+ * Los párrafos de cada proyecto, con los nombres del POA real.
+ *
+ * 28.09: "fijate que el formato en el que aparecen los proyectos no son fichas,
+ * están como redactados". Medido sobre los 366 proyectos de los ocho libros de
+ * 2026, cada uno se lee así: título, descripción y objetivo, período de trabajo,
+ * línea de base y meta. Las letras de PRISMA quedaron atrás — son la misma
+ * información con otro nombre.
+ *
+ * Lo usan la pantalla y el Word (08.10): los dos tienen que decir lo mismo.
+ */
+export const PARRAFOS_POA = [
+  { rotulo: "Descripción y objetivo", campo: "relevancia" as const },
+  { rotulo: "Período de trabajo", campo: "periodo" as const },
+  { rotulo: "Hito", campo: "hito" as const },
+  { rotulo: "Línea de base", campo: "ancla" as const },
+  { rotulo: "Meta", campo: "meta_anual" as const },
+  { rotulo: "Indicador", campo: "indicador" as const },
+];
+
+/**
+ * Lo que el POA de un área lleva además de los proyectos — 08.10, migración 057.
+ *
+ * "Algunas POAs tienen introducciones porque son necesarias antes de los
+ * proyectos [...] Lo mismo pregunto sobre los bancos de ideas que van al final
+ * de cada dirección." Una introducción va antes de los proyectos del área y una
+ * idea va después, en el banco de ideas. Las dos son un título y un texto.
+ */
+export type TipoTextoPoa = "introduccion" | "idea";
+
+export interface TextoPoa {
+  id: string;
+  unidad_id: string;
+  tipo: TipoTextoPoa;
+  titulo: string | null;
+  texto: string | null;
+  orden: number;
+  updated_at: string;
+}
+
 export interface FichaConArea {
   id: string;
   codigo: string | null;
@@ -44,8 +84,33 @@ export interface AreaDelPoa {
   enviado: boolean;
   enviado_at: string | null;
   fichas: FichaConArea[];
-  /** true si tocó alguna ficha después de haber enviado. */
+  /** Lo que va antes de los proyectos y lo que va en el banco de ideas (08.10). */
+  introducciones: TextoPoa[];
+  ideas: TextoPoa[];
+  /** true si tocó alguna ficha —o un texto— después de haber enviado. */
   tocadoDespues: boolean;
+}
+
+/**
+ * Los textos de unas áreas, ordenados.
+ *
+ * Si la tabla todavía no existe —el código se despliega solo y la migración
+ * 057 se aplica a mano— devuelve vacío en vez de romper el POA entero: sin
+ * textos el documento sigue siendo el de antes.
+ */
+export async function getTextosPoa(unidadIds: string[]): Promise<TextoPoa[]> {
+  if (unidadIds.length === 0) return [];
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb
+    .from("poa_texto")
+    .select("id, unidad_id, tipo, titulo, texto, orden, updated_at")
+    .in("unidad_id", unidadIds)
+    .eq("anio", ANIO_POA)
+    .is("deleted_at", null)
+    .order("orden")
+    .order("created_at");
+  if (error) return [];
+  return (data ?? []) as TextoPoa[];
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -91,7 +156,7 @@ export async function getPoaDelArea(unidadId: string): Promise<{
   const abajo = descendientes(unidades, unidadId);
   const ids = [unidadId, ...abajo.map((u) => u.id)];
 
-  const [fichasRes, estadosRes, obsRes] = await Promise.all([
+  const [fichasRes, estadosRes, obsRes, textos] = await Promise.all([
     sb
       .from("ficha_prisma")
       .select(
@@ -103,6 +168,7 @@ export async function getPoaDelArea(unidadId: string): Promise<{
       .order("created_at"),
     sb.from("poa_area").select("unidad_id, estado, enviado_at").eq("anio", ANIO_POA).in("unidad_id", ids),
     sb.from("ficha_observacion").select("ficha_id").is("resuelta_at", null),
+    getTextosPoa(ids),
   ]);
 
   const fichas = (fichasRes.data ?? []) as any[];
@@ -128,6 +194,7 @@ export async function getPoaDelArea(unidadId: string): Promise<{
         observaciones: obsPorFicha.get(f.id) ?? 0,
       })) as FichaConArea[];
     const enviadoAt = estado?.enviado_at ?? null;
+    const susTextos = textos.filter((t) => t.unidad_id === u.id);
     return {
       id: u.id,
       nombre: nombreDe(u),
@@ -136,9 +203,13 @@ export async function getPoaDelArea(unidadId: string): Promise<{
       enviado: estado?.estado === "enviado",
       enviado_at: enviadoAt,
       fichas: suyas,
+      introducciones: susTextos.filter((t) => t.tipo === "introduccion"),
+      ideas: susTextos.filter((t) => t.tipo === "idea"),
       // La ficha sigue editable después de enviada, así que esto es lo único
       // que le avisa a quien recibe que algo cambió abajo de sus pies.
-      tocadoDespues: !!enviadoAt && suyas.some((f) => f.updated_at > enviadoAt),
+      tocadoDespues:
+        !!enviadoAt &&
+        [...suyas, ...susTextos].some((f) => f.updated_at > enviadoAt),
     };
   };
 
@@ -150,7 +221,7 @@ export async function getPoaDelArea(unidadId: string): Promise<{
     // dice nada a nadie y llenaría la pantalla de filas vacías.
     recibidas: abajo
       .map(armar)
-      .filter((a) => a.fichas.length > 0 || a.enviado)
+      .filter((a) => a.fichas.length > 0 || a.introducciones.length > 0 || a.ideas.length > 0 || a.enviado)
       .sort((a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, "es")),
     destino: padre ? { id: padre.id, nombre: nombreDe(padre) } : null,
   };
@@ -216,6 +287,8 @@ export async function getMisFichas(unidadId: string): Promise<FichaConArea[]> {
 export interface ResumenAreaPoa {
   unidad_id: string;
   nombre: string;
+  /** La secretaría de la que cuelga, para agruparlas como en Proyectos (06.10). */
+  secretaria: string | null;
   /** Proyectos activos del 2026 que tiene el área. */
   proyectos2026: number;
   aceptadas: number;
@@ -261,16 +334,22 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
       .select("unidad_id, estado, proyecto_origen_id")
       .eq("anio", ANIO_POA)
       .is("deleted_at", null),
-    sb.from("unidad_organizacional").select("id, nombre, nombre_corto"),
+    sb.from("unidad_organizacional").select("id, nombre, nombre_corto, nivel, parent_id"),
   ]);
   if (eF) throw eF;
   if (eU) throw eU;
 
-  const nombre = new Map(
-    ((unidades ?? []) as { id: string; nombre: string; nombre_corto: string | null }[]).map(
-      (u) => [u.id, u.nombre_corto ?? u.nombre]
-    )
-  );
+  type U = { id: string; nombre: string; nombre_corto: string | null; nivel: number; parent_id: string | null };
+  const lasUnidades = (unidades ?? []) as U[];
+  const nombre = new Map(lasUnidades.map((u) => [u.id, u.nombre_corto ?? u.nombre]));
+  const porId = new Map(lasUnidades.map((u) => [u.id, u]));
+  // Se sube por el organigrama hasta el nivel 0. Una secretaría es su propia
+  // secretaría.
+  const secretariaDe = (id: string): string | null => {
+    let u = porId.get(id);
+    for (let i = 0; u && u.nivel > 0 && i < 10; i++) u = u.parent_id ? porId.get(u.parent_id) : undefined;
+    return u && u.nivel === 0 ? u.nombre_corto ?? u.nombre : null;
+  };
   const traidos = new Set(
     ((fichas ?? []) as { proyecto_origen_id: string | null }[])
       .map((f) => f.proyecto_origen_id)
@@ -281,7 +360,7 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
   const de = (id: string) => {
     let a = porArea.get(id);
     if (!a) {
-      a = { unidad_id: id, nombre: nombre.get(id) ?? "(área desconocida)", proyectos2026: 0, aceptadas: 0, propuestas: 0, sinTraer: 0 };
+      a = { unidad_id: id, nombre: nombre.get(id) ?? "(área desconocida)", secretaria: secretariaDe(id), proyectos2026: 0, aceptadas: 0, propuestas: 0, sinTraer: 0 };
       porArea.set(id, a);
     }
     return a;

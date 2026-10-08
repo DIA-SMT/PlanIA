@@ -1,5 +1,6 @@
 import { formatFecha } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
+import { agruparPorArea } from "@/lib/aporte-por-area";
 
 /**
  * INFORME DE AVANCE DE LA PLANIFICACIÓN OPERATIVA ANUAL — 18.09, párrafos 956
@@ -49,6 +50,10 @@ export function InformeAvance({
   const avance = t.pct;
   // Los que entran en el promedio: los sin datos quedan afuera.
   const evaluables = t.proyectos - t.sin_datos;
+
+  // El punto 3 por área, con lo que aporta cada una (06.10).
+  const grupos = agruparPorArea(reporte.proyectos, avance);
+  const porArea = grupos.length > 1;
 
   const filas = [
     { icono: "🟢", nombre: "Finalizados", cantidad: t.finalizados },
@@ -205,28 +210,80 @@ export function InformeAvance({
             No hay proyectos cargados en SIPEM para esta área al momento del corte.
           </p>
         ) : (
-          <div className="tabla-envoltorio">
-            <table className="tabla-reporte">
-              <thead>
-                <tr>
-                  <th className="izq">Proyecto</th>
-                  <th className="izq">Dirección responsable</th>
-                  <th>Estado</th>
-                  <th>Avance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reporte.proyectos.map((p, i) => (
-                  <tr key={`${p.codigo ?? p.nombre}-${i}`}>
-                    <td className="izq">{p.nombre}</td>
-                    <td className="izq">{p.unidad_nombre ?? "—"}</td>
-                    <td>{ESTADO[p.estado] ?? p.estado}</td>
-                    <td className="num">{p.pct != null ? `${p.pct}%` : "—"}</td>
+          <>
+            {porArea && (
+              <p className="text-xs text-foreground/90 leading-relaxed">
+                Los proyectos están agrupados por área. Al final de cada una figura su avance y
+                cuántos puntos aporta al avance de {r.el}: los aportes de todas las áreas suman el{" "}
+                <strong className="tabular-nums">{avance != null ? `${avance} %` : "—"}</strong> del
+                punto 1. Los proyectos sin datos no aportan ni restan.
+              </p>
+            )}
+            <div className="tabla-envoltorio">
+              <table className="tabla-reporte">
+                <thead>
+                  <tr>
+                    <th className="izq">Proyecto</th>
+                    <th className="izq">Dirección responsable</th>
+                    <th>Estado</th>
+                    <th>Avance</th>
                   </tr>
+                </thead>
+                {/* 06.10: un tbody por área, con una línea de color arriba y el
+                    aporte abajo. Cuando hay un área sola —el informe de una
+                    dirección— el agrupado no dice nada y la tabla queda como
+                    estaba. */}
+                {grupos.map((g) => (
+                  <tbody key={g.nombre} className={porArea ? "grupo-area" : undefined}>
+                    {g.proyectos.map((p, i) => (
+                      <tr key={`${p.codigo ?? p.nombre}-${i}`}>
+                        <td className="izq">{p.nombre}</td>
+                        <td className="izq">{p.unidad_nombre ?? "—"}</td>
+                        <td>{ESTADO[p.estado] ?? p.estado}</td>
+                        <td className="num">{p.pct != null ? `${p.pct}%` : "—"}</td>
+                      </tr>
+                    ))}
+                    {porArea && (
+                      <tr className="subtotal-area">
+                        <td className="izq" colSpan={4}>
+                          {g.nombre}: {g.proyectos.length}{" "}
+                          {g.proyectos.length === 1 ? "proyecto" : "proyectos"}
+                          {g.pct == null ? (
+                            <> · sin datos, no entra en el cálculo</>
+                          ) : (
+                            <>
+                              {" "}
+                              · avance propio <span className="tabular-nums">{g.pct} %</span>
+                              {g.aporte != null && avance != null && (
+                                <>
+                                  {" "}
+                                  · aporta{" "}
+                                  <strong className="tabular-nums">
+                                    {g.aporte} {g.aporte === 1 ? "punto" : "puntos"}
+                                  </strong>{" "}
+                                  de los <span className="tabular-nums">{avance}</span> de {r.el}
+                                </>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                {porArea && (
+                  <tbody>
+                    <tr className="total">
+                      <td className="izq" colSpan={3}>
+                        Avance de {r.el} (suma de los aportes)
+                      </td>
+                      <td className="num">{avance != null ? `${avance}%` : "—"}</td>
+                    </tr>
+                  </tbody>
+                )}
+              </table>
+            </div>
+          </>
         )}
       </section>
 
