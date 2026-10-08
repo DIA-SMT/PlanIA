@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getMisFichas, ANIO_POA } from "@/lib/poa-2027";
+import { getMisFichas, getTextosPoa, ANIO_POA } from "@/lib/poa-2027";
 import { CampoEditable } from "@/components/poa2027/campo-editable";
+import { TextosDelArea } from "@/components/poa2027/textos-del-area";
 import { TraerDe2026, AceptarFicha } from "@/components/poa2027/propuestas-acciones";
 import { BackButton } from "@/components/layout/back-button";
 
@@ -102,6 +103,10 @@ export default async function EditarMiPoaPage({
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
+  // 08.10: lo que el POA del área lleva además de los proyectos.
+  const textos = await getTextosPoa([unidadId]);
+  const introducciones = textos.filter((t) => t.tipo === "introduccion");
+  const ideas = textos.filter((t) => t.tipo === "idea");
 
   const propuestas = fichas.filter((f) => f.estado === "propuesta");
   const aceptadas = fichas.filter((f) => f.estado === "aceptada");
@@ -150,7 +155,33 @@ export default async function EditarMiPoaPage({
                 + Cargar un proyecto nuevo
               </Link>
             )}
+            {/* Planificación no tiene área propia, así que el Word del POA 2027
+                no tenía cómo bajar el de un área: ahora sale de acá (08.10). */}
+            {esPlanificacion && (
+              <a
+                href={`/api/poa-2027/exportar?unidad=${unidadId}`}
+                className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"
+              >
+                Descargar Word de esta área
+              </a>
+            )}
           </div>
+
+          <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Introducción</h2>
+              <p className="text-xs text-muted mt-0.5">
+                Lo que va en el documento antes de los proyectos: el marco general del área, notas
+                metodológicas, la descripción de un programa. Cada una con su título.
+              </p>
+            </div>
+            <TextosDelArea
+              unidadId={unidadId}
+              tipo="introduccion"
+              textos={introducciones}
+              editable
+            />
+          </section>
 
           {fichas.length === 0 && (
             <div className="rounded-xl border border-border bg-surface p-6 text-center space-y-1">
@@ -194,6 +225,17 @@ export default async function EditarMiPoaPage({
               ))}
             </section>
           )}
+
+          <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Banco de ideas</h2>
+              <p className="text-xs text-muted mt-0.5">
+                Va al final del documento del área: iniciativas sujetas a aprobación que no son
+                proyectos de este POA.
+              </p>
+            </div>
+            <TextosDelArea unidadId={unidadId} tipo="idea" textos={ideas} editable conRotulo={false} />
+          </section>
         </>
       )}
     </div>
@@ -215,7 +257,7 @@ function Ficha({ ficha }: { ficha: Awaited<ReturnType<typeof getMisFichas>>[numb
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-foreground">
             <CampoEditable
-              fichaId={ficha.id}
+              id={ficha.id}
               campo="programa"
               valor={ficha.programa}
               editable
@@ -237,7 +279,7 @@ function Ficha({ ficha }: { ficha: Awaited<ReturnType<typeof getMisFichas>>[numb
             <dt className="text-[11px] text-muted uppercase tracking-wider">{c.rotulo}</dt>
             <dd className="text-sm text-foreground/90">
               <CampoEditable
-                fichaId={ficha.id}
+                id={ficha.id}
                 campo={c.campo}
                 valor={ficha[c.campo] ?? null}
                 editable
