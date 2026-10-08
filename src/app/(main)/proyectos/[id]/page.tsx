@@ -12,7 +12,6 @@ import { ProyectoAcciones } from "@/components/dashboard/proyecto-acciones";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual } from "@/lib/auth";
-import { FichaDelLibroPOA, fichaDelLibro } from "@/components/proyectos/ficha-del-libro";
 import { formatFecha, calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceIndicadorEnPlazo } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
@@ -78,9 +77,6 @@ export default async function ProyectoDetallePage({
   const estadoGlobal = avanceProy.estado;
   const tieneSeguimiento = avanceProy.conDatos > 0;
   const conDatosInd = indicadores.filter((i) => avanceIndicadorEnPlazo(i, ahora) != null).length;
-
-  // La ficha que trae el libro del POA de la secretaría, si se importó.
-  const ficha = fichaDelLibro(proyecto.metadata);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -155,10 +151,6 @@ export default async function ProyectoDetallePage({
           {proyecto.fecha_fin && <span>Fin: {formatFecha(proyecto.fecha_fin)}</span>}
         </div>
       </div>
-
-      {/* Lo que dice el libro del POA sobre este proyecto (17.09). Si no se
-          importó su ficha, no aparece nada. */}
-      {ficha && <FichaDelLibroPOA ficha={ficha} descripcion={proyecto.descripcion ?? null} />}
 
       {/* Plan Rector: acá se produce el vínculo que el Excel del cliente no trajo. */}
       <ImputacionCard
