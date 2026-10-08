@@ -25,6 +25,30 @@
  */
 const VINETAS = /[●•▪◦‣]/g;
 
+/**
+ * Un rango de meses que abre un ítem: "Enero - Mar:", "Abr - Junio:" — 06.10.
+ *
+ * "Las POA se ven mejor pero sigue figurando de corrido. [...] La meta tiene
+ * ítems en el documento pero no en el PlanIA." El ejemplo era la calendarización
+ * trimestral de los proyectos del Parque 9 de Julio. En el libro original esos
+ * renglones eran una lista de Word, y la viñeta de una lista de Word no es un
+ * carácter del texto: es formato. Al leer el libro se perdió, así que acá no
+ * hay nada que buscar con VINETAS.
+ *
+ * Lo que sí quedó es el rango de meses con dos puntos, que es inconfundible: en
+ * una frase común un "Abr - Junio:" no aparece. Medido el 06.10: 28 fichas del
+ * POA 2027 tienen los cuatro trimestres así, sin viñetas, y ninguna otra forma
+ * de lista sin viñetas aparece más de dos veces.
+ *
+ * Busca el lugar donde empieza cada ítem; la letra anterior no puede ser parte
+ * de una palabra, para que "Primavera - Junio:" no corte en "vera".
+ */
+const MES = "(?:Ene(?:ro)?|Feb(?:rero)?|Mar(?:zo)?|Abr(?:il)?|May(?:o)?|Jun(?:io)?|Jul(?:io)?|Ago(?:sto)?|Sep(?:t(?:iembre)?)?|Set(?:iembre)?|Oct(?:ubre)?|Nov(?:iembre)?|Dic(?:iembre)?)";
+const RANGO_DE_MESES = new RegExp(
+  "(?<!\\p{L})(?=" + MES + "\\.?\\s*[-–]\\s*" + MES + "\\.?\\s*:)",
+  "gu"
+);
+
 export interface TextoConItems {
   /** Lo que viene antes de la primera viñeta. Puede estar vacío. */
   intro: string;
@@ -39,8 +63,22 @@ export interface TextoConItems {
  */
 export function partirEnItems(texto: string | null | undefined): TextoConItems | null {
   if (!texto) return null;
-  if ((texto.match(VINETAS) ?? []).length < 2) return null;
-  const [antes, ...resto] = texto.split(VINETAS);
+  let antes: string;
+  let resto: string[];
+  // Las viñetas mandan: si el texto las tiene, los ítems son esos, aunque
+  // adentro haya rangos de meses.
+  if ((texto.match(VINETAS) ?? []).length >= 2) {
+    [antes, ...resto] = texto.split(VINETAS);
+  } else {
+    // El rango de meses no se descarta como la viñeta: es parte del ítem. Se
+    // corta por posición y no con split, porque split no corta en la posición
+    // 0 y un texto que arranca con "Enero - Mar:" tomaría el primer ítem como
+    // introducción.
+    const cortes = [...texto.matchAll(RANGO_DE_MESES)].map((m) => m.index);
+    if (cortes.length < 2) return null;
+    antes = texto.slice(0, cortes[0]);
+    resto = cortes.map((c, i) => texto.slice(c, cortes[i + 1]));
+  }
   const items = resto.map((t) => t.trim()).filter(Boolean);
   if (items.length < 2) return null;
   return { intro: antes.trim(), items };
