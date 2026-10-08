@@ -103,6 +103,17 @@ html:not(.light) .logo-auto {
   font-weight: 700;
   border-top: 2px solid var(--mt);
 }
+/* 06.10: el punto 3 del informe por área. Una línea de color separa un área de
+   la otra ("si se pudiera separar un área de otra con una línea de color") y
+   la última fila de cada una dice cuánto aporta al total. El color va en el
+   borde y no en el fondo: el navegador no imprime fondos salvo que se lo pidan,
+   y los bordes sí. */
+.tabla-reporte tbody.grupo-area > tr:first-child > td { border-top: 2.5px solid var(--color-primary); }
+.tabla-reporte tr.subtotal-area > td {
+  background: var(--srf-h);
+  font-size: 11px;
+  color: var(--fg);
+}
 
 /* Lo que existe solo en papel: en pantalla no se ve. Se usa para el análisis
    del reporte, que en pantalla es un formulario y al imprimirse tiene que salir
