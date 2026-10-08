@@ -66,12 +66,28 @@ jobs:
             BODY="{\"solo_fin_de_trimestre\":${SOLO_FIN}}"
           fi
 
-          echo "POST ${PLANIA_URL}/api/corte-trimestral"
+          # LA DIRECCIÓN FINAL, ANTES DEL POST (08.10.2026). Desde que se cargaron
+          # los secrets, todas las corridas fallaron con HTTP 308: la dirección de
+          # PLANIA_URL redirige a otra (una barra de más, http en vez de https, o
+          # un dominio que Vercel manda a otro), y curl no sigue una redirección
+          # en un POST. El corte del 3er trimestre no se tomó por esto.
+          #
+          # Se resuelve la dirección con un GET SIN credenciales, siguiendo las
+          # redirecciones, y se le pega el POST al origen al que se llega. Así el
+          # token viaja una sola vez y directo a donde está la aplicación, en vez
+          # de seguir redirecciones con él encima.
+          BASE="${PLANIA_URL%/}"
+          FINAL=$(curl -sS -o /dev/null -L --max-redirs 5 --max-time 30 \
+            -w '%{url_effective}' "${BASE}/" || true)
+          ORIGEN=$(printf '%s' "$FINAL" | sed -E 's#^(https?://[^/]+).*#\1#')
+          if [ -z "$ORIGEN" ]; then ORIGEN="$BASE"; fi
+
+          echo "POST ${ORIGEN}/api/corte-trimestral"
           echo "cuerpo: ${BODY}"
 
           RESP=$(mktemp)
           STATUS=$(curl -sS -o "$RESP" -w '%{http_code}' -X POST \
-            "${PLANIA_URL}/api/corte-trimestral" \
+            "${ORIGEN}/api/corte-trimestral" \
             -H "Authorization: Bearer ${CORTE_SECRET}" \
             -H "Content-Type: application/json" \
             --max-time 120 \
@@ -81,6 +97,10 @@ jobs:
           cat "$RESP"
           echo ""
 
+          if [ "$STATUS" -ge 300 ] && [ "$STATUS" -lt 400 ]; then
+            echo "::error::El corte falló (HTTP ${STATUS}): ${ORIGEN}/api/corte-trimestral redirige a otra dirección. Poné en el secret PLANIA_URL la dirección final de PlanIA, con https y sin barra al final."
+            exit 2
+          fi
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
             echo "::error::El corte falló (HTTP ${STATUS})"
             exit 2
