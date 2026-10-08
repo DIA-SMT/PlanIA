@@ -216,6 +216,8 @@ export async function getMisFichas(unidadId: string): Promise<FichaConArea[]> {
 export interface ResumenAreaPoa {
   unidad_id: string;
   nombre: string;
+  /** La secretaría de la que cuelga, para agruparlas como en Proyectos (06.10). */
+  secretaria: string | null;
   /** Proyectos activos del 2026 que tiene el área. */
   proyectos2026: number;
   aceptadas: number;
@@ -261,16 +263,22 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
       .select("unidad_id, estado, proyecto_origen_id")
       .eq("anio", ANIO_POA)
       .is("deleted_at", null),
-    sb.from("unidad_organizacional").select("id, nombre, nombre_corto"),
+    sb.from("unidad_organizacional").select("id, nombre, nombre_corto, nivel, parent_id"),
   ]);
   if (eF) throw eF;
   if (eU) throw eU;
 
-  const nombre = new Map(
-    ((unidades ?? []) as { id: string; nombre: string; nombre_corto: string | null }[]).map(
-      (u) => [u.id, u.nombre_corto ?? u.nombre]
-    )
-  );
+  type U = { id: string; nombre: string; nombre_corto: string | null; nivel: number; parent_id: string | null };
+  const lasUnidades = (unidades ?? []) as U[];
+  const nombre = new Map(lasUnidades.map((u) => [u.id, u.nombre_corto ?? u.nombre]));
+  const porId = new Map(lasUnidades.map((u) => [u.id, u]));
+  // Se sube por el organigrama hasta el nivel 0. Una secretaría es su propia
+  // secretaría.
+  const secretariaDe = (id: string): string | null => {
+    let u = porId.get(id);
+    for (let i = 0; u && u.nivel > 0 && i < 10; i++) u = u.parent_id ? porId.get(u.parent_id) : undefined;
+    return u && u.nivel === 0 ? u.nombre_corto ?? u.nombre : null;
+  };
   const traidos = new Set(
     ((fichas ?? []) as { proyecto_origen_id: string | null }[])
       .map((f) => f.proyecto_origen_id)
@@ -281,7 +289,7 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
   const de = (id: string) => {
     let a = porArea.get(id);
     if (!a) {
-      a = { unidad_id: id, nombre: nombre.get(id) ?? "(área desconocida)", proyectos2026: 0, aceptadas: 0, propuestas: 0, sinTraer: 0 };
+      a = { unidad_id: id, nombre: nombre.get(id) ?? "(área desconocida)", secretaria: secretariaDe(id), proyectos2026: 0, aceptadas: 0, propuestas: 0, sinTraer: 0 };
       porArea.set(id, a);
     }
     return a;

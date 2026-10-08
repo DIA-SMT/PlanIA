@@ -7,6 +7,7 @@ import {
   ANIO_POA,
 } from "@/lib/poa-2027";
 import { TraerTodasBoton } from "@/components/poa2027/traer-todas-boton";
+import { TablaAreasPoa } from "@/components/poa2027/tabla-areas";
 import { DocumentoPoa } from "@/components/poa2027/documento-poa";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
 
@@ -134,48 +135,7 @@ export default async function Poa2027Page() {
             </p>
           </div>
           <TraerTodasBoton sinTraer={resumen.sinTraer} areasSinTraer={resumen.areasSinTraer} />
-          <div className="overflow-x-auto border border-border rounded-lg">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-surface-hover/40 text-muted">
-                  <th className="text-left font-medium px-3 py-2">Área</th>
-                  <th className="text-right font-medium px-3 py-2" title="Proyectos activos del POA 2026">Proyectos 2026</th>
-                  <th className="text-right font-medium px-3 py-2" title="Entran en el documento">Aceptadas</th>
-                  <th className="text-right font-medium px-3 py-2" title="Esperando que el área las revise">Propuestas</th>
-                  <th className="text-right font-medium px-3 py-2" title="Proyectos del 2026 que todavía no se trajeron">Sin traer</th>
-                  <th className="px-3 py-2"><span className="sr-only">Editar</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {resumen.areas.map((a) => (
-                  <tr key={a.unidad_id}>
-                    <td className="px-3 py-1.5">
-                      <Link
-                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
-                        className="text-foreground hover:text-primary"
-                      >
-                        {a.nombre}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-muted">{a.proyectos2026}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{a.aceptadas || "—"}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{a.propuestas || "—"}</td>
-                    <td className={`px-3 py-1.5 text-right tabular-nums ${a.sinTraer > 0 ? "text-warning" : "text-muted/50"}`}>
-                      {a.sinTraer || "—"}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <Link
-                        href={`/poa-2027/mis-fichas?unidad=${a.unidad_id}`}
-                        className="text-primary hover:underline whitespace-nowrap"
-                      >
-                        Editar →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TablaAreasPoa areas={resumen.areas} />
         </section>
       ) : !perfil?.unidad_id ? (
         <div className="rounded-xl border border-border bg-surface p-6 text-center">
