@@ -6,7 +6,9 @@ import {
   getUnidadesParaReporte,
   getCortesParaReporte,
 } from "@/lib/reporte-trimestral";
-import { InformeAvance } from "@/components/reportes/informe-avance";
+import { getAmbitoPorProyecto } from "@/lib/plan-rector";
+import { aportesPorAmbito } from "@/lib/plan-rector-comun";
+import { InformeAvance, type PlanRectorDelInforme } from "@/components/reportes/informe-avance";
 import { BarraReporte } from "@/components/reportes/barra-reporte";
 import { BackButton } from "@/components/layout/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -97,6 +99,25 @@ export default async function ReportesPage({
     errorReporte = e instanceof Error ? e.message : String(e);
   }
 
+  // 13.10: el punto 4, el Plan Rector de los proyectos del área. Con el avance
+  // del mismo corte que el resto del informe. Si falla, el informe sale igual,
+  // sin ese punto: no vale la pena perder el informe entero por él.
+  let planRector: PlanRectorDelInforme | null = null;
+  if (reporte && reporte.proyectos.length > 0) {
+    try {
+      const ambitoDe = await getAmbitoPorProyecto();
+      const imputados = reporte.proyectos.filter((p) => p.proyecto_id && ambitoDe.has(p.proyecto_id));
+      planRector = {
+        imputados: imputados.length,
+        ...aportesPorAmbito(
+          imputados.map((p) => ({ pct: p.pct, ambito: ambitoDe.get(p.proyecto_id!)! }))
+        ),
+      };
+    } catch {
+      planRector = null;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="no-imprimir space-y-4 max-w-5xl">
@@ -116,7 +137,13 @@ export default async function ReportesPage({
         </div>
       ) : (
         reporte && (
-          <InformeAvance reporte={reporte} trimestre={trimestre} anio={anio} emitidoEl={hoy} />
+          <InformeAvance
+            reporte={reporte}
+            trimestre={trimestre}
+            anio={anio}
+            emitidoEl={hoy}
+            planRector={planRector}
+          />
         )
       )}
     </div>

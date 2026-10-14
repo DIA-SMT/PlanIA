@@ -22,6 +22,7 @@ import { cache } from "react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import {
   rotuloCorto,
+  avancePlanRector,
   type TipoNodoRector,
   type NodoRector,
   type NodoRectorArbol,
@@ -34,7 +35,6 @@ import {
   avanceMetaEnPlazo,
   calcularPorcentajeMeta,
   estadoDeAvance,
-  promedioDeProyectos,
 } from "./utils";
 
 // Los tipos y los helpers puros viven en plan-rector-comun.ts para que los
@@ -74,10 +74,10 @@ const ARBOL_VACIO = { arbol: [] as NodoRectorArbol[], totalNodos: 0 };
  *
  * Usa exactamente las mismas funciones que el Panel Ejecutivo, la TV, la lista
  * de Proyectos, las fotos de corte y el reporte trimestral:
- * `avanceMetaEnPlazo` → `avanceAgregado` → `estadoDeAvance`. No hay una fórmula
- * del Plan Rector: si la hubiera, el ámbito diría un número y el Panel otro
- * para los mismos proyectos, y la primera comparación rompería la confianza en
- * las dos pantallas.
+ * `avanceMetaEnPlazo` → `avanceAgregado` → `estadoDeAvance`. El avance de CADA
+ * proyecto es el mismo en todas las pantallas. Lo que el Plan Rector hace
+ * distinto desde el 13.10 es el promedio: deja afuera a los no iniciados (ver
+ * avancePlanRector).
  *
  * Devuelve un Map solo con los proyectos que siguen VIVOS (activos, no
  * borrados, del período en curso). Un vínculo a un proyecto que salió del POA
@@ -305,19 +305,20 @@ export const getPlanRectorArbol = cache(async function getPlanRectorArbol(): Pro
   // el avance.
   //
   // El avance del ámbito es el PROMEDIO SIMPLE de los porcentajes de los
-  // proyectos que cuelgan de él, sin ponderar por cantidad. Es la misma cuenta
-  // que hace el Panel Ejecutivo para un área, así que el número del Plan Rector
-  // y el del Panel hablan el mismo idioma — que es lo que sostiene que a nadie
-  // se le caiga la confianza en el tablero al comparar dos pantallas.
+  // proyectos que cuelgan de él, sin ponderar por cantidad.
   //
-  // Los proyectos sin dato cargado no entran en el promedio (son "sin datos",
-  // no "cero"), igual que en el resto del sistema.
+  // Desde el 13.10 entran solo los que tienen avance registrado: los sin datos
+  // y los no iniciados quedan afuera ("no se contabilizan en el promedio", el
+  // texto del indicador que escribió Planificación). Hasta ese día era la misma
+  // cuenta que el Panel, con los no iniciados como 0 %; ahora el Plan Rector
+  // tiene la suya, y para los mismos proyectos da más alto. Ver
+  // avancePlanRector.
   const acumular = (n: NodoRectorArbol): ProyectoImputado[] => {
     const propios = n.proyectos;
     const deHijos = n.hijos.flatMap((h) => acumular(h));
     const todos = [...propios, ...deHijos];
     n.imputadosSubarbol = todos.length;
-    n.pct = promedioDeProyectos(todos.map((p) => p.pct)).pct;
+    n.pct = avancePlanRector(todos.map((p) => p.pct)).pct;
     // El cast es porque EstadoSemaforo incluye "gris", que estadoDeAvance no
     // devuelve nunca: es para nodos inactivos y acá no hay.
     n.estado = estadoDeAvance(n.pct) as NodoRectorArbol["estado"];
@@ -599,4 +600,66 @@ export async function getEstadoPlanRectorPorProyecto(
   ids: string[]
 ): Promise<Map<string, EstadoPlanRector>> {
   return (await estadosPlanRector(ids)) ?? new Map();
+}
+
+/**
+ * El ámbito del Plan Rector de cada proyecto imputado — 13.10, para el punto 4
+ * del informe: "en los reportes también debería salir el grado de cumplimiento
+ * del Plan Rector porque se lo está midiendo".
+ *
+ * Va con el cliente ADMIN, como el detalle del corte que lee el informe: la
+ * puerta de acceso ya la pasó getReporteUnidad, y con la sesión del lector un
+ * director podría no ver la imputación de un proyecto de su propio informe. No
+ * devuelve datos de proyectos, solo el ámbito de cada id; el informe cruza con
+ * los suyos.
+ *
+ * La imputación es la de HOY, aunque el informe sea de un corte: el corte guarda
+ * el avance de cada proyecto pero no su vínculo con el Plan Rector. Si se
+ * reimputa un proyecto después del corte, su avance de ese día aparece en el
+ * ámbito nuevo.
+ *
+ * Si las tablas del Plan Rector no están, devuelve vacío: el informe sale igual,
+ * sin el punto 4.
+ */
+export async function getAmbitoPorProyecto(): Promise<
+  Map<string, { codigo: string | null; nombre: string }>
+> {
+  const { getSupabaseAdmin } = await import("@/lib/supabase/admin");
+  const sb = getSupabaseAdmin();
+  const salida = new Map<string, { codigo: string | null; nombre: string }>();
+
+  const { data: nodos, error } = await sb
+    .from("plan_rector_nodo")
+    .select("id, parent_id, codigo_cliente, nombre, nombre_corto")
+    .eq("activa", true);
+  if (error) {
+    if (tablaInexistente(error)) return salida;
+    throw error;
+  }
+  const porId = new Map(((nodos ?? []) as any[]).map((n) => [n.id as string, n]));
+  const ambitoDe = (nodoId: string) => {
+    let n = porId.get(nodoId);
+    for (let i = 0; n?.parent_id && i < 6; i++) n = porId.get(n.parent_id);
+    return n ? { codigo: (n.codigo_cliente ?? null) as string | null, nombre: (n.nombre_corto ?? n.nombre) as string } : null;
+  };
+
+  // Paginado: PostgREST corta en 1000 filas y ya hay más de 400 vínculos.
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error: e } = await sb
+      .from("proyecto_plan_rector")
+      .select("proyecto_id, nodo_id")
+      .eq("estado", "confirmado")
+      .order("proyecto_id")
+      .range(desde, desde + 999);
+    if (e) throw e;
+    for (const v of (data ?? []) as { proyecto_id: string; nodo_id: string }[]) {
+      // Un proyecto en dos ámbitos cuenta en el primero: así los aportes del
+      // informe siguen sumando el total (ver aportesPorAmbito).
+      if (salida.has(v.proyecto_id)) continue;
+      const a = ambitoDe(v.nodo_id);
+      if (a) salida.set(v.proyecto_id, a);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  return salida;
 }

@@ -64,6 +64,8 @@ export type TipoFila = "subsecretaria" | "direccion" | "departamento" | "propios
 
 /** Un proyecto en el reporte de una dirección. */
 export interface FilaProyecto {
+  /** Para cruzarlo con el Plan Rector (punto 4 del informe, 13.10). */
+  proyecto_id: string | null;
   nombre: string;
   codigo: string | null;
   unidad_nombre: string | null;
@@ -392,7 +394,7 @@ async function traerFilas(opciones: {
     const { data, error } = await sb
       .from("corte_trimestral_proyecto")
       .select(
-        "id, proyecto_nombre, proyecto_codigo, unidad_id, unidad_nombre, unidad_nivel, " +
+        "id, proyecto_id, proyecto_nombre, proyecto_codigo, unidad_id, unidad_nombre, unidad_nivel, " +
           "secretaria_id, secretaria_nombre, subsecretaria_id, subsecretaria_nombre, " +
           "direccion_id, direccion_nombre, es_propio_de_secretaria, estado, pct, " +
           "metas, metas_con_datos, indicadores, indicadores_con_datos"
@@ -583,6 +585,7 @@ export function armarReporte(
   // respaldo de los indicadores consolidados del informe.
   const proyectos: FilaProyecto[] = propias
     .map((f) => ({
+      proyecto_id: (f.proyecto_id ?? null) as string | null,
       nombre: f.proyecto_nombre as string,
       codigo: (f.proyecto_codigo ?? null) as string | null,
       unidad_nombre: (f.unidad_nombre ?? null) as string | null,
