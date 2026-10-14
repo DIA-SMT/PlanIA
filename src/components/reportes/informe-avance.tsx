@@ -1,6 +1,13 @@
 import { formatFecha } from "@/lib/utils";
 import type { ReporteUnidad } from "@/lib/reporte-trimestral";
 import { agruparPorArea } from "@/lib/aporte-por-area";
+import type { aportesPorAmbito } from "@/lib/plan-rector-comun";
+
+/** El Plan Rector de los proyectos del área: el punto 4 del informe (13.10). */
+export type PlanRectorDelInforme = ReturnType<typeof aportesPorAmbito> & {
+  /** Proyectos del área imputados al Plan Rector. */
+  imputados: number;
+};
 
 /**
  * INFORME DE AVANCE DE LA PLANIFICACIÓN OPERATIVA ANUAL — 18.09, párrafos 956
@@ -33,11 +40,14 @@ export function InformeAvance({
   trimestre,
   anio,
   emitidoEl,
+  planRector = null,
 }: {
   reporte: ReporteUnidad;
   trimestre: number;
   anio: number;
   emitidoEl: string;
+  /** null = no se pudo leer el Plan Rector: el punto 4 no sale. */
+  planRector?: PlanRectorDelInforme | null;
 }) {
   const t = reporte.totalUnidad;
   const nivel = reporte.unidad?.nivel ?? 0;
@@ -287,6 +297,19 @@ export function InformeAvance({
         )}
       </section>
 
+      {/* ---------- 4 ---------- */}
+      {/* 13.10: "en los reportes también debería salir el grado de cumplimiento
+          del Plan Rector porque se lo está midiendo". Es el de los proyectos de
+          esta área, con la cuenta del Plan Rector: los sin datos y los no
+          iniciados no entran en el promedio. Puede dar distinto que el punto 1
+          para arriba o para abajo —mide solo los imputados y no cuenta los no
+          iniciados, que el punto 1 cuenta como 0 %— y el texto lo dice. Medido
+          el 14.10: Ambiente 60 y 61, Servicios Públicos 24 y 48, Ingresos 78 y
+          71. */}
+      {planRector && reporte.proyectos.length > 0 && (
+        <PuntoPlanRector pr={planRector} el={r.el} anio={anio} totalProyectos={t.proyectos} />
+      )}
+
       <footer className="border-t border-border pt-3 text-[10px] text-muted">
         <p>
           Generado desde SIPEM
@@ -307,3 +330,91 @@ const ESTADO: Record<string, string> = {
   rojo: "🔴 No iniciado",
   sin_datos: "⚪ Sin datos",
 };
+
+/** El punto 4: el Plan Rector de los proyectos del área, por ámbito. */
+function PuntoPlanRector({
+  pr,
+  el,
+  anio,
+  totalProyectos,
+}: {
+  pr: PlanRectorDelInforme;
+  el: string;
+  anio: number;
+  totalProyectos: number;
+}) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-base font-bold text-foreground">4. Plan Rector</h2>
+      {pr.imputados === 0 ? (
+        <p className="text-xs text-foreground/90 leading-relaxed">
+          Ninguno de los proyectos de {el} está vinculado a un ámbito del Plan Rector.
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-foreground/90 leading-relaxed">
+            De los <strong className="tabular-nums">{totalProyectos}</strong> proyectos de {el},{" "}
+            <strong className="tabular-nums">{pr.imputados}</strong>{" "}
+            {pr.imputados === 1 ? "está vinculado" : "están vinculados"} a ámbitos del Plan Rector.{" "}
+            {pr.total.pct == null ? (
+              <>Ninguno tiene avance registrado todavía.</>
+            ) : (
+              <>
+                Su grado de avance es del{" "}
+                <strong className="tabular-nums">{pr.total.pct} %</strong>: el promedio de los que
+                tienen avance registrado (<span className="tabular-nums">{pr.total.evaluables}</span>{" "}
+                de <span className="tabular-nums">{pr.imputados}</span>). Los proyectos sin datos
+                cargados y los no iniciados no se contabilizan.
+              </>
+            )}
+          </p>
+
+          <div className="tabla-envoltorio">
+            <table className="tabla-reporte">
+              <thead>
+                <tr>
+                  <th className="izq">Ámbito</th>
+                  <th>Proyectos</th>
+                  <th>Con avance registrado</th>
+                  <th>Avance</th>
+                  <th>Aporte</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pr.ambitos.map((a) => (
+                  <tr key={a.codigo ?? a.nombre}>
+                    <td className="izq">
+                      {a.codigo && <strong>{a.codigo}</strong>} {a.nombre}
+                    </td>
+                    <td className="num">{a.proyectos}</td>
+                    <td className="num">{a.evaluables}</td>
+                    <td className="num">{a.pct != null ? `${a.pct}%` : "—"}</td>
+                    <td className="num">
+                      {a.aporte != null && pr.total.pct != null ? `${a.aporte} pts` : "—"}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="total">
+                  <td className="izq">TOTAL</td>
+                  <td className="num">{pr.imputados}</td>
+                  <td className="num">{pr.total.evaluables}</td>
+                  <td className="num">{pr.total.pct != null ? `${pr.total.pct}%` : "—"}</td>
+                  <td className="num">{pr.total.pct != null ? `${pr.total.pct} pts` : "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[11px] text-muted leading-relaxed">
+            El aporte de cada ámbito es la parte del grado de avance que ponen sus proyectos: los
+            aportes suman el total. El Plan Rector tiene horizonte al 2030; este porcentaje refleja el avance
+            registrado durante {anio} por los proyectos de la POA vinculados a cada ámbito, no el
+            avance del Plan Rector hacia 2030. Puede no coincidir con el del punto 1: acá entran solo
+            los proyectos vinculados al Plan Rector, y los no iniciados, que el punto 1 cuenta como 0
+            %, no se contabilizan.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
