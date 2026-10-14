@@ -251,24 +251,25 @@ function IconoODS({ numero, nombre }: { numero: number; nombre: string }) {
  * El porcentaje de avance del ámbito — 09.09, párrafo 703.
  *
  * Es el promedio simple de los proyectos imputados al ámbito y a todo lo que
- * cuelga de él. La misma cuenta que hace el Panel Ejecutivo para un área, así
- * que las dos pantallas dicen lo mismo de los mismos proyectos.
+ * cuelga de él que tienen avance registrado. Desde el 13.10 los no iniciados no
+ * entran, como los sin datos (ver avancePlanRector), así que puede dar más alto
+ * que el Panel para los mismos proyectos.
  */
 function PorcentajeAmbito({ pct, color }: { pct: number | null; color: string | null }) {
   if (pct == null) {
     return (
       <span
         className="text-[10px] text-muted/60 shrink-0 w-14 text-right"
-        title="Ninguno de los proyectos imputados tiene datos cargados"
+        title="Ninguno de los proyectos imputados tiene avance registrado: los sin datos y los no iniciados no se cuentan"
       >
-        sin datos
+        sin avance
       </span>
     );
   }
   return (
     <span
       className="shrink-0 w-14 text-right"
-      title={pct + " % de avance promedio de los proyectos imputados"}
+      title={pct + " % de avance promedio de los proyectos imputados con avance registrado"}
     >
       <span className="text-sm font-bold tabular-nums" style={{ color: color ?? undefined }}>
         {pct}%

@@ -9,6 +9,8 @@
  * Regla: acá nada que toque la base, el request ni cookies.
  */
 
+import { agruparPorArea } from "./aporte-por-area";
+
 export type TipoNodoRector = "area_intervencion" | "eje" | "objetivo" | "linea";
 export type EstadoVinculoRector = "propuesto" | "confirmado" | "rechazado";
 
@@ -169,4 +171,109 @@ export function rotuloCorto(n: {
 export function rotuloCobertura(imputados: number): string {
   if (imputados === 0) return "Sin proyectos imputados";
   return imputados === 1 ? "1 proyecto imputado" : `${imputados} proyectos imputados`;
+}
+
+// ---------------------------------------------------------------------------
+// La cuenta del Plan Rector
+// ---------------------------------------------------------------------------
+
+/**
+ * El avance del Plan Rector de un conjunto de proyectos — 13.10.
+ *
+ * Planificación definió el texto del indicador: "Para el cálculo del indicador
+ * se consideran únicamente los proyectos que cuentan con información de avance
+ * registrada. Los proyectos sin datos cargados y los no iniciados no se
+ * contabilizan en el promedio."
+ *
+ * Es el promedio del avance de los proyectos con avance registrado. Quedan
+ * afuera los sin datos (pct null) y los no iniciados (pct 0: tienen carga y no
+ * avanzaron).
+ *
+ * ES UNA CUENTA DISTINTA DE LA DEL PANEL Y EL INFORME, a propósito: ahí los no
+ * iniciados entran como 0 %. Se decidió el 14.10 aplicarlo solo acá. Por eso,
+ * para los mismos proyectos, el Plan Rector da más alto: con los datos del
+ * 14.10, 68 % contra 55 % si contara los no iniciados, y A1 96 % contra 38 %
+ * (de sus 5 proyectos con datos, 3 no arrancaron). Contra el Panel puede dar
+ * más alto o más bajo, porque además mide solo los proyectos imputados.
+ */
+export function avancePlanRector(pcts: (number | null)[]): {
+  pct: number | null;
+  total: number;
+  /** Los que entran en el promedio: con avance registrado. */
+  evaluables: number;
+  sinDatos: number;
+  noIniciados: number;
+} {
+  const conDato = pcts.filter((p): p is number => p != null);
+  const evaluables = conDato.filter((p) => p > 0);
+  return {
+    pct: evaluables.length === 0
+      ? null
+      : Math.round(evaluables.reduce((s, p) => s + p, 0) / evaluables.length),
+    total: pcts.length,
+    evaluables: evaluables.length,
+    sinDatos: pcts.length - conDato.length,
+    noIniciados: conDato.length - evaluables.length,
+  };
+}
+
+export interface AporteAmbito {
+  codigo: string | null;
+  nombre: string;
+  color: string | null;
+  proyectos: number;
+  evaluables: number;
+  /** El avance propio del ámbito, con la cuenta del Plan Rector. */
+  pct: number | null;
+  /** Los puntos que pone en el avance total. Suman exactamente el total. */
+  aporte: number | null;
+}
+
+/**
+ * Cuánto aporta cada ámbito al avance del Plan Rector — 13.10.
+ *
+ * "Vamos cumpliendo un 80 % y cada ámbito aporta x." El total es el promedio
+ * de los proyectos con avance registrado, así que se parte sin residuo: cada
+ * proyecto pone su avance dividido por la cantidad de proyectos que entran en
+ * la cuenta, y lo de un ámbito es su aporte. Es la misma partición que el
+ * aporte de cada dirección en el informe (`agruparPorArea`), que también reparte
+ * los puntos enteros por mayor resto para que sumen el total.
+ *
+ * Cada proyecto tiene que venir UNA vez. Hoy cada uno está en un solo ámbito
+ * (medido el 14.10: 408 imputados, ninguno en dos); si alguna vez uno cuelga de
+ * dos, quien llama lo pasa con uno solo, o los aportes dejarían de sumar el
+ * total. La pantalla del Plan Rector y el informe ya lo hacen así.
+ */
+export function aportesPorAmbito(
+  proyectos: { pct: number | null; ambito: { codigo: string | null; nombre: string } }[]
+): { total: ReturnType<typeof avancePlanRector>; ambitos: AporteAmbito[] } {
+  const total = avancePlanRector(proyectos.map((p) => p.pct));
+  // Los no iniciados pasan como sin dato: así `agruparPorArea`, que promedia y
+  // reparte sobre los que tienen dato, aplica la regla del Plan Rector.
+  const clave = (a: { codigo: string | null; nombre: string }) =>
+    `${a.codigo ?? "~"}\u0000${a.nombre}`;
+  const grupos = agruparPorArea(
+    proyectos.map((p, i) => ({
+      nombre: String(i),
+      unidad_nombre: clave(p.ambito),
+      pct: p.pct != null && p.pct > 0 ? p.pct : null,
+    })),
+    total.pct
+  );
+  return {
+    total,
+    ambitos: grupos.map((g) => {
+      const [codigo, nombre] = g.nombre.split("\u0000");
+      const cod = codigo === "~" ? null : codigo;
+      return {
+        codigo: cod,
+        nombre,
+        color: colorAmbito(cod),
+        proyectos: g.proyectos.length,
+        evaluables: g.conDatos,
+        pct: g.pct,
+        aporte: g.aporte,
+      };
+    }),
+  };
 }
