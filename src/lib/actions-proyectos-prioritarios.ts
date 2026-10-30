@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getPerfilActual } from "./auth";
 import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
+import { puedeEditarPrioritarios } from "./proyectos-prioritarios";
 import {
   ANIOS_HISTORIAL,
   CAMPOS_PRIORITARIO,
@@ -18,9 +19,8 @@ import {
 /**
  * Proyectos prioritarios del POA 2027 — corrección del 28.10, migración 059.
  *
- * Se editan como las fichas del POA: en la ficha misma, campo por campo. Puede
- * editar el director del área y Planificación, que es lo que deja la base
- * (usuario_puede_cargar_unidad); la RLS repite el control.
+ * Se editan como las fichas del POA: en la ficha misma, campo por campo, y con
+ * los mismos permisos (puedeEditarPrioritarios); la RLS repite el control.
  */
 
 type Resultado = { success: boolean; error?: string };
@@ -34,9 +34,8 @@ function refrescar(id?: string) {
 async function puedeEditar(unidadId: string): Promise<string | null> {
   const perfil = await getPerfilActual();
   if (!perfil) return "No autenticado";
-  const esPlanificacion = perfil.rol === "admin_funcional";
-  if (!esPlanificacion && !(perfil.rol === "director" && perfil.unidad_id === unidadId)) {
-    return "Solo el director del área o Planificación pueden editar sus proyectos prioritarios";
+  if (!(await puedeEditarPrioritarios(perfil, unidadId))) {
+    return "No podés editar los proyectos prioritarios de esta área";
   }
   const sb = await getSupabaseServer();
   const { data } = await sb

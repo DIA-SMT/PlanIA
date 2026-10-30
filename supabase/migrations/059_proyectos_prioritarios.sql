@@ -40,8 +40,9 @@
 --    datos disponibles", que no es cero.
 --
 -- PERMISOS: los mismos que poa_texto y ficha_prisma. Se ve con el alcance de
--- lectura del area y se edita con el de carga (el director de esa area);
--- Planificacion, todo.
+-- lectura del area y se edita con el de carga (director, secretario,
+-- subsecretario o coordinador, sobre su area y las de abajo); Planificacion,
+-- todo.
 --
 -- Formato para el editor SQL de Supabase: sin BEGIN/COMMIT, cada sentencia
 -- fuera del CREATE TABLE en una sola linea. Idempotente.

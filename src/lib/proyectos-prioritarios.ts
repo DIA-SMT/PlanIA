@@ -1,4 +1,6 @@
 import { getSupabaseServer } from "./supabase/server";
+import { getScopeUnidades } from "./auth";
+import type { PerfilUsuario } from "@/types/database";
 import { ANIO_POA } from "./poa-2027";
 import {
   AREAS_CON_PRIORITARIOS,
@@ -50,6 +52,21 @@ export interface AreaConPrioritarios {
   nombre: string;
   codigo: string | null;
   habilitada: boolean;
+}
+
+/**
+ * Quién edita los proyectos prioritarios de un área: lo mismo que la base
+ * (usuario_puede_cargar_unidad, igual que las fichas del POA). Planificación,
+ * todas; director, secretario, subsecretario y coordinador, su área y las que
+ * cuelgan de ella. Antes del 30.10 solo dejaba al director del área, más
+ * cerrado que la base: las secretarías de la lista no podían cargar la suya.
+ */
+const ROLES_CARGA = ["director", "secretario", "subsecretario", "coordinador"];
+
+export async function puedeEditarPrioritarios(perfil: PerfilUsuario, unidadId: string): Promise<boolean> {
+  if (perfil.rol === "admin_funcional") return true;
+  if (!ROLES_CARGA.includes(perfil.rol)) return false;
+  return (await getScopeUnidades(perfil)).includes(unidadId);
 }
 
 export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrioritarios | null> {

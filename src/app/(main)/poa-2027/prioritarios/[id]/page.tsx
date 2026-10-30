@@ -7,6 +7,7 @@ import {
   getEjeDeProyecto,
   getPrioritario,
   getProyectosDelArea,
+  puedeEditarPrioritarios,
 } from "@/lib/proyectos-prioritarios";
 import {
   HORIZONTE_PLAN_RECTOR,
@@ -50,8 +51,7 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
   if (!area) notFound();
 
   const esPlanificacion = perfil.rol === "admin_funcional";
-  const editable =
-    area.habilitada && (esPlanificacion || (perfil.rol === "director" && perfil.unidad_id === area.id));
+  const editable = area.habilitada && (await puedeEditarPrioritarios(perfil, area.id));
 
   const [eje, proyectos] = await Promise.all([
     getEjeDeProyecto(ficha.proyecto_id),
