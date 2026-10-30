@@ -10,6 +10,7 @@
  */
 
 import { agruparPorArea } from "./aporte-por-area";
+import type { ProyeccionPrioritario } from "./proyectos-prioritarios-comun";
 
 export type TipoNodoRector = "area_intervencion" | "eje" | "objetivo" | "linea";
 export type EstadoVinculoRector = "propuesto" | "confirmado" | "rechazado";
@@ -49,6 +50,8 @@ export interface ProyectoImputado {
   orden_area: string;
   pct: number | null;
   estado: "verde" | "amarillo" | "rojo" | "sin_datos";
+  /** 28.10: si tiene ficha de proyecto prioritario, lo que muestra "Ver avance del proyecto". */
+  prioritario?: ProyeccionPrioritario | null;
 }
 
 export interface NodoRectorArbol extends NodoRector {

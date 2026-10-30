@@ -10,6 +10,7 @@ import { TraerTodasBoton } from "@/components/poa2027/traer-todas-boton";
 import { TablaAreasPoa } from "@/components/poa2027/tabla-areas";
 import { DocumentoPoa } from "@/components/poa2027/documento-poa";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
+import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
 
 export const revalidate = 0;
 
@@ -67,6 +68,12 @@ export default async function Poa2027Page() {
     }
   }
 
+  // 28.10: el botón de Proyectos prioritarios, solo para las áreas de la lista.
+  const conPrioritarios =
+    puedeCargar && perfil?.unidad_id
+      ? (await getAreaPrioritarios(perfil.unidad_id))?.habilitada ?? false
+      : false;
+
   const propia = circuito?.propia;
   return (
     <div className="space-y-6 max-w-4xl">
@@ -94,6 +101,14 @@ export default async function Poa2027Page() {
             >
               Descargar Word
             </a>
+            {conPrioritarios && (
+              <Link
+                href="/poa-2027/prioritarios"
+                className="text-sm font-semibold bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
+              >
+                Proyectos prioritarios
+              </Link>
+            )}
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { CampoEditable } from "@/components/poa2027/campo-editable";
 import { TextosDelArea } from "@/components/poa2027/textos-del-area";
 import { TraerDe2026, AceptarFicha } from "@/components/poa2027/propuestas-acciones";
 import { BackButton } from "@/components/layout/back-button";
+import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
 
 export const revalidate = 0;
 
@@ -108,6 +109,8 @@ export default async function EditarMiPoaPage({
   const introducciones = textos.filter((t) => t.tipo === "introduccion");
   const ideas = textos.filter((t) => t.tipo === "idea");
 
+  const conPrioritarios = (await getAreaPrioritarios(unidadId))?.habilitada ?? false;
+
   const propuestas = fichas.filter((f) => f.estado === "propuesta");
   const aceptadas = fichas.filter((f) => f.estado === "aceptada");
 
@@ -164,6 +167,15 @@ export default async function EditarMiPoaPage({
               >
                 Descargar Word de esta área
               </a>
+            )}
+            {/* 28.10: solo las áreas de la lista tienen proyectos prioritarios. */}
+            {conPrioritarios && (
+              <Link
+                href={esPlanificacion ? `/poa-2027/prioritarios?unidad=${unidadId}` : "/poa-2027/prioritarios"}
+                className="text-sm font-semibold bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
+              >
+                Proyectos prioritarios
+              </Link>
             )}
           </div>
 
