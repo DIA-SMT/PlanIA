@@ -6,6 +6,7 @@ import {
   getAreaPrioritarios,
   getPrioritariosDelArea,
   getResumenPrioritarios,
+  puedeEditarPrioritarios,
   getProyectosDelArea,
 } from "@/lib/proyectos-prioritarios";
 import { numeroArg } from "@/lib/proyectos-prioritarios-comun";
@@ -94,7 +95,7 @@ export default async function ProyectosPrioritariosPage({
     );
   }
 
-  const editable = esPlanificacion || (perfil.rol === "director" && perfil.unidad_id === area.id);
+  const editable = await puedeEditarPrioritarios(perfil, area.id);
 
   let fichas: Awaited<ReturnType<typeof getPrioritariosDelArea>> = [];
   let error: string | null = null;
