@@ -112,6 +112,18 @@ export default async function Poa2027Page() {
           </div>
         )}
 
+        {/* 30.10: Planificación no tiene área, así que no le salía el botón de arriba. */}
+        {esPlanificacion && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/poa-2027/prioritarios"
+              className="text-sm font-semibold bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
+            >
+              Proyectos prioritarios
+            </Link>
+          </div>
+        )}
+
         {propia && (
           <div className="rounded-xl border border-border bg-surface p-4">
             <EnviarPoa

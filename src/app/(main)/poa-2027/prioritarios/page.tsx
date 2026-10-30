@@ -5,6 +5,7 @@ import { ANIO_POA } from "@/lib/poa-2027";
 import {
   getAreaPrioritarios,
   getPrioritariosDelArea,
+  getResumenPrioritarios,
   getProyectosDelArea,
 } from "@/lib/proyectos-prioritarios";
 import { numeroArg } from "@/lib/proyectos-prioritarios-comun";
@@ -37,8 +38,48 @@ export default async function ProyectosPrioritariosPage({
   let unidadId = esPlanificacion ? params.unidad ?? null : perfil.unidad_id;
   if (esPlanificacion && unidadId && !(await getScopeUnidades(perfil)).includes(unidadId)) unidadId = null;
 
+  // 30.10: Planificación no tiene área, así que sin una elegida no veía nada
+  // ("no puedo ver los prioritarios desde nuestro usuario"). Ve las 16 áreas
+  // juntas, con cuántas fichas cargó cada una, y entra a la que quiera.
+  if (esPlanificacion && !unidadId) {
+    const areas = await getResumenPrioritarios();
+    const total = areas.reduce((s, a) => s + a.fichas, 0);
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <BackButton fallback="/poa-2027" />
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Proyectos prioritarios · POA {ANIO_POA}</h1>
+          <p className="text-sm text-muted mt-1">
+            Las {areas.length} áreas con proyectos prioritarios.{" "}
+            {total === 0
+              ? "Todavía ninguna cargó una ficha."
+              : `Hay ${total} ${total === 1 ? "ficha cargada" : "fichas cargadas"}.`}{" "}
+            Entrá a un área para ver sus fichas o generar una.
+          </p>
+        </div>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {areas.map((a) => (
+            <li key={a.id}>
+              <Link
+                href={`/poa-2027/prioritarios?unidad=${a.id}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 hover:bg-surface-hover"
+              >
+                <span className="text-sm text-foreground">{a.nombre}</span>
+                <span
+                  className={`text-[11px] shrink-0 tabular-nums ${a.fichas ? "font-semibold text-primary" : "text-muted/60"}`}
+                >
+                  {a.fichas ? `${a.fichas} ${a.fichas === 1 ? "ficha" : "fichas"}` : "sin fichas"}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   const area = unidadId ? await getAreaPrioritarios(unidadId) : null;
-  const volver = esPlanificacion && unidadId ? `/poa-2027/mis-fichas?unidad=${unidadId}` : "/poa-2027/mis-fichas";
+  const volver = esPlanificacion ? "/poa-2027/prioritarios" : "/poa-2027/mis-fichas";
 
   if (!area || !area.habilitada) {
     return (

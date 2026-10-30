@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
 import {
+  AREAS_CON_PRIORITARIOS,
   proyeccionPrioritario,
   tienePrioritarios,
   type FilaHistorial,
@@ -61,6 +62,28 @@ export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrio
   if (!data) return null;
   const u = data as { id: string; nombre: string; codigo: string | null };
   return { ...u, habilitada: tienePrioritarios(u.codigo) };
+}
+
+/**
+ * Para Planificación, que no tiene área: las 16 áreas con proyectos
+ * prioritarios y cuántas fichas cargó cada una, en el orden de la lista.
+ */
+export async function getResumenPrioritarios(): Promise<
+  { id: string; nombre: string; codigo: string; fichas: number }[]
+> {
+  const sb = await getSupabaseServer();
+  const codigos = Object.keys(AREAS_CON_PRIORITARIOS);
+  const [{ data: unidades }, { data: fichas }] = await Promise.all([
+    sb.from("unidad_organizacional").select("id, nombre, codigo").in("codigo", codigos).eq("activa", true),
+    sb.from("proyecto_prioritario").select("unidad_id").eq("anio", ANIO_POA).is("deleted_at", null),
+  ]);
+  const porUnidad = new Map<string, number>();
+  for (const f of (fichas ?? []) as { unidad_id: string }[]) {
+    porUnidad.set(f.unidad_id, (porUnidad.get(f.unidad_id) ?? 0) + 1);
+  }
+  return ((unidades ?? []) as { id: string; nombre: string; codigo: string }[])
+    .map((u) => ({ ...u, fichas: porUnidad.get(u.id) ?? 0 }))
+    .sort((a, b) => codigos.indexOf(a.codigo) - codigos.indexOf(b.codigo));
 }
 
 export async function getPrioritariosDelArea(unidadId: string): Promise<ProyectoPrioritario[]> {
