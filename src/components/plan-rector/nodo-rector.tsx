@@ -7,6 +7,7 @@ import {
   type NodoRectorArbol,
   type ProyectoImputado,
 } from "@/lib/plan-rector-comun";
+import { AvancePrioritario } from "./avance-prioritario";
 
 /**
  * Un nodo del árbol del Plan Rector, desplegable.
@@ -290,36 +291,60 @@ function ProyectosDelNodo({ proyectos }: { proyectos: ProyectoImputado[] }) {
   return (
     <ul className="pl-9 pr-3 pb-2 space-y-1">
       {proyectos.map((p) => (
-        <li key={p.id} className="flex items-center gap-2 text-xs">
-          <span
-            className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-              p.estado === "verde"
-                ? "bg-success"
-                : p.estado === "amarillo"
-                ? "bg-warning"
-                : p.estado === "rojo"
-                ? "bg-info"
-                : "bg-muted/40"
-            }`}
-          />
-          <Link
-            href={`/proyectos/${p.id}`}
-            className="flex-1 min-w-0 line-clamp-1 text-foreground/90 hover:text-primary"
-            title={p.nombre}
-          >
-            {p.nombre}
-          </Link>
-          {p.unidad_nombre && (
-            <span className="text-[10px] text-muted/70 shrink-0 hidden sm:inline">
-              {p.unidad_nombre}
-            </span>
-          )}
-          <span className="text-[10px] text-muted shrink-0 w-10 text-right tabular-nums">
-            {p.pct != null ? `${p.pct}%` : "—"}
-          </span>
-        </li>
+        <ProyectoDelNodo key={p.id} p={p} />
       ))}
     </ul>
+  );
+}
+
+/**
+ * 28.10: "junto a cada proyecto incorporar una opción «Ver avance del
+ * proyecto»". Se calcula con la ficha de proyecto prioritario, así que solo la
+ * tienen los proyectos que la tienen; el resto sigue como estaba.
+ */
+function ProyectoDelNodo({ p }: { p: ProyectoImputado }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <li>
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+            p.estado === "verde"
+              ? "bg-success"
+              : p.estado === "amarillo"
+              ? "bg-warning"
+              : p.estado === "rojo"
+              ? "bg-info"
+              : "bg-muted/40"
+          }`}
+        />
+        <Link
+          href={`/proyectos/${p.id}`}
+          className="flex-1 min-w-0 line-clamp-1 text-foreground/90 hover:text-primary"
+          title={p.nombre}
+        >
+          {p.nombre}
+        </Link>
+        {p.unidad_nombre && (
+          <span className="text-[10px] text-muted/70 shrink-0 hidden sm:inline">
+            {p.unidad_nombre}
+          </span>
+        )}
+        {p.prioritario && (
+          <button
+            onClick={() => setAbierto((v) => !v)}
+            aria-expanded={abierto}
+            className="text-[10px] font-semibold text-primary border border-primary/30 rounded px-1.5 py-0.5 hover:bg-primary/10 shrink-0"
+          >
+            {abierto ? "Ocultar avance" : "Ver avance del proyecto"}
+          </button>
+        )}
+        <span className="text-[10px] text-muted shrink-0 w-10 text-right tabular-nums">
+          {p.pct != null ? `${p.pct}%` : "—"}
+        </span>
+      </div>
+      {abierto && p.prioritario && <AvancePrioritario p={p.prioritario} />}
+    </li>
   );
 }
 

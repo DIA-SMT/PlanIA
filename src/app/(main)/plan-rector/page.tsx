@@ -1,6 +1,7 @@
 import { getPeriodoActivo } from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
 import { getPlanRectorArbol, getCoberturaPlanRector } from "@/lib/plan-rector";
+import { getProyeccionesPorProyecto } from "@/lib/proyectos-prioritarios";
 import { aportesPorAmbito, type NodoRectorArbol, type ProyectoImputado } from "@/lib/plan-rector-comun";
 import { NodoRector } from "@/components/plan-rector/nodo-rector";
 import { TortaAportes } from "@/components/plan-rector/torta-aportes";
@@ -50,10 +51,21 @@ export default async function PlanRectorPage() {
   }
 
   const periodo = await getPeriodoActivo();
-  const [{ arbol, totalNodos }, cobertura] = await Promise.all([
+  const [{ arbol: arbolBase, totalNodos }, cobertura, proyecciones] = await Promise.all([
     getPlanRectorArbol(),
     getCoberturaPlanRector(periodo.id),
+    getProyeccionesPorProyecto(),
   ]);
+
+  // 28.10: "Ver avance del proyecto" en los que tienen ficha de proyecto
+  // prioritario. Se copia el árbol en vez de tocarlo: getPlanRectorArbol está
+  // cacheado y lo pueden estar usando en otro lado del mismo request.
+  const conProyeccion = (n: NodoRectorArbol): NodoRectorArbol => ({
+    ...n,
+    proyectos: n.proyectos.map((p) => ({ ...p, prioritario: proyecciones.get(p.id) ?? null })),
+    hijos: n.hijos.map(conProyeccion),
+  });
+  const arbol = proyecciones.size > 0 ? arbolBase.map(conProyeccion) : arbolBase;
 
   if (totalNodos === 0) {
     return (
