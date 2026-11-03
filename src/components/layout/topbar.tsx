@@ -17,6 +17,7 @@ type NavItem = { href: string; label: string; icon: string; roles?: RolUsuario[]
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
+  { href: "/prioritarios", label: "Prioritarios", icon: "★" },
   { href: "/reportes", label: "Reportes", icon: "▢" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   {

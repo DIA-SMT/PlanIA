@@ -65,15 +65,21 @@ export interface ProyectoPrioritario {
   historial: FilaHistorial[];
   meta_anual: number | null;
   indicador: string | null;
-  medio_verificacion: string | null;
   enlace_territorial: string | null;
   presupuesto_area: number | null;
   presupuesto_proyecto: number | null;
   periodicidad: string | null;
+  /** 30.10 (060): va en Seguimiento y evolución. */
+  justificacion_tecnica: string | null;
   updated_at: string;
 }
 
-/** Los campos que se editan uno por uno desde la ficha, y de qué tipo son. */
+/**
+ * Los campos que se editan uno por uno desde la ficha, y de qué tipo son.
+ *
+ * 30.10: "eliminar medio de verificación". Sale de la ficha y de esta lista;
+ * la columna queda en la base con lo que se haya cargado.
+ */
 export const CAMPOS_PRIORITARIO = {
   nombre: "texto",
   proyecto_id: "proyecto",
@@ -85,11 +91,11 @@ export const CAMPOS_PRIORITARIO = {
   linea_base_fuente: "texto",
   meta_anual: "numero",
   indicador: "texto",
-  medio_verificacion: "texto",
   enlace_territorial: "enlace",
   presupuesto_area: "numero",
   presupuesto_proyecto: "numero",
   periodicidad: "periodicidad",
+  justificacion_tecnica: "texto",
 } as const;
 
 export type CampoPrioritario = keyof typeof CAMPOS_PRIORITARIO;
@@ -189,8 +195,18 @@ export function numeroArg(n: number | null | undefined): string {
   return n.toLocaleString("es-AR", { maximumFractionDigits: 2 });
 }
 
-/** Lee un número escrito a mano. Acepta "3.000", "3000", "1.250,5" y "$ 12.000". */
+/**
+ * Lee un número escrito a mano. Acepta "3.000", "3000", "1.250,5" y "$ 12.000".
+ *
+ * 30.10: "debería poder no completarse las líneas de base porque no en todos
+ * los casos tenemos esa info". Vacío ya se podía; lo que trababa era escribir
+ * "-" para decir que no hay dato, que daba error. Un guion, "s/d" o "sin
+ * datos" cuentan como vacío.
+ */
+const SIN_DATO = /^(-+|—|–|s\/d|sd|sin\s*datos?|n\/a|no)$/i;
+
 export function leerNumero(texto: string): number | null | "invalido" {
+  if (SIN_DATO.test(texto.trim())) return null;
   const limpio = texto.replace(/[$\s]/g, "");
   if (!limpio) return null;
   // Con coma: la coma es el decimal y los puntos, miles. Sin coma, los puntos

@@ -25,6 +25,7 @@ import {
   type AvanceNivel,
 } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
+import { getProyectosPrioritariosIds } from "@/lib/proyectos-prioritarios";
 import type { Meta } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
@@ -50,9 +51,11 @@ export default async function DashboardPage({ searchParams }: Props) {
     getUnidades(),
     getPerfilActual(),
   ]);
-  const [resumen, indicadores] = await Promise.all([
+  const [resumen, indicadores, prioritarios] = await Promise.all([
     getResumenDashboard(periodo.id),
     getIndicadoresAvance(periodo.id),
+    // 30.10: los proyectos prioritarios se marcan y se cuentan, no se miden aparte.
+    getProyectosPrioritariosIds(),
   ]);
 
   // Quien ve todo puede elegir el ámbito libremente. El resto (secretario/
@@ -145,6 +148,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   // Distribución del ámbito completo (tarjeta "Grado de avance")
   const distribucionProyectos = distribucion(proyectosActivos);
+  // 30.10: cuántos de cada estado son prioritarios.
+  const distribucionPrioritarios = distribucion(proyectosActivos.filter((p) => prioritarios.has(p.id)));
+  const anioPoa = periodo.anio ?? new Date(periodo.fecha_inicio).getUTCFullYear();
 
   // Filtro por estado (semáforo). El ámbito ya está aplicado en proyectosActivos.
   let proyectosFiltrados = proyectosActivos;
@@ -280,6 +286,14 @@ export default async function DashboardPage({ searchParams }: Props) {
           {!tieneSeguimiento && (
             <p className="text-sm text-muted/70 text-center">Aguardando primer reporte</p>
           )}
+          {/* 30.10: "una frase que diga: el cumplimiento de la POA contempla el
+              avance de las POA y los Proyectos Prioritarios de la misma". El año
+              es el del período del Panel: los prioritarios cuentan por el
+              proyecto del POA al que están vinculados. */}
+          <p className="text-xs text-muted text-center mt-2">
+            El cumplimiento de la POA contempla el avance de los proyectos de la POA {anioPoa} y de
+            los Proyectos Prioritarios de la misma.
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -345,7 +359,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <p className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
           Estado de los proyectos
         </p>
-        <EstadoProyectos distribucion={distribucionProyectos} />
+        <EstadoProyectos distribucion={distribucionProyectos} prioritarios={distribucionPrioritarios} />
       </div>
 
       {/* Aviso: proyectos sin datos */}
@@ -381,7 +395,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {proyectosFiltrados.map((py) => {
               const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-              return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} />;
+              return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} prioritario={prioritarios.has(py.id)} />;
             })}
           </div>
         ) : (
@@ -406,11 +420,20 @@ export default async function DashboardPage({ searchParams }: Props) {
                       {nombreSec}
                     </h3>
                     <span className="text-xs text-muted">— {pysSec.length} proyectos</span>
+                    {/* 30.10: "a la par de donde dice 242 proyectos (10 son prioritarios)". */}
+                    {(() => {
+                      const n = pysSec.filter((p) => prioritarios.has(p.id)).length;
+                      return n > 0 ? (
+                        <span className="text-xs text-primary">
+                          ({n} {n === 1 ? "es prioritario" : "son prioritarios"})
+                        </span>
+                      ) : null;
+                    })()}
                   </Link>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     {pysSec.slice(0, 9).map((py) => {
                       const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-                      return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} />;
+                      return <ProyectoCard key={py.id} proyecto={py} metas={metas} avance={avanceCard(py.id)} prioritario={prioritarios.has(py.id)} />;
                     })}
                   </div>
                   {pysSec.length > 9 && (

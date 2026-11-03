@@ -27,8 +27,8 @@ export function AvancePrioritario({ p }: { p: ProyeccionPrioritario }) {
     return (
       <Marco p={p}>
         <p className="text-xs text-muted">
-          Falta la línea de base pendiente en la ficha del proyecto prioritario: es el objetivo al{" "}
-          {HORIZONTE_PLAN_RECTOR} y sin ella no hay nada que proyectar.
+          La ficha del proyecto prioritario no tiene línea de base pendiente, que es el objetivo al{" "}
+          {HORIZONTE_PLAN_RECTOR}: sin ese dato no se puede proyectar el avance.
         </p>
       </Marco>
     );
