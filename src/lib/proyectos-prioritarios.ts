@@ -20,7 +20,7 @@ import {
  */
 
 const COLUMNAS =
-  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_anio, linea_base_fuente, historial, meta_anual, indicador, medio_verificacion, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, updated_at";
+  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_anio, linea_base_fuente, historial, meta_anual, indicador, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, justificacion_tecnica, updated_at";
 
 /** PostgREST devuelve numeric como texto cuando no entra en un double: se pasa a número igual. */
 function aNumero(v: unknown): number | null {
@@ -151,6 +151,49 @@ export async function getProyeccionesPorProyecto(): Promise<Map<string, Proyecci
     }
   }
   return porProyecto;
+}
+
+/**
+ * 30.10: qué proyectos del POA son prioritarios, para marcarlos en el Panel
+ * Ejecutivo. Es prioritario el proyecto al que está vinculada una ficha de
+ * proyecto prioritario. Sin la migración 059, vacío.
+ */
+export async function getProyectosPrioritariosIds(): Promise<Set<string>> {
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb
+    .from("proyecto_prioritario")
+    .select("proyecto_id")
+    .eq("anio", ANIO_POA)
+    .not("proyecto_id", "is", null)
+    .is("deleted_at", null);
+  if (error) return new Set();
+  return new Set(((data ?? []) as { proyecto_id: string }[]).map((f) => f.proyecto_id));
+}
+
+/** 30.10: todas las fichas que el usuario puede ver (la RLS acota), con su área. */
+export async function getTodosLosPrioritarios(): Promise<
+  (ProyectoPrioritario & { unidad_nombre: string })[]
+> {
+  const sb = await getSupabaseServer();
+  const [{ data, error }, { data: unidades }] = await Promise.all([
+    sb
+      .from("proyecto_prioritario")
+      .select(COLUMNAS)
+      .eq("anio", ANIO_POA)
+      .is("deleted_at", null)
+      .order("created_at"),
+    sb.from("unidad_organizacional").select("id, nombre, nombre_corto"),
+  ]);
+  if (error) throw error;
+  const nombre = new Map(
+    ((unidades ?? []) as { id: string; nombre: string; nombre_corto: string | null }[]).map((u) => [
+      u.id,
+      u.nombre_corto ?? u.nombre,
+    ])
+  );
+  return ((data ?? []) as Record<string, unknown>[])
+    .map(normalizar)
+    .map((f) => ({ ...f, unidad_nombre: nombre.get(f.unidad_id) ?? "—" }));
 }
 
 /** Los proyectos del POA vigente (2026) del área, para elegir a cuál corresponde la ficha. */

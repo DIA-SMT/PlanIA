@@ -20,9 +20,11 @@ interface ProyectoCardProps {
    * cálculo viven en un solo lugar y los componentes solo muestran.
    */
   avance: { porcentaje: number | null; estado: EstadoSemaforo; tieneSeguimiento: boolean };
+  /** 30.10: "poner si son o no prioritarios con un marcador". */
+  prioritario?: boolean;
 }
 
-export function ProyectoCard({ proyecto, metas, avance }: ProyectoCardProps) {
+export function ProyectoCard({ proyecto, metas, avance, prioritario = false }: ProyectoCardProps) {
   const { porcentaje, estado, tieneSeguimiento } = avance;
 
   const ultimaAct = metas
@@ -45,6 +47,14 @@ export function ProyectoCard({ proyecto, metas, avance }: ProyectoCardProps) {
               </span>
             )}
             <StatusBadge estado={estado} />
+            {prioritario && (
+              <span
+                className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/30 rounded px-1.5 py-0.5"
+                title="Proyecto prioritario 2027"
+              >
+                ★ Prioritario
+              </span>
+            )}
           </div>
           <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
             {proyecto.nombre}

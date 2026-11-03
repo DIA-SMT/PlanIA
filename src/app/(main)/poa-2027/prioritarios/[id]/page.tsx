@@ -33,6 +33,9 @@ export const revalidate = 0;
  * y seguimiento". El modelo pasaba del punto 5 al 9 ("revisar que los puntos
  * estén bien enumerados"): Seguimiento y evolución queda como 6.
  *
+ * 30.10: sin medio de verificación, líneas de base opcionales y con su
+ * explicación, y justificación técnica en Seguimiento y evolución.
+ *
  * Lo que el modelo marca como automático (área, prioridad, eje, horizonte) no
  * se edita: el eje sale del proyecto del POA 2026 que se elige en la ficha.
  *
@@ -140,15 +143,30 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
           {campo("unidad_medida", ficha.unidad_medida, { placeholder: "Ej.: calles, luminarias, árboles" })}
         </Dato>
         <Par>
-          <Dato rotulo="Línea de base · Total relevado">
-            {campo("linea_base_total", ficha.linea_base_total, { mostrar: conUnidad(ficha.linea_base_total) })}
+          {/* 30.10: los rótulos y su explicación, con las palabras del pedido. */}
+          <Dato
+            rotulo="Línea de base - relevado"
+            ayuda="Cantidad total registrada del indicador. Por ej.: 3.000 unidades relevadas."
+          >
+            {campo("linea_base_total", ficha.linea_base_total, {
+              mostrar: conUnidad(ficha.linea_base_total),
+              placeholder: "Opcional",
+            })}
           </Dato>
-          <Dato rotulo="Línea de base · Pendiente">
+          <Dato
+            rotulo="Línea de base - pendiente"
+            ayuda="Cantidad total que falta para llegar a lo relevado. Por ej.: 800 unidades."
+          >
             {campo("linea_base_pendiente", ficha.linea_base_pendiente, {
               mostrar: conUnidad(ficha.linea_base_pendiente),
+              placeholder: "Opcional",
             })}
           </Dato>
         </Par>
+        <Nota>
+          Las líneas de base son opcionales: si no hay ese dato, se dejan vacías. Sin la línea de
+          base pendiente, el Plan Rector no puede proyectar el avance del proyecto.
+        </Nota>
         <Par>
           <Dato rotulo="Año de referencia">{campo("linea_base_anio", ficha.linea_base_anio, { placeholder: "Ej.: 2024" })}</Dato>
           <Dato rotulo="Fuente">{campo("linea_base_fuente", ficha.linea_base_fuente, { placeholder: "Ej.: Portal de Datos" })}</Dato>
@@ -197,9 +215,6 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
             {campo("indicador", ficha.indicador, {
               placeholder: `Ej.: cantidad de calles pavimentadas durante ${ANIO_POA}`,
             })}
-          </Dato>
-          <Dato rotulo="Medio de verificación">
-            {campo("medio_verificacion", ficha.medio_verificacion, { largo: true })}
           </Dato>
         </div>
         <div className="flex items-start gap-4 rounded-lg bg-background/50 p-3">
@@ -265,6 +280,9 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
             vacio="Completar por el director"
           />
         </Dato>
+        <Dato rotulo="Justificación técnica">
+          {campo("justificacion_tecnica", ficha.justificacion_tecnica, { largo: true })}
+        </Dato>
       </Seccion>
     </div>
   );
@@ -298,10 +316,11 @@ function Par({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>;
 }
 
-function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function Dato({ rotulo, ayuda, children }: { rotulo: string; ayuda?: string; children: React.ReactNode }) {
   return (
     <div>
       <p className="text-[11px] text-muted uppercase tracking-wider">{rotulo}</p>
+      {ayuda && <p className="text-[11px] text-muted/80">{ayuda}</p>}
       <div className="text-sm text-foreground/90 mt-0.5">{children}</div>
     </div>
   );

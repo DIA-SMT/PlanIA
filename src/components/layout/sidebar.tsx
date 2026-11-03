@@ -26,6 +26,10 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel Ejecutivo", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
+  // 30.10: "generar una vista única de los proyectos prioritarios abajo de la
+  // opción proyectos". Va en /prioritarios y no en /proyectos/prioritarios: el
+  // menú marca activo por prefijo y se encenderían los dos.
+  { href: "/prioritarios", label: "Proyectos prioritarios", icon: "★" },
   // 15.09, párrafo 797: "eliminar la herramienta AVANCE POR DIRECCIÓN del
   // tablero de los usuarios de los directores. Esa herramienta solamente debe
   // visualizarse para los usuarios Subsecretarios, Secretarios e Intendente."

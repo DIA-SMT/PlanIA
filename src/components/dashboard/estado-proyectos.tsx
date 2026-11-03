@@ -52,7 +52,17 @@ const CATEGORIAS = [
   },
 ] as const;
 
-export function EstadoProyectos({ distribucion }: { distribucion: DistribucionEstados }) {
+export function EstadoProyectos({
+  distribucion,
+  prioritarios,
+}: {
+  distribucion: DistribucionEstados;
+  /**
+   * 30.10: "en estado de los proyectos yo agregaría en cada cuadrado cuántos
+   * prioritarios incluyen". Sin esto, la tarjeta no dice nada de prioritarios.
+   */
+  prioritarios?: DistribucionEstados;
+}) {
   const total = totalDistribucion(distribucion);
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
@@ -82,6 +92,11 @@ export function EstadoProyectos({ distribucion }: { distribucion: DistribucionEs
                 {cantidad}
               </p>
               <p className={`text-sm font-semibold mt-1 ${c.texto}`}>{porcentaje}%</p>
+              {prioritarios && (
+                <p className="text-[11px] text-primary mt-1">
+                  ★ {prioritarios[c.key] === 1 ? "incluye 1 prioritario" : `incluye ${prioritarios[c.key]} prioritarios`}
+                </p>
+              )}
             </div>
 
             <div className="h-1.5 rounded-full bg-border/50 overflow-hidden">
