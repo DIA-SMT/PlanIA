@@ -141,6 +141,8 @@ export async function getPoaDelArea(unidadId: string): Promise<{
   recibidas: AreaDelPoa[];
   /** A quién le manda esta área su POA. null si es una secretaría. */
   destino: { id: string; nombre: string } | null;
+  /** 03.11: todas las áreas que cuelgan de esta, para entrar a cargar su POA. */
+  areasDeAbajo: { id: string; nombre: string }[];
 }> {
   const sb = await getSupabaseServer();
 
@@ -151,7 +153,7 @@ export async function getPoaDelArea(unidadId: string): Promise<{
   const unidades = (unidadesData ?? []) as any[];
   const porId = new Map(unidades.map((u) => [u.id, u]));
   const propia = porId.get(unidadId);
-  if (!propia) return { propia: null, recibidas: [], destino: null };
+  if (!propia) return { propia: null, recibidas: [], destino: null, areasDeAbajo: [] };
 
   const abajo = descendientes(unidades, unidadId);
   const ids = [unidadId, ...abajo.map((u) => u.id)];
@@ -224,6 +226,9 @@ export async function getPoaDelArea(unidadId: string): Promise<{
       .filter((a) => a.fichas.length > 0 || a.introducciones.length > 0 || a.ideas.length > 0 || a.enviado)
       .sort((a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, "es")),
     destino: padre ? { id: padre.id, nombre: nombreDe(padre) } : null,
+    areasDeAbajo: [...abajo]
+      .sort((a, b) => a.nivel - b.nivel || nombreDe(a).localeCompare(nombreDe(b), "es"))
+      .map((u) => ({ id: u.id, nombre: nombreDe(u) })),
   };
 }
 
@@ -304,8 +309,8 @@ export interface ResumenAreaPoa {
  * al entrar al POA 2027, que hasta hoy le mostraba "tu perfil no tiene un área
  * asignada" y le pedía que le escribiera a Planificación Estratégica.
  *
- * Solo cuenta; no trae el texto de las fichas. Las áreas sin un solo proyecto
- * del 2026 y sin fichas no aparecen: no tienen nada que mostrar.
+ * Solo cuenta; no trae el texto de las fichas. Desde el 03.11 aparecen también
+ * las áreas sin proyectos del 2026 ni fichas (ver abajo).
  */
 export async function getResumenPoaParaPlanificacion(): Promise<{
   areas: ResumenAreaPoa[];
@@ -334,12 +339,12 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
       .select("unidad_id, estado, proyecto_origen_id")
       .eq("anio", ANIO_POA)
       .is("deleted_at", null),
-    sb.from("unidad_organizacional").select("id, nombre, nombre_corto, nivel, parent_id"),
+    sb.from("unidad_organizacional").select("id, nombre, nombre_corto, nivel, parent_id, activa"),
   ]);
   if (eF) throw eF;
   if (eU) throw eU;
 
-  type U = { id: string; nombre: string; nombre_corto: string | null; nivel: number; parent_id: string | null };
+  type U = { id: string; nombre: string; nombre_corto: string | null; nivel: number; parent_id: string | null; activa: boolean };
   const lasUnidades = (unidades ?? []) as U[];
   const nombre = new Map(lasUnidades.map((u) => [u.id, u.nombre_corto ?? u.nombre]));
   const porId = new Map(lasUnidades.map((u) => [u.id, u]));
@@ -376,6 +381,12 @@ export async function getResumenPoaParaPlanificacion(): Promise<{
     if (f.estado === "aceptada") a.aceptadas++;
     else a.propuestas++;
   }
+  // 03.11: "esta secretaría no aparece ni en las herramientas de POA 2027,
+  // debe incorporarse". Obras Públicas no tiene proyectos del 2026 ni fichas,
+  // así que no salía. Ahora entran todas las secretarías, subsecretarías y
+  // direcciones activas, aunque estén vacías: un área nueva arma su POA 2027
+  // cargando proyectos de cero.
+  for (const u of lasUnidades) if (u.activa && u.nivel <= 2) de(u.id);
 
   // Primero las que tienen algo pendiente, de más a menos; después el resto.
   const areas = [...porArea.values()].sort(

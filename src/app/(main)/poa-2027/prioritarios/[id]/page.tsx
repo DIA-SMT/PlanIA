@@ -18,11 +18,20 @@ import {
 } from "@/lib/proyectos-prioritarios-comun";
 import {
   BorrarPrioritario,
+  BotonAccion,
   CampoPrioritario,
   CeldaHistorial,
   SelectorPrioritario,
 } from "@/components/poa2027/prioritarios-acciones";
 import { BackButton } from "@/components/layout/back-button";
+import {
+  agregarIndicadorPrioritario,
+  agregarMetaPrioritario,
+  borrarIndicadorPrioritario,
+  borrarMetaPrioritario,
+  editarIndicadorPrioritario,
+  editarMetaPrioritario,
+} from "@/lib/actions-proyectos-prioritarios";
 
 export const revalidate = 0;
 
@@ -53,7 +62,6 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
   const area = await getAreaPrioritarios(ficha.unidad_id);
   if (!area) notFound();
 
-  const esPlanificacion = perfil.rol === "admin_funcional";
   const editable = area.habilitada && (await puedeEditarPrioritarios(perfil, area.id));
 
   const [eje, proyectos] = await Promise.all([
@@ -70,7 +78,7 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
   const conUnidad = (n: number | null) => (n === null ? "" : `${numeroArg(n)}${unidad ? ` ${unidad}` : ""}`);
   const pesos = (n: number | null) => (n === null ? "" : `$${numeroArg(n)}`);
   const historial = historialConAcumulado(ficha.historial);
-  const volver = esPlanificacion ? `/poa-2027/prioritarios?unidad=${area.id}` : "/poa-2027/prioritarios";
+  const volver = `/poa-2027/prioritarios?unidad=${area.id}`;
 
   const campo = (
     nombre: string,
@@ -203,20 +211,95 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
       </Seccion>
 
       <Seccion numero={4} titulo={`Meta anual POA ${ANIO_POA}`} quien="Director">
-        <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 space-y-2">
-          <p className="text-[11px] text-primary uppercase tracking-wider">Meta comprometida para el año</p>
-          <p className="text-3xl font-bold text-foreground">
-            {campo("meta_anual", ficha.meta_anual, {
-              mostrar: conUnidad(ficha.meta_anual),
-              placeholder: "Completar la meta",
-            })}
-          </p>
-          <Dato rotulo="Indicador">
-            {campo("indicador", ficha.indicador, {
-              placeholder: `Ej.: cantidad de calles pavimentadas durante ${ANIO_POA}`,
-            })}
-          </Dato>
-        </div>
+        {/* 04.11: "se debe poder cargar más de un indicador x meta y más de una
+            meta x proyecto". La primera es la que proyecta el Plan Rector. */}
+        {ficha.metas.length === 0 && (
+          <p className="text-xs text-muted italic">Todavía no hay metas cargadas.</p>
+        )}
+        {ficha.metas.map((m, i) => (
+          <div key={m.id} className="rounded-lg border border-primary/40 bg-primary/5 p-4 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] text-primary uppercase tracking-wider">
+                {ficha.metas.length > 1 ? `Meta ${i + 1} · ` : ""}Meta comprometida para el año
+              </p>
+              {editable && (
+                <BotonAccion
+                  accion={borrarMetaPrioritario.bind(null, ficha.id, m.id)}
+                  texto="Borrar meta"
+                  confirmar="¿Borrar esta meta y sus indicadores?"
+                  peligro
+                />
+              )}
+            </div>
+            <p className="text-3xl font-bold text-foreground">
+              <CampoPrioritario
+                id={ficha.id}
+                campo="valor"
+                valor={m.valor === null ? "" : String(m.valor)}
+                mostrar={conUnidad(m.valor)}
+                placeholder="Completar la meta"
+                editable={editable}
+                accion={editarMetaPrioritario.bind(null, ficha.id, m.id, "valor")}
+              />
+            </p>
+            <Dato rotulo="Descripción de la meta">
+              <CampoPrioritario
+                id={ficha.id}
+                campo="descripcion"
+                valor={m.descripcion ?? ""}
+                placeholder="Opcional"
+                largo
+                editable={editable}
+                accion={editarMetaPrioritario.bind(null, ficha.id, m.id, "descripcion")}
+              />
+            </Dato>
+            <div>
+              <p className="text-[11px] text-muted uppercase tracking-wider">
+                {m.indicadores.length > 1 ? "Indicadores" : "Indicador"}
+              </p>
+              <ul className="space-y-1 mt-0.5">
+                {m.indicadores.map((ind) => (
+                  <li key={ind.id} className="flex items-start gap-2 text-sm text-foreground/90">
+                    <span className="text-muted/60 mt-0.5">•</span>
+                    <span className="flex-1 min-w-0">
+                      <CampoPrioritario
+                        id={ficha.id}
+                        campo="indicador"
+                        valor={ind.texto}
+                        placeholder={`Ej.: cantidad de calles pavimentadas durante ${ANIO_POA}`}
+                        editable={editable}
+                        accion={editarIndicadorPrioritario.bind(null, ficha.id, m.id, ind.id)}
+                      />
+                    </span>
+                    {editable && (
+                      <BotonAccion
+                        accion={borrarIndicadorPrioritario.bind(null, ficha.id, m.id, ind.id)}
+                        texto="✕"
+                        peligro
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {editable && (
+                <div className="mt-1.5">
+                  <BotonAccion
+                    accion={agregarIndicadorPrioritario.bind(null, ficha.id, m.id)}
+                    texto="+ Agregar indicador"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {editable && (
+          <div>
+            <BotonAccion accion={agregarMetaPrioritario.bind(null, ficha.id)} texto="+ Agregar otra meta" />
+          </div>
+        )}
+        {ficha.metas.length > 1 && (
+          <Nota>La primera meta es la que usa el Plan Rector para proyectar el avance del proyecto.</Nota>
+        )}
         <div className="flex items-start gap-4 rounded-lg bg-background/50 p-3">
           <div className="flex-1 min-w-0 space-y-1">
             <p className="text-[11px] text-muted uppercase tracking-wider">Detalle territorial de la meta</p>

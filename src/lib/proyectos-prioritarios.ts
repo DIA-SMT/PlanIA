@@ -1,9 +1,10 @@
 import { getSupabaseServer } from "./supabase/server";
-import { getScopeUnidades } from "./auth";
+import { getScopeUnidades, puedeCargarArea } from "./auth";
 import type { PerfilUsuario } from "@/types/database";
 import { ANIO_POA } from "./poa-2027";
 import {
   AREAS_CON_PRIORITARIOS,
+  leerMetas,
   proyeccionPrioritario,
   tienePrioritarios,
   type FilaHistorial,
@@ -20,7 +21,7 @@ import {
  */
 
 const COLUMNAS =
-  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_anio, linea_base_fuente, historial, meta_anual, indicador, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, justificacion_tecnica, updated_at";
+  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_anio, linea_base_fuente, historial, metas, meta_anual, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, justificacion_tecnica, updated_at";
 
 /** PostgREST devuelve numeric como texto cuando no entra en un double: se pasa a número igual. */
 function aNumero(v: unknown): number | null {
@@ -30,6 +31,7 @@ function aNumero(v: unknown): number | null {
 }
 
 function normalizar(fila: Record<string, unknown>): ProyectoPrioritario {
+  const metas = leerMetas(fila.metas);
   const historial = Array.isArray(fila.historial)
     ? (fila.historial as { anio: unknown; valor: unknown }[]).map(
         (h): FilaHistorial => ({ anio: Number(h.anio), valor: aNumero(h.valor) })
@@ -41,7 +43,9 @@ function normalizar(fila: Record<string, unknown>): ProyectoPrioritario {
     linea_base_total: aNumero(fila.linea_base_total),
     linea_base_pendiente: aNumero(fila.linea_base_pendiente),
     linea_base_anio: aNumero(fila.linea_base_anio),
-    meta_anual: aNumero(fila.meta_anual),
+    metas,
+    // La primera meta manda; meta_anual solo si la ficha todavía no tiene lista.
+    meta_anual: metas.length > 0 ? metas[0].valor : aNumero(fila.meta_anual),
     presupuesto_area: aNumero(fila.presupuesto_area),
     presupuesto_proyecto: aNumero(fila.presupuesto_proyecto),
   };
@@ -55,18 +59,25 @@ export interface AreaConPrioritarios {
 }
 
 /**
- * Quién edita los proyectos prioritarios de un área: lo mismo que la base
- * (usuario_puede_cargar_unidad, igual que las fichas del POA). Planificación,
- * todas; director, secretario, subsecretario y coordinador, su área y las que
- * cuelgan de ella. Antes del 30.10 solo dejaba al director del área, más
- * cerrado que la base: las secretarías de la lista no podían cargar la suya.
+ * Quién edita los proyectos prioritarios de un área: los mismos que cargan su
+ * POA 2027 (puedeCargarArea). Antes del 30.10 solo dejaba al director del área.
  */
-const ROLES_CARGA = ["director", "secretario", "subsecretario", "coordinador"];
-
 export async function puedeEditarPrioritarios(perfil: PerfilUsuario, unidadId: string): Promise<boolean> {
-  if (perfil.rol === "admin_funcional") return true;
-  if (!ROLES_CARGA.includes(perfil.rol)) return false;
-  return (await getScopeUnidades(perfil)).includes(unidadId);
+  return puedeCargarArea(perfil, unidadId);
+}
+
+/**
+ * 03.11: las áreas con proyectos prioritarios que el perfil puede cargar. Es
+ * lo que ve una secretaría en Proyectos prioritarios: sus direcciones de la
+ * lista, además de la suya si está.
+ */
+export async function getAreasPrioritariosACargo(perfil: PerfilUsuario): Promise<string[]> {
+  const resumen = await getResumenPrioritarios();
+  if (perfil.rol === "admin_funcional") return resumen.map((a) => a.id);
+  const alcance = new Set(await getScopeUnidades(perfil));
+  const roles = ["director", "secretario", "subsecretario", "coordinador"];
+  if (!roles.includes(perfil.rol)) return [];
+  return resumen.filter((a) => alcance.has(a.id)).map((a) => a.id);
 }
 
 export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrioritarios | null> {
@@ -82,8 +93,9 @@ export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrio
 }
 
 /**
- * Para Planificación, que no tiene área: las 16 áreas con proyectos
- * prioritarios y cuántas fichas cargó cada una, en el orden de la lista.
+ * Las áreas con proyectos prioritarios y cuántas fichas cargó cada una, en el
+ * orden de la lista. Para Planificación son todas; a una secretaría se le
+ * filtra con getAreasPrioritariosACargo.
  */
 export async function getResumenPrioritarios(): Promise<
   { id: string; nombre: string; codigo: string; fichas: number }[]

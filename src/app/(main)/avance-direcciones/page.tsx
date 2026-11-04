@@ -15,6 +15,7 @@ import {
   promedioDeProyectos,
   calcularPorcentajeMeta,
   estadoDeAvance,
+  perfilVeTodo,
 } from "@/lib/utils";
 import Link from "next/link";
 import type { Meta, UnidadOrganizacional } from "@/types/database";
@@ -153,6 +154,17 @@ export default async function AvanceDireccionesPage() {
     .filter((u): u is UnidadOrganizacional => !!u)
     .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre));
 
+  // 03.11: "incorporar la secretaría en las otras funciones: [...] avances por
+  // dirección". La lista sale de los proyectos, así que una secretaría sin
+  // ninguno (Obras Públicas, que es nueva) no aparecía. Se agrega al final con
+  // su cartel, solo para quien ve todo: a una secretaría no se le muestran las
+  // otras vacías.
+  const secretariasVacias = perfilVeTodo(perfil)
+    ? unidades
+        .filter((u) => u.nivel === 0 && !porSecretaria.has(u.id))
+        .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre))
+    : [];
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between gap-3">
@@ -208,6 +220,17 @@ export default async function AvanceDireccionesPage() {
               </section>
             );
           })}
+          {secretariasVacias.map((sec) => (
+            <section key={sec.id}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                  {sec.nombre_corto?.[0] ?? sec.nombre[0]}
+                </div>
+                <h2 className="text-sm font-bold text-foreground">{sec.nombre}</h2>
+              </div>
+              <p className="text-xs text-muted/70 pl-11">Todavía no tiene proyectos en el POA.</p>
+            </section>
+          ))}
         </div>
       )}
     </div>

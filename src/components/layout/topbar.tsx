@@ -53,6 +53,7 @@ export function Topbar({
   verComo,
   producto = PLANIA,
   items = navItems,
+  sinPrioritarios = false,
 }: {
   perfilNombre: string | null;
   rol: RolUsuario | null;
@@ -76,10 +77,14 @@ export function Topbar({
    * el producto entero quedaba inalcanzable.
    */
   items?: NavItem[];
+  /** 03.11: un director sin proyectos prioritarios no ve esa sección (ver Sidebar). */
+  sinPrioritarios?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const visibles = items.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
+  const visibles = items.filter(
+    (i) => (!i.roles || (rol && i.roles.includes(rol))) && !(sinPrioritarios && i.href === "/prioritarios")
+  );
 
   const logout = async () => {
     const sb = getSupabaseBrowser();

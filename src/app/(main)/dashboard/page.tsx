@@ -403,8 +403,26 @@ export default async function DashboardPage({ searchParams }: Props) {
             {secretarias.map((sec) => {
               const allUnitIds = descendientes(sec.id);
               const pysSec = proyectosFiltrados.filter((p) => allUnitIds.includes(p.unidad_id));
-              if (pysSec.length === 0) return null;
               const nombreSec = sec.nombre_corto ?? sec.nombre;
+              // 03.11: "incorporar la secretaría en las otras funciones: panel
+              // ejecutivo...". Una secretaría sin proyectos (Obras Públicas, que
+              // es nueva) antes no salía; ahora sale con su cartel.
+              if (pysSec.length === 0) {
+                return (
+                  <div key={sec.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-6 w-6 rounded-md bg-accent/20 flex items-center justify-center">
+                        <span className="text-accent text-xs font-bold">{nombreSec[0]}</span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-foreground">{nombreSec}</h3>
+                      <span className="text-xs text-muted">— 0 proyectos</span>
+                    </div>
+                    <p className="text-xs text-muted/70 pl-8">
+                      Todavía no tiene proyectos en el POA {anioPoa}.
+                    </p>
+                  </div>
+                );
+              }
               return (
                 <div key={sec.id}>
                   {/* Click en la secretaría → fija el ámbito, y el ámbito ya

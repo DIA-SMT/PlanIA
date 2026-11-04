@@ -30,6 +30,19 @@ export const AREAS_CON_PRIORITARIOS: Record<string, string> = {
   DIR08: "Casa Azul",
   DIR09: "Tartamudez",
   DIR42: "Familia",
+  // 03.11: "necesitamos agregar las siguientes direcciones al apartado de
+  // proyectos prioritarios". Falta "PPC": no hay ninguna área con ese nombre
+  // en PlanIA y se está consultando cuál es.
+  DIR05: "Población animal",
+  DIR66: "Proyectos",
+  DIR30: "COMM",
+  DIR34: "Deportes",
+  DIR16: "Gestión cultural",
+  DIR17: "Museos",
+  DIR22: "Turismo",
+  DIR03: "Niñez y Juventud",
+  DIR04: "Adultos mayores",
+  DIR41: "Programas sociales",
 };
 
 export function tienePrioritarios(codigo: string | null | undefined): boolean {
@@ -50,6 +63,18 @@ export interface FilaHistorial {
   valor: number | null;
 }
 
+/**
+ * Una meta de la ficha — 04.11: "se debe poder cargar más de un indicador x
+ * meta y más de una meta x proyecto". Los id sirven para editar o borrar sin
+ * depender de la posición en la lista.
+ */
+export interface MetaPrioritario {
+  id: string;
+  valor: number | null;
+  descripcion: string | null;
+  indicadores: { id: string; texto: string }[];
+}
+
 export interface ProyectoPrioritario {
   id: string;
   unidad_id: string;
@@ -63,8 +88,13 @@ export interface ProyectoPrioritario {
   linea_base_anio: number | null;
   linea_base_fuente: string | null;
   historial: FilaHistorial[];
+  /** 04.11 (062): las metas del año, cada una con sus indicadores. */
+  metas: MetaPrioritario[];
+  /**
+   * La primera meta: es la que usa el Plan Rector para proyectar. Sale de
+   * `metas` al leer la ficha; la columna se mantiene igual al guardar.
+   */
   meta_anual: number | null;
-  indicador: string | null;
   enlace_territorial: string | null;
   presupuesto_area: number | null;
   presupuesto_proyecto: number | null;
@@ -79,6 +109,9 @@ export interface ProyectoPrioritario {
  *
  * 30.10: "eliminar medio de verificación". Sale de la ficha y de esta lista;
  * la columna queda en la base con lo que se haya cargado.
+ *
+ * 04.11: la meta y el indicador salen de acá; se editan como lista de metas
+ * (editarMetaPrioritario y compañía).
  */
 export const CAMPOS_PRIORITARIO = {
   nombre: "texto",
@@ -89,8 +122,6 @@ export const CAMPOS_PRIORITARIO = {
   linea_base_pendiente: "numero",
   linea_base_anio: "anio",
   linea_base_fuente: "texto",
-  meta_anual: "numero",
-  indicador: "texto",
   enlace_territorial: "enlace",
   presupuesto_area: "numero",
   presupuesto_proyecto: "numero",
@@ -229,4 +260,25 @@ export function esEnlaceWeb(texto: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/** Lee la lista de metas tal como viene de la base, sin confiar en su forma. */
+export function leerMetas(raw: unknown): MetaPrioritario[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is Record<string, unknown> => !!m && typeof m === "object")
+    .map((m) => {
+      const valor = m.valor === null || m.valor === undefined || m.valor === "" ? null : Number(m.valor);
+      return {
+        id: String(m.id ?? ""),
+        valor: valor !== null && Number.isFinite(valor) ? valor : null,
+        descripcion: typeof m.descripcion === "string" && m.descripcion.trim() ? m.descripcion : null,
+        indicadores: Array.isArray(m.indicadores)
+          ? (m.indicadores as Record<string, unknown>[])
+              .filter((i) => !!i && typeof i === "object")
+              .map((i) => ({ id: String(i.id ?? ""), texto: String(i.texto ?? "") }))
+          : [],
+      };
+    })
+    .filter((m) => m.id);
 }

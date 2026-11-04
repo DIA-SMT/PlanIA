@@ -10,10 +10,12 @@ import {
   CAMPOS_PRIORITARIO,
   PERIODICIDADES,
   esEnlaceWeb,
+  leerMetas,
   leerNumero,
   tienePrioritarios,
   type CampoPrioritario,
   type FilaHistorial,
+  type MetaPrioritario,
 } from "./proyectos-prioritarios-comun";
 
 /**
@@ -96,6 +98,9 @@ export async function crearProyectoPrioritario(
       nombre: nombre.trim(),
       proyecto_id: proyectoId,
       historial: ANIOS_HISTORIAL.map((anio) => ({ anio, valor: null })),
+      // 04.11: arranca con una meta vacía, con un indicador vacío, para que la
+      // ficha muestre dónde va cada cosa.
+      metas: [{ id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "" }] }],
       created_by: auth.user?.id ?? null,
     })
     .select("id")
@@ -197,4 +202,120 @@ export async function borrarProyectoPrioritario(id: string): Promise<Resultado> 
   if (error) return { success: false, error: error.message };
   refrescar(id);
   return { success: true };
+}
+
+/*
+ * Metas e indicadores — 04.11: "se debe poder cargar más de un indicador x
+ * meta y más de una meta x proyecto" (062).
+ *
+ * Cada acción lee la lista, la cambia y la guarda entera, como el historial.
+ * Al guardar, meta_anual e indicador quedan iguales a la primera meta y su
+ * primer indicador: el Plan Rector proyecta con la primera meta.
+ */
+async function cambiarMetas(
+  id: string,
+  cambiar: (metas: MetaPrioritario[]) => MetaPrioritario[] | string
+): Promise<Resultado> {
+  const sb = await getSupabaseServer();
+  const { data } = await sb
+    .from("proyecto_prioritario")
+    .select("id, unidad_id, metas")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const p = data as { id: string; unidad_id: string; metas: unknown } | null;
+  if (!p) return { success: false, error: "No se encontró la ficha" };
+  const sinPermiso = await puedeEditar(p.unidad_id);
+  if (sinPermiso) return { success: false, error: sinPermiso };
+
+  const metas = cambiar(leerMetas(p.metas));
+  if (typeof metas === "string") return { success: false, error: metas };
+  const primera = metas[0];
+  const { error } = await sb
+    .from("proyecto_prioritario")
+    .update({
+      metas,
+      meta_anual: primera?.valor ?? null,
+      indicador: primera?.indicadores.find((i) => i.texto.trim())?.texto ?? null,
+    })
+    .eq("id", id);
+  if (error) return { success: false, error: error.message };
+  refrescar(id);
+  return { success: true };
+}
+
+export async function agregarMetaPrioritario(id: string): Promise<Resultado> {
+  return cambiarMetas(id, (metas) => [
+    ...metas,
+    { id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "" }] },
+  ]);
+}
+
+export async function borrarMetaPrioritario(id: string, metaId: string): Promise<Resultado> {
+  return cambiarMetas(id, (metas) => metas.filter((m) => m.id !== metaId));
+}
+
+/** campo: "valor" (la cantidad comprometida) o "descripcion". */
+export async function editarMetaPrioritario(
+  id: string,
+  metaId: string,
+  campo: string,
+  valor: string
+): Promise<Resultado> {
+  if (campo !== "valor" && campo !== "descripcion") return { success: false, error: "Campo desconocido" };
+  let numero: number | null = null;
+  if (campo === "valor") {
+    const n = leerNumero(valor.trim());
+    if (n === "invalido") return { success: false, error: "Escribí un número, sin letras" };
+    numero = n;
+  }
+  return cambiarMetas(id, (metas) => {
+    if (!metas.some((m) => m.id === metaId)) return "No se encontró la meta";
+    return metas.map((m) =>
+      m.id !== metaId
+        ? m
+        : campo === "valor"
+          ? { ...m, valor: numero }
+          : { ...m, descripcion: valor.trim() || null }
+    );
+  });
+}
+
+export async function agregarIndicadorPrioritario(id: string, metaId: string): Promise<Resultado> {
+  return cambiarMetas(id, (metas) => {
+    if (!metas.some((m) => m.id === metaId)) return "No se encontró la meta";
+    return metas.map((m) =>
+      m.id === metaId ? { ...m, indicadores: [...m.indicadores, { id: crypto.randomUUID(), texto: "" }] } : m
+    );
+  });
+}
+
+export async function editarIndicadorPrioritario(
+  id: string,
+  metaId: string,
+  indicadorId: string,
+  texto: string
+): Promise<Resultado> {
+  return cambiarMetas(id, (metas) =>
+    metas.map((m) =>
+      m.id !== metaId
+        ? m
+        : {
+            ...m,
+            indicadores: m.indicadores.map((i) => (i.id === indicadorId ? { ...i, texto: texto.trim() } : i)),
+          }
+    )
+  );
+}
+
+export async function borrarIndicadorPrioritario(
+  id: string,
+  metaId: string,
+  indicadorId: string
+): Promise<Resultado> {
+  return cambiarMetas(id, (metas) =>
+    metas.map((m) =>
+      m.id !== metaId ? m : { ...m, indicadores: m.indicadores.filter((i) => i.id !== indicadorId) }
+    )
+  );
 }

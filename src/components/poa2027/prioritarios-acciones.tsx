@@ -52,6 +52,7 @@ export function CampoPrioritario({
   largo = false,
   placeholder = "Completar por el director",
   className = "",
+  accion,
 }: {
   id: string;
   campo: string;
@@ -61,11 +62,16 @@ export function CampoPrioritario({
   largo?: boolean;
   placeholder?: string;
   className?: string;
+  /**
+   * 04.11: otra acción de guardado en vez de editarCampoPrioritario, ya atada
+   * a lo que guarda (una meta, un indicador). Es una server action con .bind.
+   */
+  accion?: (texto: string) => Promise<{ success: boolean; error?: string }>;
 }) {
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState(valor);
   const { correr, error, pendiente } = useGuardar(
-    (t) => editarCampoPrioritario(id, campo, t),
+    (t) => (accion ? accion(t) : editarCampoPrioritario(id, campo, t)),
     () => setEditando(false)
   );
 
@@ -375,6 +381,43 @@ export function BorrarPrioritario({ id, volverA }: { id: string; volverA: string
         {pendiente ? "Borrando…" : "Borrar ficha"}
       </button>
       {error && <span className="block text-[11px] text-danger">{error}</span>}
+    </span>
+  );
+}
+
+/**
+ * 04.11: un botón que corre una acción ya atada (agregar o borrar una meta o
+ * un indicador) y refresca. Con `confirmar`, pregunta antes.
+ */
+export function BotonAccion({
+  accion,
+  texto,
+  confirmar,
+  peligro = false,
+}: {
+  accion: () => Promise<{ success: boolean; error?: string }>;
+  texto: string;
+  confirmar?: string;
+  peligro?: boolean;
+}) {
+  const { correr, error, pendiente } = useGuardar(() => accion(), () => {});
+  return (
+    <span className="inline-flex flex-col">
+      <button
+        onClick={() => {
+          if (confirmar && !confirm(confirmar)) return;
+          correr("");
+        }}
+        disabled={pendiente}
+        className={`text-[11px] rounded px-2 py-0.5 border disabled:opacity-50 ${
+          peligro
+            ? "text-danger border-danger/30 hover:bg-danger/10"
+            : "text-primary border-primary/30 hover:bg-primary/10"
+        }`}
+      >
+        {pendiente ? "…" : texto}
+      </button>
+      {error && <span className="text-[11px] text-danger">{error}</span>}
     </span>
   );
 }
