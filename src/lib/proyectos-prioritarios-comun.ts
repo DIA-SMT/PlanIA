@@ -55,6 +55,17 @@ export const HORIZONTE_PLAN_RECTOR = 2030;
 /** Los años del historial de ejecución: la gestión, hasta el año anterior al POA. */
 export const ANIOS_HISTORIAL = [2024, 2025, 2026];
 
+/**
+ * 04.11: "¿podrán agregar 2023? Tenemos algunos datos 2023. Que no condicione
+ * si no pongo nada." Es anterior a la gestión: se carga como antecedente y no
+ * suma al acumulado ni a la proyección del Plan Rector, que cuentan desde 2024.
+ * Vacío no cambia nada.
+ */
+export const ANIOS_ANTECEDENTE = [2023];
+
+/** Todos los años que se pueden cargar en el historial, en orden. */
+export const ANIOS_CARGABLES = [...ANIOS_ANTECEDENTE, ...ANIOS_HISTORIAL];
+
 export const PERIODICIDADES = ["Mensual", "Bimestral", "Trimestral", "Semestral", "Anual"];
 
 /** valor null es "sin datos disponibles", que no es cero. */
@@ -144,6 +155,14 @@ export function historialConAcumulado(
     acumulado = acumulado === null || valor === null ? null : acumulado + valor;
     return { anio, valor, acumulado };
   });
+}
+
+/** 04.11: los años de antecedente (2023), con su valor y sin acumulado. */
+export function historialAntecedente(historial: FilaHistorial[]): { anio: number; valor: number | null }[] {
+  return ANIOS_ANTECEDENTE.map((anio) => ({
+    anio,
+    valor: historial.find((h) => h.anio === anio)?.valor ?? null,
+  }));
 }
 
 /** El año en que arranca la gestión: el historial y la meta acumulada se cuentan desde acá. */

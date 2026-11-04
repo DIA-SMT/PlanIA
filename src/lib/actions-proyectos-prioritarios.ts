@@ -6,6 +6,7 @@ import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
 import { puedeEditarPrioritarios } from "./proyectos-prioritarios";
 import {
+  ANIOS_CARGABLES,
   ANIOS_HISTORIAL,
   CAMPOS_PRIORITARIO,
   PERIODICIDADES,
@@ -166,7 +167,7 @@ export async function editarHistorialPrioritario(
   anio: number,
   valor: string
 ): Promise<Resultado> {
-  if (!ANIOS_HISTORIAL.includes(anio)) return { success: false, error: "Ese año no va en el historial" };
+  if (!ANIOS_CARGABLES.includes(anio)) return { success: false, error: "Ese año no va en el historial" };
   const n = leerNumero(valor.trim());
   if (n === "invalido") return { success: false, error: "Escribí un número, sin letras" };
   const p = await prioritarioDe(id);
@@ -175,7 +176,8 @@ export async function editarHistorialPrioritario(
   if (sinPermiso) return { success: false, error: sinPermiso };
 
   const actual = Array.isArray(p.historial) ? p.historial : [];
-  const historial = ANIOS_HISTORIAL.map((a) => ({
+  // 04.11: con 2023, que es opcional.
+  const historial = ANIOS_CARGABLES.map((a) => ({
     anio: a,
     valor: a === anio ? n : actual.find((h) => Number(h.anio) === a)?.valor ?? null,
   }));

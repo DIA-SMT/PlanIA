@@ -13,6 +13,7 @@ import {
   HORIZONTE_PLAN_RECTOR,
   PERIODICIDADES,
   esEnlaceWeb,
+  historialAntecedente,
   historialConAcumulado,
   numeroArg,
 } from "@/lib/proyectos-prioritarios-comun";
@@ -191,6 +192,18 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
             </tr>
           </thead>
           <tbody>
+            {/* 04.11: 2023 es opcional y queda como antecedente, sin acumulado. */}
+            {historialAntecedente(ficha.historial).map((h) => (
+              <tr key={h.anio} className="border-b border-border/50">
+                <td className="py-1.5">
+                  {h.anio} <span className="text-[10px] text-muted">(antecedente, opcional)</span>
+                </td>
+                <td className="py-1.5 text-right">
+                  <CeldaHistorial id={ficha.id} anio={h.anio} valor={h.valor} editable={editable} />
+                </td>
+                <td className="py-1.5 text-right text-[11px] text-muted/70">no suma</td>
+              </tr>
+            ))}
             {historial.map((h) => (
               <tr key={h.anio} className="border-b border-border/50">
                 <td className="py-1.5">{h.anio}</td>
@@ -206,7 +219,8 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
         </table>
         <Nota>
           Si no hay registros históricos, se informa &ldquo;sin datos disponibles&rdquo;; no equivale a
-          cero.
+          cero. 2023 es anterior a la gestión: se puede cargar como antecedente, pero no suma al
+          acumulado ni a la proyección del Plan Rector, y dejarlo vacío no cambia nada.
         </Nota>
       </Seccion>
 
