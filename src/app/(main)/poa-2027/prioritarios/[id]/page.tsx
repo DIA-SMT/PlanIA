@@ -294,7 +294,10 @@ export default async function FichaPrioritariaPage({ params }: { params: Promise
         ))}
         {editable && (
           <div>
-            <BotonAccion accion={agregarMetaPrioritario.bind(null, ficha.id)} texto="+ Agregar otra meta" />
+            <BotonAccion
+              accion={agregarMetaPrioritario.bind(null, ficha.id)}
+              texto={ficha.metas.length > 0 ? "+ Agregar otra meta" : "+ Agregar una meta"}
+            />
           </div>
         )}
         {ficha.metas.length > 1 && (
