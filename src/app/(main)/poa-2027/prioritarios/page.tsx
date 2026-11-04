@@ -6,6 +6,7 @@ import {
   getAreaPrioritarios,
   getPrioritariosDelArea,
   getResumenPrioritarios,
+  getAreasPrioritariosACargo,
   puedeEditarPrioritarios,
   getProyectosDelArea,
 } from "@/lib/proyectos-prioritarios";
@@ -23,8 +24,8 @@ export const revalidate = 0;
  * prioritarios y poder visualizarlos." El botón está en Editar mi POA; acá se
  * listan las fichas del área y se genera una nueva.
  *
- * El área se elige igual que en Editar mi POA: Planificación la recibe por
- * parámetro, cualquier otro rol ve la suya.
+ * El área se elige igual que en Editar mi POA: por parámetro, entre las que el
+ * perfil puede cargar (03.11); sin parámetro, la suya.
  */
 export default async function ProyectosPrioritariosPage({
   searchParams,
@@ -36,14 +37,24 @@ export default async function ProyectosPrioritariosPage({
   const params = await searchParams;
 
   const esPlanificacion = perfil.rol === "admin_funcional";
-  let unidadId = esPlanificacion ? params.unidad ?? null : perfil.unidad_id;
-  if (esPlanificacion && unidadId && !(await getScopeUnidades(perfil)).includes(unidadId)) unidadId = null;
+  // 03.11: además de Planificación, una secretaría (o subsecretaría, o
+  // coordinación) carga los prioritarios de sus direcciones de la lista. Puede
+  // entrar a cualquiera de ellas por parámetro; sin parámetro, si tiene más de
+  // una, las ve juntas.
+  const aCargo = await getAreasPrioritariosACargo(perfil);
+  let unidadId: string | null = params.unidad ?? null;
+  if (unidadId && !aCargo.includes(unidadId) && !(await getScopeUnidades(perfil)).includes(unidadId)) {
+    unidadId = null;
+  }
+  const verTodas =
+    !unidadId && (esPlanificacion || aCargo.length > 1 || (aCargo.length === 1 && aCargo[0] !== perfil.unidad_id));
+  if (!unidadId && !verTodas) unidadId = perfil.unidad_id;
 
   // 30.10: Planificación no tiene área, así que sin una elegida no veía nada
-  // ("no puedo ver los prioritarios desde nuestro usuario"). Ve las 16 áreas
-  // juntas, con cuántas fichas cargó cada una, y entra a la que quiera.
-  if (esPlanificacion && !unidadId) {
-    const areas = await getResumenPrioritarios();
+  // ("no puedo ver los prioritarios desde nuestro usuario"). Ve todas las
+  // áreas juntas, con cuántas fichas cargó cada una, y entra a la que quiera.
+  if (verTodas) {
+    const areas = (await getResumenPrioritarios()).filter((a) => aCargo.includes(a.id));
     const total = areas.reduce((s, a) => s + a.fichas, 0);
     return (
       <div className="space-y-6 max-w-4xl">
@@ -51,7 +62,9 @@ export default async function ProyectosPrioritariosPage({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Proyectos prioritarios · POA {ANIO_POA}</h1>
           <p className="text-sm text-muted mt-1">
-            Las {areas.length} áreas con proyectos prioritarios.{" "}
+            {esPlanificacion
+              ? `Las ${areas.length} áreas con proyectos prioritarios.`
+              : `Las áreas a tu cargo con proyectos prioritarios (${areas.length}).`}{" "}
             {total === 0
               ? "Todavía ninguna cargó una ficha."
               : `Hay ${total} ${total === 1 ? "ficha cargada" : "fichas cargadas"}.`}{" "}
@@ -80,7 +93,10 @@ export default async function ProyectosPrioritariosPage({
   }
 
   const area = unidadId ? await getAreaPrioritarios(unidadId) : null;
-  const volver = esPlanificacion ? "/poa-2027/prioritarios" : "/poa-2027/mis-fichas";
+  const volver =
+    esPlanificacion || aCargo.length > 1 || (area && area.id !== perfil.unidad_id)
+      ? "/poa-2027/prioritarios"
+      : "/poa-2027/mis-fichas";
 
   if (!area || !area.habilitada) {
     return (

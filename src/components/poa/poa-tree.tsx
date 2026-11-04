@@ -138,7 +138,24 @@ function SecretariaNode({ nodo, autoExpand }: { nodo: PoaArbolNodo; autoExpand: 
     ...nodo.subs.flatMap((s) => [...s.proyectosDirectos, ...s.dirs.flatMap(dirPys)]),
   ];
   const totalPy = todosProyectos.length;
-  if (totalPy === 0) return null;
+  // 03.11: una secretaría sin proyectos (Obras Públicas, que es nueva) tiene
+  // que aparecer igual. Sin filtros se muestra con su cartel; con un filtro o
+  // una búsqueda puesta, no: ahí vacía quiere decir "no coincide".
+  if (totalPy === 0) {
+    if (autoExpand) return null;
+    return (
+      <div className="rounded-xl border border-border bg-surface p-4 flex items-center gap-3">
+        <span className="w-3" />
+        <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+          {nodo.unidad.nombre_corto?.[0] ?? nodo.unidad.nombre[0]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground line-clamp-1">{nodo.unidad.nombre}</p>
+          <p className="text-[10px] text-muted">Todavía no tiene proyectos cargados</p>
+        </div>
+      </div>
+    );
+  }
   const totalMet = contarMetas(todosProyectos);
   const totalInd = contarIndicadores(todosProyectos);
 

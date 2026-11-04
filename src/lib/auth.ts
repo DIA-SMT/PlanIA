@@ -156,6 +156,24 @@ export async function requireRol(...roles: RolUsuario[]): Promise<PerfilUsuario>
 }
 
 /**
+ * Quién carga el POA 2027 y los proyectos prioritarios de un área — 03.11.
+ *
+ * "Los secretarios (de todas las direcciones) y la dirección de planificación
+ * deben poder cargar proyectos en la POA 2027 y en proyectos prioritarios [...],
+ * ahora solo pueden los directores de cada área." La base ya lo dejaba
+ * (usuario_puede_cargar_unidad, 051); lo que faltaba era la pantalla. Es la
+ * misma regla: Planificación (admin_funcional), todas; director, secretario,
+ * subsecretario y coordinador, su área y las que cuelgan de ella.
+ */
+const ROLES_CARGA_AREA: RolUsuario[] = ["director", "secretario", "subsecretario", "coordinador"];
+
+export async function puedeCargarArea(perfil: PerfilUsuario, unidadId: string): Promise<boolean> {
+  if (perfil.rol === "admin_funcional") return true;
+  if (!ROLES_CARGA_AREA.includes(perfil.rol)) return false;
+  return (await getScopeUnidades(perfil)).includes(unidadId);
+}
+
+/**
  * Verifica que el perfil pueda cargar datos sobre una unidad específica.
  * Director solo carga sobre su propia unidad; admin_funcional sobre cualquiera.
  */

@@ -10,7 +10,7 @@ import { TraerTodasBoton } from "@/components/poa2027/traer-todas-boton";
 import { TablaAreasPoa } from "@/components/poa2027/tabla-areas";
 import { DocumentoPoa } from "@/components/poa2027/documento-poa";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
-import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
+import { getAreasPrioritariosACargo } from "@/lib/proyectos-prioritarios";
 
 export const revalidate = 0;
 
@@ -69,10 +69,20 @@ export default async function Poa2027Page() {
   }
 
   // 28.10: el botón de Proyectos prioritarios, solo para las áreas de la lista.
+  // 03.11: también si alguna de las áreas que el perfil carga está en la lista
+  // (una secretaría con direcciones prioritarias, aunque ella no lo sea).
   const conPrioritarios =
     puedeCargar && perfil?.unidad_id
-      ? (await getAreaPrioritarios(perfil.unidad_id))?.habilitada ?? false
+      ? (await getAreasPrioritariosACargo(perfil)).length > 0
       : false;
+
+  // 03.11: "los secretarios (de todas las direcciones) [...] deben poder
+  // cargar proyectos en la POA 2027". Las áreas de abajo que el perfil puede
+  // cargar, para entrar a editar el POA de cada una.
+  const areasACargo =
+    puedeCargar && perfil?.unidad_id && !esPlanificacion && circuito
+      ? circuito.areasDeAbajo
+      : [];
 
   const propia = circuito?.propia;
   return (
@@ -109,6 +119,23 @@ export default async function Poa2027Page() {
                 Proyectos prioritarios
               </Link>
             )}
+          </div>
+        )}
+
+        {areasACargo.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface p-4 space-y-2">
+            <p className="text-xs font-semibold text-foreground">Editar el POA de un área a tu cargo</p>
+            <div className="flex flex-wrap gap-2">
+              {areasACargo.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/poa-2027/mis-fichas?unidad=${a.id}`}
+                  className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-surface-hover hover:text-primary"
+                >
+                  {a.nombre}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

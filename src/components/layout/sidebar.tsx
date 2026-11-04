@@ -89,9 +89,22 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar({ rol }: { rol: RolUsuario | null }) {
+export function Sidebar({
+  rol,
+  sinPrioritarios = false,
+}: {
+  rol: RolUsuario | null;
+  /**
+   * 03.11: "viendo desde el perfil de un director, la herramienta de PROYECTOS
+   * PRIORITARIOS que está en el margen izquierdo debe verse solamente si la
+   * dirección tiene asignados proyectos prioritarios". Lo decide el layout.
+   */
+  sinPrioritarios?: boolean;
+}) {
   const pathname = usePathname();
-  const visibles = navItems.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
+  const visibles = navItems.filter(
+    (i) => (!i.roles || (rol && i.roles.includes(rol))) && !(sinPrioritarios && i.href === "/prioritarios")
+  );
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-surface min-h-screen">

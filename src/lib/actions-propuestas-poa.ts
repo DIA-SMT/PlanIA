@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getPerfilActual, getScopeUnidades } from "./auth";
+import { getPerfilActual, getScopeUnidades, puedeCargarArea } from "./auth";
 import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
 
@@ -263,5 +263,43 @@ export async function volverAPropuesta(id: string): Promise<{ success: boolean; 
 
   revalidatePath("/poa-2027");
   revalidatePath("/poa-2027/mis-fichas");
+  return { success: true };
+}
+
+/**
+ * "+ Cargar un proyecto nuevo" — 03.11.
+ *
+ * "Esa ficha ya no se utiliza. Al entrar al botón + CARGAR UN PROYECTO NUEVO
+ * tiene que verse este formato pero sin el texto propio del proyecto, solo los
+ * elementos." Antes abría el formulario PRISMA (/poa-2027/cargar). Ahora crea
+ * una ficha vacía, con el nombre que se le pone, como PROPUESTA del área: queda
+ * en "Para revisar" con los mismos campos que las que vienen del 2026, se
+ * completa ahí mismo y se acepta con "Va al POA 2027".
+ *
+ * Puede crearla quien carga el POA del área (puedeCargarArea): el director, la
+ * secretaría sobre sus direcciones y Planificación sobre todas.
+ */
+export async function crearFichaNueva(
+  unidadId: string,
+  programa: string
+): Promise<{ success: boolean; error?: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!programa.trim()) return { success: false, error: "Poné el nombre del proyecto" };
+  if (!(await puedeCargarArea(perfil, unidadId))) {
+    return { success: false, error: "No podés cargar proyectos en esta área" };
+  }
+
+  const sb = await getSupabaseServer();
+  const { error } = await sb.from("ficha_prisma").insert({
+    unidad_id: unidadId,
+    anio: ANIO_POA,
+    programa: programa.trim(),
+    estado: "propuesta",
+    created_by: perfil.user_id,
+  });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/poa-2027/mis-fichas");
+  revalidatePath("/poa-2027");
   return { success: true };
 }

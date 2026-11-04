@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
+import { getPerfilActual, puedeCargarArea } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getMisFichas, getTextosPoa, ANIO_POA } from "@/lib/poa-2027";
 import { CampoEditable } from "@/components/poa2027/campo-editable";
 import { TextosDelArea } from "@/components/poa2027/textos-del-area";
-import { TraerDe2026, AceptarFicha } from "@/components/poa2027/propuestas-acciones";
+import { TraerDe2026, AceptarFicha, NuevoProyectoPoa } from "@/components/poa2027/propuestas-acciones";
 import { BackButton } from "@/components/layout/back-button";
 import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
 
@@ -47,28 +47,30 @@ export default async function EditarMiPoaPage({
 
   // 05.10: "la idea es que ustedes carguen y nosotros editamos". Planificación
   // Estratégica no tiene área propia, así que edita la que elija desde la tabla
-  // de todas las áreas del POA 2027. Para cualquier otro rol el parámetro se
-  // ignora y manda su área, como siempre: si no, cualquiera podría abrir el POA
-  // de otra área escribiendo la URL.
+  // de todas las áreas del POA 2027.
   //
-  // Las acciones de guardar, aceptar y traer del 2026 ya lo permitían —validan
-  // con getScopeUnidades, que a Planificación le da todas las áreas, y la base
-  // la deja escribir por ficha_mutate_admin—. Faltaba el camino en pantalla.
+  // 03.11: "los secretarios (de todas las direcciones) y la dirección de
+  // planificación deben poder cargar proyectos en la POA 2027 [...], ahora solo
+  // pueden los directores de cada área". Ahora cualquiera que pueda cargar un
+  // área (puedeCargarArea: Planificación todas, una secretaría su árbol) la
+  // abre por parámetro. Si no puede, el parámetro se ignora y manda su área:
+  // si no, cualquiera abriría el POA de otra área escribiendo la URL.
   const esPlanificacion = perfil.rol === "admin_funcional";
-  const unidadId = esPlanificacion ? params.unidad ?? null : perfil.unidad_id;
+  const otraArea =
+    params.unidad && params.unidad !== perfil.unidad_id && (await puedeCargarArea(perfil, params.unidad))
+      ? params.unidad
+      : null;
+  const unidadId = otraArea ?? (esPlanificacion ? null : perfil.unidad_id);
 
   let nombreArea: string | null = null;
-  if (esPlanificacion && unidadId) {
-    const alcance = await getScopeUnidades(perfil);
-    if (alcance.includes(unidadId)) {
-      const sb = await getSupabaseServer();
-      const { data } = await sb
-        .from("unidad_organizacional")
-        .select("nombre, nombre_corto")
-        .eq("id", unidadId)
-        .single();
-      nombreArea = (data as { nombre: string } | null)?.nombre ?? null;
-    }
+  if (otraArea) {
+    const sb = await getSupabaseServer();
+    const { data } = await sb
+      .from("unidad_organizacional")
+      .select("nombre, nombre_corto")
+      .eq("id", otraArea)
+      .single();
+    nombreArea = (data as { nombre: string } | null)?.nombre ?? null;
   }
 
   if (esPlanificacion && !nombreArea) {
@@ -120,17 +122,19 @@ export default async function EditarMiPoaPage({
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          {esPlanificacion ? `POA ${ANIO_POA} · ${nombreArea}` : `Editar mi POA ${ANIO_POA}`}
+          {otraArea ? `POA ${ANIO_POA} · ${nombreArea}` : `Editar mi POA ${ANIO_POA}`}
         </h1>
         <p className="text-sm text-muted mt-1">
-          {esPlanificacion
+          {otraArea
             ? "Lo que aceptes acá es lo que va a aparecer en el documento de esta área."
             : "Acá armás tu parte. Lo que aceptes es lo que va a aparecer en el documento de tu secretaría."}
         </p>
-        {esPlanificacion && (
+        {otraArea && (
           <p className="text-[11px] text-primary border border-primary/30 bg-primary/5 rounded-lg px-3 py-2 mt-3">
-            Estás editando el POA de esta área como Planificación Estratégica. Lo que cambies o
-            aceptes lo ve el área, igual que si lo hubiera hecho ella.
+            {esPlanificacion
+              ? "Estás editando el POA de esta área como Planificación Estratégica."
+              : "Estás editando el POA de un área a tu cargo."}{" "}
+            Lo que cambies o aceptes lo ve el área, igual que si lo hubiera hecho ella.
           </p>
         )}
       </div>
@@ -147,17 +151,11 @@ export default async function EditarMiPoaPage({
         <>
           <div className="flex flex-wrap items-start gap-3">
             <TraerDe2026 unidadId={unidadId} hayPropuestas={propuestas.length > 0} />
-            {/* Cargar uno de cero no se ofrece desde Planificación: /poa-2027/cargar
-                trabaja con el área del perfil y no tiene cómo recibir otra. Lo que
-                se pidió es editar y aceptar lo que ya está. */}
-            {!esPlanificacion && (
-              <Link
-                href="/poa-2027/cargar"
-                className="text-sm bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
-              >
-                + Cargar un proyecto nuevo
-              </Link>
-            )}
+            {/* 03.11: "esa ficha ya no se utiliza". Cargar un proyecto nuevo ya no
+                abre el formulario PRISMA: agrega una ficha vacía con el formato de
+                las de abajo, en el área que se está editando (también desde
+                Planificación o desde la secretaría). */}
+            <NuevoProyectoPoa unidadId={unidadId} />
             {/* Planificación no tiene área propia, así que el Word del POA 2027
                 no tenía cómo bajar el de un área: ahora sale de acá (08.10). */}
             {esPlanificacion && (
@@ -171,7 +169,7 @@ export default async function EditarMiPoaPage({
             {/* 28.10: solo las áreas de la lista tienen proyectos prioritarios. */}
             {conPrioritarios && (
               <Link
-                href={esPlanificacion ? `/poa-2027/prioritarios?unidad=${unidadId}` : "/poa-2027/prioritarios"}
+                href={`/poa-2027/prioritarios?unidad=${unidadId}`}
                 className="text-sm font-semibold bg-primary/10 text-primary border border-primary/30 rounded-lg px-4 py-2 hover:bg-primary/20"
               >
                 Proyectos prioritarios

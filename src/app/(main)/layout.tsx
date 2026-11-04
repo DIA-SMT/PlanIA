@@ -6,6 +6,7 @@ import { puedeVerComo, getVistaElegida } from "@/lib/ver-como";
 import { getUnidades } from "@/lib/queries";
 import { VerComo } from "@/components/layout/ver-como";
 import { getAlertasDelUsuario, getIndicadoresPorVencer } from "@/lib/queries";
+import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const perfil = await getPerfilActual();
@@ -19,6 +20,12 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         getIndicadoresPorVencer().catch(() => []),
       ])
     : [[], []];
+
+  // 03.11: el director ve "Proyectos prioritarios" en el menú solo si su
+  // dirección está en la lista. Los demás roles lo siguen viendo.
+  const sinPrioritarios =
+    perfil?.rol === "director" &&
+    !(perfil.unidad_id && (await getAreaPrioritarios(perfil.unidad_id))?.habilitada);
 
   // 28.09: "ver la aplicación como…". El perfil REAL es el que decide si el
   // selector aparece; el de arriba ya viene con el área elegida aplicada.
@@ -34,11 +41,12 @@ export default async function MainLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="flex h-full">
-      <Sidebar rol={perfil?.rol ?? null} />
+      <Sidebar rol={perfil?.rol ?? null} sinPrioritarios={sinPrioritarios} />
       <div className="flex-1 flex flex-col min-w-0 h-full">
         <Topbar
           perfilNombre={perfil?.nombre ?? perfil?.email ?? null}
           rol={perfil?.rol ?? null}
+          sinPrioritarios={sinPrioritarios}
           alertas={alertas}
           porVencer={porVencer}
           verComo={
