@@ -20,6 +20,12 @@ import {
 
 type Guardar = (texto: string) => Promise<{ success: boolean; error?: string }>;
 
+/**
+ * 05.11: en la ficha final, "lo que no se cargó poner no se registran datos en
+ * vez de dejar los lugares u opciones vacías".
+ */
+export const SIN_DATOS = "No se registran datos";
+
 function useGuardar(guardar: Guardar, alTerminar: () => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +85,11 @@ export function CampoPrioritario({
   const visible = vacio ? placeholder : mostrar ?? valor;
 
   if (!editable) {
-    return <span className={`${className} ${vacio ? "text-muted/60 italic" : ""}`}>{vacio ? "—" : visible}</span>;
+    return (
+      <span className={`${className} ${vacio ? "text-muted/60 italic" : ""} ${largo ? "block whitespace-pre-wrap" : ""}`}>
+        {vacio ? SIN_DATOS : visible}
+      </span>
+    );
   }
 
   if (!editando) {
@@ -150,7 +160,11 @@ export function CampoPrioritario({
   );
 }
 
-/** Un campo que se elige de una lista (el proyecto del 2026, la periodicidad). Guarda al elegir. */
+/**
+ * Un campo que se elige de una lista (el proyecto del 2026, la periodicidad,
+ * el eje del Plan Rector). Guarda al elegir. Las opciones con `grupo` van
+ * juntas bajo ese rótulo (los ejes, bajo su ámbito).
+ */
 export function SelectorPrioritario({
   id,
   campo,
@@ -163,15 +177,21 @@ export function SelectorPrioritario({
   id: string;
   campo: string;
   valor: string;
-  opciones: { valor: string; rotulo: string }[];
+  opciones: { valor: string; rotulo: string; grupo?: string }[];
   mostrar: string | null;
   editable: boolean;
   vacio: string;
 }) {
   const { correr, error, pendiente } = useGuardar((t) => editarCampoPrioritario(id, campo, t), () => {});
+  const grupos = [...new Set(opciones.map((o) => o.grupo ?? ""))];
+  const opcion = (o: { valor: string; rotulo: string }) => (
+    <option key={o.valor} value={o.valor}>
+      {o.rotulo}
+    </option>
+  );
 
   if (!editable) {
-    return <span className={mostrar ? "" : "text-muted/60 italic"}>{mostrar ?? "—"}</span>;
+    return <span className={mostrar ? "" : "text-muted/60 italic"}>{mostrar ?? SIN_DATOS}</span>;
   }
   return (
     <span className="block">
@@ -182,11 +202,15 @@ export function SelectorPrioritario({
         className="w-full bg-background border border-border rounded px-2 py-1 text-sm disabled:opacity-50"
       >
         <option value="">{vacio}</option>
-        {opciones.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.rotulo}
-          </option>
-        ))}
+        {grupos.map((g) =>
+          g ? (
+            <optgroup key={g} label={g}>
+              {opciones.filter((o) => o.grupo === g).map(opcion)}
+            </optgroup>
+          ) : (
+            opciones.filter((o) => !o.grupo).map(opcion)
+          )
+        )}
       </select>
       {error && <span className="block text-[11px] text-danger">{error}</span>}
     </span>
@@ -289,7 +313,8 @@ export function NuevoPrioritario({
         setError(r.error ?? "No se pudo crear");
         return;
       }
-      router.push(`/poa-2027/prioritarios/${r.id}`);
+      // 05.11: la ficha nueva abre en la plantilla para completar.
+      router.push(`/poa-2027/prioritarios/${r.id}?editar=1`);
     });
   };
 
@@ -352,6 +377,18 @@ export function NuevoPrioritario({
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
+  );
+}
+
+/** 05.11: "un botón para imprimir" la ficha final. El menú y los botones no salen en el papel. */
+export function BotonImprimir() {
+  return (
+    <button
+      onClick={() => window.print()}
+      className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-surface-hover"
+    >
+      Imprimir
+    </button>
   );
 }
 

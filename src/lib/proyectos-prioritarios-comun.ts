@@ -83,7 +83,18 @@ export interface MetaPrioritario {
   id: string;
   valor: number | null;
   descripcion: string | null;
-  indicadores: { id: string; texto: string }[];
+  /**
+   * 05.11: "nos tiene que dejar dividir la meta en totales x indicador. Ahora
+   * solo deja poner el nombre del indicador". total es lo planificado para el
+   * año en ese indicador, en la unidad de medida de la ficha.
+   */
+  indicadores: IndicadorPrioritario[];
+}
+
+export interface IndicadorPrioritario {
+  id: string;
+  texto: string;
+  total: number | null;
 }
 
 export interface ProyectoPrioritario {
@@ -96,8 +107,22 @@ export interface ProyectoPrioritario {
   unidad_medida: string | null;
   linea_base_total: number | null;
   linea_base_pendiente: number | null;
+  /**
+   * 05.11 (063): "en ambas líneas de base se debe poder escribir". Lo escrito,
+   * cuando no es un número solo; el número de arriba es la cantidad con la
+   * que empieza (leerLineaBase).
+   */
+  linea_base_total_texto: string | null;
+  linea_base_pendiente_texto: string | null;
   linea_base_anio: number | null;
   linea_base_fuente: string | null;
+  /** 05.11 (063): "Agregar Observaciones debajo de la línea de base". */
+  linea_base_observaciones: string | null;
+  /**
+   * 05.11 (063): el eje del Plan Rector elegido en la ficha, para cuando no
+   * sale del proyecto del POA 2026. Si ese proyecto está imputado, manda él.
+   */
+  plan_rector_eje_id: string | null;
   historial: FilaHistorial[];
   /** 04.11 (062): las metas del año, cada una con sus indicadores. */
   metas: MetaPrioritario[];
@@ -129,10 +154,13 @@ export const CAMPOS_PRIORITARIO = {
   proyecto_id: "proyecto",
   diagnostico: "texto",
   unidad_medida: "texto",
-  linea_base_total: "numero",
-  linea_base_pendiente: "numero",
+  // 05.11: las líneas de base aceptan texto (leerLineaBase).
+  linea_base_total: "linea_base",
+  linea_base_pendiente: "linea_base",
   linea_base_anio: "anio",
   linea_base_fuente: "texto",
+  linea_base_observaciones: "texto",
+  plan_rector_eje_id: "eje",
   enlace_territorial: "enlace",
   presupuesto_area: "numero",
   presupuesto_proyecto: "numero",
@@ -270,6 +298,24 @@ export function leerNumero(texto: string): number | null | "invalido" {
   return Number.isFinite(n) && n >= 0 ? n : "invalido";
 }
 
+/**
+ * Una línea de base escrita a mano — 05.11: "se debe poder escribir. Solo
+ * recibe números".
+ *
+ * Un número solo ("3.000") se guarda como número, como antes. Otro texto se
+ * guarda como texto, y el número es la cantidad con la que empieza ("930
+ * basurales relevados" → 930), para que el Plan Rector pueda seguir
+ * proyectando. Si no empieza con una cantidad, no hay número: no se adivina.
+ */
+export function leerLineaBase(escrito: string): { numero: number | null; texto: string | null } {
+  const t = escrito.trim();
+  const n = leerNumero(t);
+  if (n !== "invalido") return { numero: n, texto: null };
+  const inicio = t.match(/^\$?\s*(\d[\d.,]*)/)?.[1].replace(/[.,]+$/, "");
+  const inicial = inicio ? leerNumero(inicio) : null;
+  return { numero: typeof inicial === "number" ? inicial : null, texto: t };
+}
+
 /** Solo enlaces web: es lo que se convierte en QR y se abre desde la ficha. */
 export function esEnlaceWeb(texto: string | null | undefined): boolean {
   if (!texto) return false;
@@ -295,7 +341,14 @@ export function leerMetas(raw: unknown): MetaPrioritario[] {
         indicadores: Array.isArray(m.indicadores)
           ? (m.indicadores as Record<string, unknown>[])
               .filter((i) => !!i && typeof i === "object")
-              .map((i) => ({ id: String(i.id ?? ""), texto: String(i.texto ?? "") }))
+              .map((i) => {
+                const total = i.total === null || i.total === undefined || i.total === "" ? null : Number(i.total);
+                return {
+                  id: String(i.id ?? ""),
+                  texto: String(i.texto ?? ""),
+                  total: total !== null && Number.isFinite(total) ? total : null,
+                };
+              })
           : [],
       };
     })

@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { getPerfilActual } from "./auth";
 import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
-import { puedeEditarPrioritarios } from "./proyectos-prioritarios";
+import { esEjePlanRector, puedeEditarPrioritarios } from "./proyectos-prioritarios";
 import {
   ANIOS_CARGABLES,
   ANIOS_HISTORIAL,
   CAMPOS_PRIORITARIO,
   PERIODICIDADES,
   esEnlaceWeb,
+  leerLineaBase,
   leerMetas,
   leerNumero,
   tienePrioritarios,
@@ -101,7 +102,7 @@ export async function crearProyectoPrioritario(
       historial: ANIOS_HISTORIAL.map((anio) => ({ anio, valor: null })),
       // 04.11: arranca con una meta vacía, con un indicador vacío, para que la
       // ficha muestre dónde va cada cosa.
-      metas: [{ id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "" }] }],
+      metas: [{ id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "", total: null }] }],
       created_by: auth.user?.id ?? null,
     })
     .select("id")
@@ -127,7 +128,17 @@ export async function editarCampoPrioritario(
 
   const texto = valor.trim();
   let guardar: string | number | null = texto || null;
-  if (tipo === "numero") {
+  // 05.11: la línea de base guarda el número y, si no es un número solo, lo escrito.
+  let tambien: Record<string, string | null> = {};
+  if (tipo === "linea_base") {
+    const lb = leerLineaBase(texto);
+    guardar = lb.numero;
+    tambien = { [`${campo}_texto`]: lb.texto };
+  } else if (tipo === "eje") {
+    if (texto && !(await esEjePlanRector(texto))) {
+      return { success: false, error: "Ese eje no está en el Plan Rector" };
+    }
+  } else if (tipo === "numero") {
     const n = leerNumero(texto);
     if (n === "invalido") return { success: false, error: "Escribí un número, sin letras" };
     guardar = n;
@@ -154,7 +165,7 @@ export async function editarCampoPrioritario(
   const sb = await getSupabaseServer();
   const { error } = await sb
     .from("proyecto_prioritario")
-    .update({ [campo]: guardar })
+    .update({ [campo]: guardar, ...tambien })
     .eq("id", id);
   if (error) return { success: false, error: error.message };
   refrescar(id);
@@ -249,7 +260,7 @@ async function cambiarMetas(
 export async function agregarMetaPrioritario(id: string): Promise<Resultado> {
   return cambiarMetas(id, (metas) => [
     ...metas,
-    { id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "" }] },
+    { id: crypto.randomUUID(), valor: null, descripcion: null, indicadores: [{ id: crypto.randomUUID(), texto: "", total: null }] },
   ]);
 }
 
@@ -287,7 +298,7 @@ export async function agregarIndicadorPrioritario(id: string, metaId: string): P
   return cambiarMetas(id, (metas) => {
     if (!metas.some((m) => m.id === metaId)) return "No se encontró la meta";
     return metas.map((m) =>
-      m.id === metaId ? { ...m, indicadores: [...m.indicadores, { id: crypto.randomUUID(), texto: "" }] } : m
+      m.id === metaId ? { ...m, indicadores: [...m.indicadores, { id: crypto.randomUUID(), texto: "", total: null }] } : m
     );
   });
 }
@@ -306,6 +317,27 @@ export async function editarIndicadorPrioritario(
             ...m,
             indicadores: m.indicadores.map((i) => (i.id === indicadorId ? { ...i, texto: texto.trim() } : i)),
           }
+    )
+  );
+}
+
+/**
+ * 05.11: el total planificado de un indicador ("dividir la meta en totales x
+ * indicador"). Vacío es que todavía no se cargó, no cero.
+ */
+export async function editarTotalIndicadorPrioritario(
+  id: string,
+  metaId: string,
+  indicadorId: string,
+  valor: string
+): Promise<Resultado> {
+  const total = leerNumero(valor.trim());
+  if (total === "invalido") return { success: false, error: "Escribí un número, sin letras" };
+  return cambiarMetas(id, (metas) =>
+    metas.map((m) =>
+      m.id !== metaId
+        ? m
+        : { ...m, indicadores: m.indicadores.map((i) => (i.id === indicadorId ? { ...i, total } : i)) }
     )
   );
 }

@@ -76,8 +76,10 @@ export function IndicadorCargaInline({
           indicador_id: indicadorId,
           valor_actual: null,
           valor_actual_texto: valorTxt.trim(),
-          valor_objetivo: null,
-          valor_objetivo_texto: objTxt.trim() || null,
+          // Como en IndicadorCargaForm (03.08): sin objetivo textual no se
+          // mandan estos campos. En null borraban el objetivo numérico, y el
+          // indicador pasaba a contarse como Sí/No, con el 50 % del semáforo.
+          ...(objTxt.trim() ? { valor_objetivo: null, valor_objetivo_texto: objTxt.trim() } : {}),
           estado_semaforo_override: estadoTexto,
           unidad_medida: unidad || null,
           proyecto_id: proyectoId,
