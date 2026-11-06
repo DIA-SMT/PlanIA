@@ -267,6 +267,13 @@ export function avanceIndicador(ind: {
   const texto = (ind.valor_actual_texto ?? "").trim();
   if (!textoEsVacio(texto)) {
     if (/^no$/i.test(texto) || textoEsCero(texto)) return 0;
+    // Correcciones 05.11: "lo puse como en ejecución SIN ASIGNARLE UN VALOR
+    // NUMÉRICO, se cambió [el avance de la meta] de 63 % a 83 %. No debería
+    // ser así porque no estoy agregando un dato cuantitativo". Con objetivo
+    // numérico el avance sale de la cantidad: cambiar solo el estado a "En
+    // ejecución" no suma. Finalizado sí vale 100: dice que se cumplió. Los
+    // indicadores sin objetivo numérico (Sí/No, Realizado) siguen con el 50 %.
+    if (ind.valor_objetivo != null && ind.estado_semaforo === "amarillo") return 0;
     return porEstadoPct(ind.estado_semaforo);
   }
   return null; // sin dato

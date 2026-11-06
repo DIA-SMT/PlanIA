@@ -2,6 +2,7 @@ import { getSupabaseServer } from "./supabase/server";
 import { getScopeUnidades, puedeCargarArea } from "./auth";
 import type { PerfilUsuario } from "@/types/database";
 import { ANIO_POA } from "./poa-2027";
+import { rotuloCorto, type TipoNodoRector } from "./plan-rector-comun";
 import {
   AREAS_CON_PRIORITARIOS,
   leerMetas,
@@ -21,7 +22,7 @@ import {
  */
 
 const COLUMNAS =
-  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_anio, linea_base_fuente, historial, metas, meta_anual, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, justificacion_tecnica, updated_at";
+  "id, unidad_id, anio, proyecto_id, nombre, diagnostico, unidad_medida, linea_base_total, linea_base_pendiente, linea_base_total_texto, linea_base_pendiente_texto, linea_base_anio, linea_base_fuente, linea_base_observaciones, plan_rector_eje_id, historial, metas, meta_anual, enlace_territorial, presupuesto_area, presupuesto_proyecto, periodicidad, justificacion_tecnica, updated_at";
 
 /** PostgREST devuelve numeric como texto cuando no entra en un double: se pasa a número igual. */
 function aNumero(v: unknown): number | null {
@@ -42,6 +43,10 @@ function normalizar(fila: Record<string, unknown>): ProyectoPrioritario {
     historial,
     linea_base_total: aNumero(fila.linea_base_total),
     linea_base_pendiente: aNumero(fila.linea_base_pendiente),
+    linea_base_total_texto: (fila.linea_base_total_texto as string | null) ?? null,
+    linea_base_pendiente_texto: (fila.linea_base_pendiente_texto as string | null) ?? null,
+    linea_base_observaciones: (fila.linea_base_observaciones as string | null) ?? null,
+    plan_rector_eje_id: (fila.plan_rector_eje_id as string | null) ?? null,
     linea_base_anio: aNumero(fila.linea_base_anio),
     metas,
     // La primera meta manda; meta_anual solo si la ficha todavía no tiene lista.
@@ -223,12 +228,73 @@ export async function getProyectosDelArea(unidadId: string): Promise<{ id: strin
   return (data ?? []) as { id: string; nombre: string }[];
 }
 
+export interface EjeDeFicha {
+  eje: string;
+  ambito: string | null;
+  /** De dónde sale: la imputación del proyecto del POA 2026, o la ficha. */
+  origen: "proyecto" | "ficha";
+}
+
 /**
- * El eje del Plan Rector de la ficha: el del proyecto del POA 2026 al que
- * corresponde, por su imputación confirmada (la principal, si hay varias).
- * Sin proyecto o sin imputación, no hay eje: no se adivina.
+ * El eje del Plan Rector de la ficha. Primero, el del proyecto del POA 2026 al
+ * que corresponde, por su imputación confirmada (la principal, si hay varias).
+ *
+ * 05.11: "si no se asocia a la POA 2026, no permite cargar el ámbito y eje".
+ * Sin proyecto, o con uno que no está imputado, vale el eje elegido en la
+ * ficha (plan_rector_eje_id). Sin ninguno de los dos, no hay eje: no se
+ * adivina.
  */
-export async function getEjeDeProyecto(
+export async function getEjeDeFicha(ficha: {
+  proyecto_id: string | null;
+  plan_rector_eje_id: string | null;
+}): Promise<EjeDeFicha | null> {
+  const delProyecto = await getEjeDeProyecto(ficha.proyecto_id);
+  if (delProyecto) return { ...delProyecto, origen: "proyecto" };
+  const deLaFicha = await ejeYAmbito(ficha.plan_rector_eje_id);
+  return deLaFicha ? { ...deLaFicha, origen: "ficha" } : null;
+}
+
+/** Los ejes del Plan Rector para elegir en la ficha, con su ámbito, en el orden del documento. */
+export async function getEjesPlanRector(): Promise<{ id: string; rotulo: string; ambito: string }[]> {
+  const sb = await getSupabaseServer();
+  const { data } = await sb
+    .from("plan_rector_nodo")
+    .select("id, parent_id, tipo, codigo_cliente, nombre, nombre_corto, orden")
+    .in("tipo", ["area_intervencion", "eje"])
+    .eq("activa", true)
+    .order("orden");
+  type Nodo = {
+    id: string;
+    parent_id: string | null;
+    tipo: TipoNodoRector;
+    codigo_cliente: string | null;
+    nombre: string;
+    nombre_corto: string | null;
+  };
+  const nodos = (data ?? []) as Nodo[];
+  return nodos
+    .filter((n) => n.tipo === "area_intervencion")
+    .flatMap((a) =>
+      nodos
+        .filter((e) => e.tipo === "eje" && e.parent_id === a.id)
+        .map((e) => ({ id: e.id, rotulo: rotuloCorto(e), ambito: rotuloCorto(a) }))
+    );
+}
+
+/** Un eje elegido a mano: tiene que existir, estar activo y ser un eje. */
+export async function esEjePlanRector(nodoId: string): Promise<boolean> {
+  const sb = await getSupabaseServer();
+  const { data } = await sb
+    .from("plan_rector_nodo")
+    .select("id")
+    .eq("id", nodoId)
+    .eq("tipo", "eje")
+    .eq("activa", true)
+    .maybeSingle();
+  return !!data;
+}
+
+async function getEjeDeProyecto(
   proyectoId: string | null
 ): Promise<{ eje: string; ambito: string | null } | null> {
   if (!proyectoId) return null;
@@ -240,7 +306,13 @@ export async function getEjeDeProyecto(
     .eq("estado", "confirmado")
     .order("principal", { ascending: false })
     .limit(1);
-  let nodoId = (vinculos?.[0] as { nodo_id: string } | undefined)?.nodo_id ?? null;
+  return ejeYAmbito((vinculos?.[0] as { nodo_id: string } | undefined)?.nodo_id ?? null);
+}
+
+/** El eje y el ámbito de un nodo del Plan Rector (eje, objetivo o línea). */
+async function ejeYAmbito(desde: string | null): Promise<{ eje: string; ambito: string | null } | null> {
+  const sb = await getSupabaseServer();
+  let nodoId = desde;
 
   // Se sube desde el nodo imputado (eje, objetivo o línea) hasta el eje.
   type Nodo = { id: string; parent_id: string | null; tipo: string; nombre: string };
