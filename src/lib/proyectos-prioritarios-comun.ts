@@ -5,49 +5,11 @@
  * Corrección del 28.10, migración 059.
  */
 
-/**
- * Las áreas que tienen el botón de Proyectos prioritarios, por código de
- * unidad. "Ese botón y la ficha que contiene debe estar SOLAMENTE en estas
- * direcciones"; las demás siguen con la ficha POA 2027 tal cual.
- *
- * "Obras públicas" y "movilidad urbana" no son direcciones en el organigrama:
- * son las secretarías (confirmado el 30.10).
+/*
+ * Las áreas que tienen el botón de Proyectos prioritarios ya no están acá: desde
+ * el 13.11 (migración 064) son la tabla area_prioritaria, que Planificación
+ * cambia desde PlanIA. Ver getAreasConPrioritarios.
  */
-export const AREAS_CON_PRIORITARIOS: Record<string, string> = {
-  DIR64: "Obras viales",
-  DIR65: "Alumbrado",
-  DIR51: "Limpieza urbana",
-  SEC11: "Obras públicas",
-  DIR50: "Arbolado",
-  DIR49: "Espacios verdes",
-  DIR62: "Transporte",
-  DIR15: "Respuestas rápidas",
-  DIR44: "Ambiente",
-  DIR02: "Educación",
-  SEC10: "Movilidad urbana",
-  DIR06: "Asistencia pública",
-  DIR01: "Salud",
-  DIR08: "Casa Azul",
-  DIR09: "Tartamudez",
-  DIR42: "Familia",
-  // 03.11: "necesitamos agregar las siguientes direcciones al apartado de
-  // proyectos prioritarios". Falta "PPC": no hay ninguna área con ese nombre
-  // en PlanIA y se está consultando cuál es.
-  DIR05: "Población animal",
-  DIR66: "Proyectos",
-  DIR30: "COMM",
-  DIR34: "Deportes",
-  DIR16: "Gestión cultural",
-  DIR17: "Museos",
-  DIR22: "Turismo",
-  DIR03: "Niñez y Juventud",
-  DIR04: "Adultos mayores",
-  DIR41: "Programas sociales",
-};
-
-export function tienePrioritarios(codigo: string | null | undefined): boolean {
-  return !!codigo && codigo in AREAS_CON_PRIORITARIOS;
-}
 
 /** El horizonte del Plan Rector: automático en la ficha. */
 export const HORIZONTE_PLAN_RECTOR = 2030;
@@ -89,6 +51,12 @@ export interface MetaPrioritario {
    * año en ese indicador, en la unidad de medida de la ficha.
    */
   indicadores: IndicadorPrioritario[];
+  /**
+   * 12.11 (064): "necesitamos que cada meta pueda vincularse con un
+   * histórico". Lo ejecutado cada año en esta meta; el de la primera es el
+   * que proyecta el Plan Rector.
+   */
+  historial: FilaHistorial[];
 }
 
 export interface IndicadorPrioritario {
@@ -327,12 +295,33 @@ export function esEnlaceWeb(texto: string | null | undefined): boolean {
   }
 }
 
-/** Lee la lista de metas tal como viene de la base, sin confiar en su forma. */
-export function leerMetas(raw: unknown): MetaPrioritario[] {
+/**
+ * Lee un historial tal como viene de la base. valor null es "sin datos
+ * disponibles", que no es cero.
+ */
+export function leerHistorial(raw: unknown): FilaHistorial[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((h): h is Record<string, unknown> => !!h && typeof h === "object")
+    .map((h) => {
+      const valor = h.valor === null || h.valor === undefined || h.valor === "" ? null : Number(h.valor);
+      return { anio: Number(h.anio), valor: valor !== null && Number.isFinite(valor) ? valor : null };
+    })
+    .filter((h) => Number.isInteger(h.anio));
+}
+
+/**
+ * Lee la lista de metas tal como viene de la base, sin confiar en su forma.
+ *
+ * 12.11: cada meta trae su historial. Una primera meta que todavía no lo tiene
+ * (ficha de antes de la migración 064) se queda con el de la ficha, que era
+ * el único.
+ */
+export function leerMetas(raw: unknown, historialFicha: FilaHistorial[] = []): MetaPrioritario[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((m): m is Record<string, unknown> => !!m && typeof m === "object")
-    .map((m) => {
+    .map((m, i) => {
       const valor = m.valor === null || m.valor === undefined || m.valor === "" ? null : Number(m.valor);
       return {
         id: String(m.id ?? ""),
@@ -350,6 +339,7 @@ export function leerMetas(raw: unknown): MetaPrioritario[] {
                 };
               })
           : [],
+        historial: "historial" in m ? leerHistorial(m.historial) : i === 0 ? historialFicha : [],
       };
     })
     .filter((m) => m.id);

@@ -1,14 +1,13 @@
+import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
 import { getScopeUnidades, puedeCargarArea } from "./auth";
 import type { PerfilUsuario } from "@/types/database";
 import { ANIO_POA } from "./poa-2027";
 import { rotuloCorto, type TipoNodoRector } from "./plan-rector-comun";
 import {
-  AREAS_CON_PRIORITARIOS,
+  leerHistorial,
   leerMetas,
   proyeccionPrioritario,
-  tienePrioritarios,
-  type FilaHistorial,
   type ProyeccionPrioritario,
   type ProyectoPrioritario,
 } from "./proyectos-prioritarios-comun";
@@ -16,8 +15,8 @@ import {
 /**
  * Proyectos prioritarios del POA 2027 — corrección del 28.10, migración 059.
  *
- * Una ficha aparte de la del POA 2027, solo para las áreas de
- * AREAS_CON_PRIORITARIOS. Las lecturas pasan por la RLS: cada uno ve las de su
+ * Una ficha aparte de la del POA 2027, solo para las áreas de la tabla
+ * area_prioritaria (064). Las lecturas pasan por la RLS: cada uno ve las de su
  * alcance.
  */
 
@@ -32,15 +31,11 @@ function aNumero(v: unknown): number | null {
 }
 
 function normalizar(fila: Record<string, unknown>): ProyectoPrioritario {
-  const metas = leerMetas(fila.metas);
-  const historial = Array.isArray(fila.historial)
-    ? (fila.historial as { anio: unknown; valor: unknown }[]).map(
-        (h): FilaHistorial => ({ anio: Number(h.anio), valor: aNumero(h.valor) })
-      )
-    : [];
+  const metas = leerMetas(fila.metas, leerHistorial(fila.historial));
   return {
     ...(fila as unknown as ProyectoPrioritario),
-    historial,
+    // 12.11: el historial de la ficha es el de la primera meta, como meta_anual.
+    historial: metas.length > 0 ? metas[0].historial : leerHistorial(fila.historial),
     linea_base_total: aNumero(fila.linea_base_total),
     linea_base_pendiente: aNumero(fila.linea_base_pendiente),
     linea_base_total_texto: (fila.linea_base_total_texto as string | null) ?? null,
@@ -62,6 +57,25 @@ export interface AreaConPrioritarios {
   codigo: string | null;
   habilitada: boolean;
 }
+
+/**
+ * Las áreas que tienen el botón de Proyectos prioritarios, con su orden en la
+ * lista — 13.11, migración 064. "Ese botón y la ficha que contiene debe estar
+ * SOLAMENTE en estas direcciones"; las demás siguen con la ficha POA 2027 tal
+ * cual. Hasta el 13.11 era una lista fija en el código; ahora la cambia
+ * Planificación desde PlanIA.
+ *
+ * Una vez por pedido: la consultan el menú, la página y las acciones. Sin la
+ * migración 064, ninguna área.
+ */
+export const getAreasConPrioritarios = cache(async function getAreasConPrioritarios(): Promise<
+  Map<string, number>
+> {
+  const sb = await getSupabaseServer();
+  const { data, error } = await sb.from("area_prioritaria").select("unidad_id, orden");
+  if (error) return new Map();
+  return new Map(((data ?? []) as { unidad_id: string; orden: number }[]).map((a) => [a.unidad_id, a.orden]));
+});
 
 /**
  * Quién edita los proyectos prioritarios de un área: los mismos que cargan su
@@ -87,14 +101,13 @@ export async function getAreasPrioritariosACargo(perfil: PerfilUsuario): Promise
 
 export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrioritarios | null> {
   const sb = await getSupabaseServer();
-  const { data } = await sb
-    .from("unidad_organizacional")
-    .select("id, nombre, codigo")
-    .eq("id", unidadId)
-    .maybeSingle();
+  const [{ data }, areas] = await Promise.all([
+    sb.from("unidad_organizacional").select("id, nombre, codigo").eq("id", unidadId).maybeSingle(),
+    getAreasConPrioritarios(),
+  ]);
   if (!data) return null;
   const u = data as { id: string; nombre: string; codigo: string | null };
-  return { ...u, habilitada: tienePrioritarios(u.codigo) };
+  return { ...u, habilitada: areas.has(u.id) };
 }
 
 /**
@@ -103,21 +116,35 @@ export async function getAreaPrioritarios(unidadId: string): Promise<AreaConPrio
  * filtra con getAreasPrioritariosACargo.
  */
 export async function getResumenPrioritarios(): Promise<
-  { id: string; nombre: string; codigo: string; fichas: number }[]
+  { id: string; nombre: string; codigo: string | null; fichas: number }[]
 > {
+  const areas = await getAreasConPrioritarios();
+  if (areas.size === 0) return [];
   const sb = await getSupabaseServer();
-  const codigos = Object.keys(AREAS_CON_PRIORITARIOS);
   const [{ data: unidades }, { data: fichas }] = await Promise.all([
-    sb.from("unidad_organizacional").select("id, nombre, codigo").in("codigo", codigos).eq("activa", true),
+    sb.from("unidad_organizacional").select("id, nombre, codigo").in("id", [...areas.keys()]).eq("activa", true),
     sb.from("proyecto_prioritario").select("unidad_id").eq("anio", ANIO_POA).is("deleted_at", null),
   ]);
   const porUnidad = new Map<string, number>();
   for (const f of (fichas ?? []) as { unidad_id: string }[]) {
     porUnidad.set(f.unidad_id, (porUnidad.get(f.unidad_id) ?? 0) + 1);
   }
-  return ((unidades ?? []) as { id: string; nombre: string; codigo: string }[])
+  return ((unidades ?? []) as { id: string; nombre: string; codigo: string | null }[])
     .map((u) => ({ ...u, fichas: porUnidad.get(u.id) ?? 0 }))
-    .sort((a, b) => codigos.indexOf(a.codigo) - codigos.indexOf(b.codigo));
+    .sort((a, b) => (areas.get(a.id) ?? 0) - (areas.get(b.id) ?? 0) || a.nombre.localeCompare(b.nombre, "es"));
+}
+
+/**
+ * 13.11: las áreas que se pueden agregar a la lista. Las activas que todavía
+ * no están, para el selector de Planificación.
+ */
+export async function getAreasParaAgregar(): Promise<{ id: string; nombre: string; tipo: string }[]> {
+  const sb = await getSupabaseServer();
+  const [{ data }, areas] = await Promise.all([
+    sb.from("unidad_organizacional").select("id, nombre, tipo").eq("activa", true).order("nombre"),
+    getAreasConPrioritarios(),
+  ]);
+  return ((data ?? []) as { id: string; nombre: string; tipo: string }[]).filter((u) => !areas.has(u.id));
 }
 
 export async function getPrioritariosDelArea(unidadId: string): Promise<ProyectoPrioritario[]> {
@@ -156,6 +183,7 @@ export async function getProyeccionesPorProyecto(): Promise<Map<string, Proyecci
     .from("proyecto_prioritario")
     .select(COLUMNAS)
     .eq("anio", ANIO_POA)
+    .in("unidad_id", await idsDeAreas())
     .not("proyecto_id", "is", null)
     .is("deleted_at", null)
     .order("created_at");
@@ -181,10 +209,19 @@ export async function getProyectosPrioritariosIds(): Promise<Set<string>> {
     .from("proyecto_prioritario")
     .select("proyecto_id")
     .eq("anio", ANIO_POA)
+    .in("unidad_id", await idsDeAreas())
     .not("proyecto_id", "is", null)
     .is("deleted_at", null);
   if (error) return new Set();
   return new Set(((data ?? []) as { proyecto_id: string }[]).map((f) => f.proyecto_id));
+}
+
+/**
+ * 13.11: los id de las áreas de la lista, para filtrar las fichas. Las de un
+ * área que se quitó de la lista quedan guardadas pero no se ven.
+ */
+async function idsDeAreas(): Promise<string[]> {
+  return [...(await getAreasConPrioritarios()).keys()];
 }
 
 /** 30.10: todas las fichas que el usuario puede ver (la RLS acota), con su área. */
@@ -197,6 +234,7 @@ export async function getTodosLosPrioritarios(): Promise<
       .from("proyecto_prioritario")
       .select(COLUMNAS)
       .eq("anio", ANIO_POA)
+      .in("unidad_id", await idsDeAreas())
       .is("deleted_at", null)
       .order("created_at"),
     sb.from("unidad_organizacional").select("id, nombre, nombre_corto"),
