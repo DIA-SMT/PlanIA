@@ -217,14 +217,16 @@ export function SelectorPrioritario({
   );
 }
 
-/** Lo ejecutado en un año del historial. */
+/** Lo ejecutado en un año del historial de una meta (12.11: cada meta tiene el suyo). */
 export function CeldaHistorial({
   id,
+  metaId,
   anio,
   valor,
   editable,
 }: {
   id: string;
+  metaId: string;
   anio: number;
   valor: number | null;
   editable: boolean;
@@ -233,7 +235,7 @@ export function CeldaHistorial({
   const inicial = valor === null ? "" : String(valor);
   const [texto, setTexto] = useState(inicial);
   const { correr, error, pendiente } = useGuardar(
-    (t) => editarHistorialPrioritario(id, anio, t),
+    (t) => editarHistorialPrioritario(id, metaId, anio, t),
     () => setEditando(false)
   );
   const mostrar =

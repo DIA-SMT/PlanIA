@@ -6,12 +6,14 @@ import {
   getAreaPrioritarios,
   getPrioritariosDelArea,
   getResumenPrioritarios,
+  getAreasParaAgregar,
   getAreasPrioritariosACargo,
   puedeEditarPrioritarios,
   getProyectosDelArea,
 } from "@/lib/proyectos-prioritarios";
 import { numeroArg } from "@/lib/proyectos-prioritarios-comun";
 import { NuevoPrioritario } from "@/components/poa2027/prioritarios-acciones";
+import { AreasPrioritarias } from "@/components/poa2027/areas-prioritarias";
 import { BackButton } from "@/components/layout/back-button";
 
 export const revalidate = 0;
@@ -56,6 +58,8 @@ export default async function ProyectosPrioritariosPage({
   if (verTodas) {
     const areas = (await getResumenPrioritarios()).filter((a) => aCargo.includes(a.id));
     const total = areas.reduce((s, a) => s + a.fichas, 0);
+    // 11.11: Planificación agrega y quita áreas de la lista desde acá.
+    const paraAgregar = esPlanificacion ? await getAreasParaAgregar() : [];
     return (
       <div className="space-y-6 max-w-4xl">
         <BackButton fallback="/poa-2027" />
@@ -71,23 +75,11 @@ export default async function ProyectosPrioritariosPage({
             Entrá a un área para ver sus fichas o generar una.
           </p>
         </div>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {areas.map((a) => (
-            <li key={a.id}>
-              <Link
-                href={`/poa-2027/prioritarios?unidad=${a.id}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 hover:bg-surface-hover"
-              >
-                <span className="text-sm text-foreground">{a.nombre}</span>
-                <span
-                  className={`text-[11px] shrink-0 tabular-nums ${a.fichas ? "font-semibold text-primary" : "text-muted/60"}`}
-                >
-                  {a.fichas ? `${a.fichas} ${a.fichas === 1 ? "ficha" : "fichas"}` : "sin fichas"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <AreasPrioritarias
+          areas={areas.map(({ id, nombre, fichas }) => ({ id, nombre, fichas }))}
+          esPlanificacion={esPlanificacion}
+          paraAgregar={paraAgregar}
+        />
       </div>
     );
   }

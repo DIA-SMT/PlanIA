@@ -100,9 +100,6 @@ export default async function FichaPrioritariaPage({
   const unidad = ficha.unidad_medida?.trim() ?? "";
   const conUnidad = (n: number | null) => (n === null ? "" : `${numeroArg(n)}${unidad ? ` ${unidad}` : ""}`);
   const pesos = (n: number | null) => (n === null ? "" : `$${numeroArg(n)}`);
-  const historial = historialConAcumulado(ficha.historial);
-  // 04.11: 2023 es opcional; en la vista final sale solo si se cargó.
-  const antecedentes = historialAntecedente(ficha.historial).filter((h) => editable || h.valor !== null);
   const volver = `/poa-2027/prioritarios?unidad=${area.id}`;
   const aqui = `/poa-2027/prioritarios/${ficha.id}`;
 
@@ -272,41 +269,70 @@ export default async function FichaPrioritariaPage({
       </Seccion>
 
       <Seccion numero={3} titulo="Historial de ejecución" quien={quien("Director · Portal de Datos, si existen esos datos")}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[11px] text-muted uppercase tracking-wider border-b border-border">
-              <th className="text-left font-normal py-1.5">Año</th>
-              <th className="text-right font-normal py-1.5">Ejecutadas{unidad ? ` (${unidad})` : ""}</th>
-              <th className="text-right font-normal py-1.5">Acumulado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* 04.11: 2023 es opcional y queda como antecedente, sin acumulado. */}
-            {antecedentes.map((h) => (
-              <tr key={h.anio} className="border-b border-border/50">
-                <td className="py-1.5">
-                  {h.anio}{" "}
-                  <span className="text-[10px] text-muted">{editable ? "(antecedente, opcional)" : "(antecedente)"}</span>
-                </td>
-                <td className="py-1.5 text-right">
-                  <CeldaHistorial id={ficha.id} anio={h.anio} valor={h.valor} editable={editable} />
-                </td>
-                <td className="py-1.5 text-right text-[11px] text-muted/70">no suma</td>
-              </tr>
-            ))}
-            {historial.map((h) => (
-              <tr key={h.anio} className="border-b border-border/50">
-                <td className="py-1.5">{h.anio}</td>
-                <td className="py-1.5 text-right">
-                  <CeldaHistorial id={ficha.id} anio={h.anio} valor={h.valor} editable={editable} />
-                </td>
-                <td className="py-1.5 text-right text-muted">
-                  {h.acumulado === null ? "—" : numeroArg(h.acumulado)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* 12.11: "necesitamos que cada meta pueda vincularse con un histórico", y
+            "los proyectos pueden tener más de una meta [...] ¿cómo resolveríamos el
+            tema de la vista del historial?". Una tabla por meta, en el orden del punto 4. */}
+        {ficha.metas.length === 0 && (
+          <p className="text-xs text-muted italic">
+            {editable ? "Agregá una meta en el punto 4 para cargar su historial." : SIN_DATOS}
+          </p>
+        )}
+        {ficha.metas.map((m, i) => {
+          const historial = historialConAcumulado(m.historial);
+          // 04.11: 2023 es opcional; en la vista final sale solo si se cargó.
+          const antecedentes = historialAntecedente(m.historial).filter((h) => editable || h.valor !== null);
+          return (
+            <div key={m.id} className={ficha.metas.length > 1 ? "space-y-1" : ""}>
+              {ficha.metas.length > 1 && (
+                <p className="text-[11px] text-primary uppercase tracking-wider">
+                  Meta {i + 1}
+                  {m.valor !== null && <span className="normal-case"> · {conUnidad(m.valor)}</span>}
+                  {m.descripcion && (
+                    <span className="normal-case text-muted"> · {m.descripcion.split("\n")[0]}</span>
+                  )}
+                </p>
+              )}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] text-muted uppercase tracking-wider border-b border-border">
+                    <th className="text-left font-normal py-1.5">Año</th>
+                    <th className="text-right font-normal py-1.5">Ejecutadas{unidad ? ` (${unidad})` : ""}</th>
+                    <th className="text-right font-normal py-1.5">Acumulado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {antecedentes.map((h) => (
+                    <tr key={h.anio} className="border-b border-border/50">
+                      <td className="py-1.5">
+                        {h.anio}{" "}
+                        <span className="text-[10px] text-muted">
+                          {editable ? "(antecedente, opcional)" : "(antecedente)"}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-right">
+                        <CeldaHistorial id={ficha.id} metaId={m.id} anio={h.anio} valor={h.valor} editable={editable} />
+                      </td>
+                      <td className="py-1.5 text-right text-[11px] text-muted/70">no suma</td>
+                    </tr>
+                  ))}
+                  {historial.map((h) => (
+                    <tr key={h.anio} className="border-b border-border/50">
+                      <td className="py-1.5">{h.anio}</td>
+                      <td className="py-1.5 text-right">
+                        <CeldaHistorial id={ficha.id} metaId={m.id} anio={h.anio} valor={h.valor} editable={editable} />
+                      </td>
+                      <td className="py-1.5 text-right text-muted">
+                        {h.acumulado === null ? "—" : numeroArg(h.acumulado)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+        {ficha.metas.length > 1 &&
+          nota("Cada meta lleva su historial. El de la primera es el que usa el Plan Rector para proyectar el avance.")}
         {nota(
           <>
             Si no hay registros históricos, se informa &ldquo;sin datos disponibles&rdquo;; no equivale a
