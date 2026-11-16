@@ -281,8 +281,10 @@ export default async function FichaPrioritariaPage({
           const historial = historialConAcumulado(m.historial);
           // 04.11: 2023 es opcional; en la vista final sale solo si se cargó.
           const antecedentes = historialAntecedente(m.historial).filter((h) => editable || h.valor !== null);
+          // 13.11: "las metas del historial de ejecución deberían tener también su indicador".
+          const indicadores = m.indicadores.filter((ind) => ind.texto.trim());
           return (
-            <div key={m.id} className={ficha.metas.length > 1 ? "space-y-1" : ""}>
+            <div key={m.id} className="space-y-1">
               {ficha.metas.length > 1 && (
                 <p className="text-[11px] text-primary uppercase tracking-wider">
                   Meta {i + 1}
@@ -291,6 +293,17 @@ export default async function FichaPrioritariaPage({
                     <span className="normal-case text-muted"> · {m.descripcion.split("\n")[0]}</span>
                   )}
                 </p>
+              )}
+              {indicadores.length > 0 && (
+                <ul className="text-xs text-muted space-y-0.5">
+                  {indicadores.map((ind) => (
+                    <li key={ind.id}>
+                      <span className="text-[11px] uppercase tracking-wider">Indicador:</span>{" "}
+                      <span className="text-foreground/90">{ind.texto}</span>
+                      {ind.total !== null && <span> · {conUnidad(ind.total)}</span>}
+                    </li>
+                  ))}
+                </ul>
               )}
               <table className="w-full text-sm">
                 <thead>
