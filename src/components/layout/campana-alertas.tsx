@@ -74,15 +74,27 @@ export function CampanaAlertas({ alertas, porVencer }: Props) {
               <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
                 Avisos
               </p>
-              {sinLeer.length > 0 && (
+              <div className="flex items-center gap-3">
+                {sinLeer.length > 0 && (
+                  <button
+                    onClick={marcarTodas}
+                    disabled={isPending}
+                    className="text-[10px] text-primary hover:text-primary-light disabled:opacity-50"
+                  >
+                    Marcar todo como leído
+                  </button>
+                )}
+                {/* 17.11: "podrían ponerle una crucecita a la vista para cerrarla?
+                    Estuve un rato largo para darme cuenta cómo cerrarla". */}
                 <button
-                  onClick={marcarTodas}
-                  disabled={isPending}
-                  className="text-[10px] text-primary hover:text-primary-light disabled:opacity-50"
+                  onClick={() => setAbierto(false)}
+                  aria-label="Cerrar avisos"
+                  title="Cerrar"
+                  className="h-6 w-6 rounded border border-border text-xs text-muted hover:text-foreground"
                 >
-                  Marcar todo como leído
+                  ✕
                 </button>
-              )}
+              </div>
             </div>
 
             {visibles.length === 0 && porVencer.length === 0 && (

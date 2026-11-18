@@ -6,6 +6,7 @@ import { getMisFichas, getTextosPoa, ANIO_POA } from "@/lib/poa-2027";
 import { CampoEditable } from "@/components/poa2027/campo-editable";
 import { TextosDelArea } from "@/components/poa2027/textos-del-area";
 import { TraerDe2026, AceptarFicha, NuevoProyectoPoa } from "@/components/poa2027/propuestas-acciones";
+import { BotonInstructivo } from "@/components/poa2027/instructivo";
 import { BackButton } from "@/components/layout/back-button";
 import { getAreaPrioritarios } from "@/lib/proyectos-prioritarios";
 
@@ -118,7 +119,11 @@ export default async function EditarMiPoaPage({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <BackButton fallback="/poa-2027" />
+      <div className="flex items-center justify-between gap-3">
+        <BackButton fallback="/poa-2027" />
+        {/* 16.11: el instructivo, antes de comenzar la carga. */}
+        <BotonInstructivo guia="poa" />
+      </div>
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">

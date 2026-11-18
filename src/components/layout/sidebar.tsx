@@ -148,8 +148,16 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* 22.09: se puede volver al selector de sistema. */}
-      <div className="px-4 pb-2">
+      {/* 22.09: se puede volver al selector de sistema.
+          17.11: "podrían poner una opción visible para el cambio de contraseña?
+          Porque hoy todos tienen la misma". Estaba solo detrás del nombre, arriba. */}
+      <div className="px-4 pb-2 space-y-0.5">
+        <Link
+          href="/perfil#contrasena"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+        >
+          <span>🔑</span> Cambiar contraseña
+        </Link>
         <Link
           href="/"
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted hover:text-foreground hover:bg-surface-hover transition-colors"

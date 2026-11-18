@@ -15,6 +15,7 @@ import { numeroArg } from "@/lib/proyectos-prioritarios-comun";
 import { NuevoPrioritario } from "@/components/poa2027/prioritarios-acciones";
 import { AreasPrioritarias } from "@/components/poa2027/areas-prioritarias";
 import { BackButton } from "@/components/layout/back-button";
+import { BotonInstructivo } from "@/components/poa2027/instructivo";
 
 export const revalidate = 0;
 
@@ -62,7 +63,11 @@ export default async function ProyectosPrioritariosPage({
     const paraAgregar = esPlanificacion ? await getAreasParaAgregar() : [];
     return (
       <div className="space-y-6 max-w-4xl">
-        <BackButton fallback="/poa-2027" />
+        <div className="flex items-center justify-between gap-3">
+          <BackButton fallback="/poa-2027" />
+          {/* 16.11: el instructivo, antes de comenzar la carga. */}
+          <BotonInstructivo guia="prioritarios" />
+        </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Proyectos prioritarios · POA {ANIO_POA}</h1>
           <p className="text-sm text-muted mt-1">
@@ -116,7 +121,10 @@ export default async function ProyectosPrioritariosPage({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <BackButton fallback={volver} />
+      <div className="flex items-center justify-between gap-3">
+        <BackButton fallback={volver} />
+        <BotonInstructivo guia="prioritarios" />
+      </div>
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">Proyectos prioritarios · {area.nombre}</h1>

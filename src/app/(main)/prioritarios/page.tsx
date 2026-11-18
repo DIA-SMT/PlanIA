@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BuscadorAreas } from "@/components/dashboard/buscador-areas";
+import { BotonInstructivo } from "@/components/poa2027/instructivo";
 
 export const revalidate = 0;
 
@@ -76,14 +77,18 @@ export default async function ProyectosPrioritariosVistaPage() {
             {areas.length > 0 && ` de ${areas.length} ${areas.length === 1 ? "área" : "áreas"}`}.
           </p>
         </div>
-        {perfil.rol === "admin_funcional" && (
-          <Link
-            href="/poa-2027/prioritarios"
-            className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover self-start"
-          >
-            Cargar o editar por área
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          {/* 16.11: el instructivo, antes de comenzar la carga. */}
+          <BotonInstructivo guia="prioritarios" />
+          {perfil.rol === "admin_funcional" && (
+            <Link
+              href="/poa-2027/prioritarios"
+              className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"
+            >
+              Cargar o editar por área
+            </Link>
+          )}
+        </div>
       </div>
 
       {error ? (

@@ -9,6 +9,7 @@ import {
 import { TraerTodasBoton } from "@/components/poa2027/traer-todas-boton";
 import { TablaAreasPoa } from "@/components/poa2027/tabla-areas";
 import { DocumentoPoa } from "@/components/poa2027/documento-poa";
+import { BotonInstructivo } from "@/components/poa2027/instructivo";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
 import { getAreasPrioritariosACargo } from "@/lib/proyectos-prioritarios";
 
@@ -88,13 +89,17 @@ export default async function Poa2027Page() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="no-imprimir space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">POA {ANIO_POA}</h1>
-          <p className="text-sm text-muted mt-1">
-            {puedeCargar
-              ? "Este es el documento que se va a enviar. Hacé clic sobre cualquier texto de tus fichas para corregirlo acá mismo."
-              : "El Plan Operativo Anual 2027, armado con las fichas PRISMA de cada área."}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">POA {ANIO_POA}</h1>
+            <p className="text-sm text-muted mt-1">
+              {puedeCargar
+                ? "Este es el documento que se va a enviar. Hacé clic sobre cualquier texto de tus fichas para corregirlo acá mismo."
+                : "El Plan Operativo Anual 2027, armado con las fichas PRISMA de cada área."}
+            </p>
+          </div>
+          {/* 16.11: el instructivo, antes de comenzar la carga. */}
+          {(puedeCargar || esPlanificacion) && <BotonInstructivo guia="poa" />}
         </div>
 
         {puedeCargar && perfil?.unidad_id && (

@@ -153,6 +153,16 @@ export function Topbar({
               </button>
             </div>
           )}
+          {/* 17.11: el cambio de contraseña, a la vista (también en el celular). */}
+          <Link
+            href="/perfil#contrasena"
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+            className="h-8 px-2 rounded-lg border border-border flex items-center gap-1.5 text-xs text-muted hover:text-foreground hover:border-primary/30 transition-colors"
+          >
+            <span className="text-sm">🔑</span>
+            <span className="hidden xl:inline">Cambiar contraseña</span>
+          </Link>
           <CampanaAlertas alertas={alertas} porVencer={porVencer} />
           <ThemeToggle />
         </div>
