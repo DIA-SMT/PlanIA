@@ -76,7 +76,10 @@ export default async function PerfilPage() {
         </p>
       </section>
 
-      <CambiarContrasena />
+      {/* 17.11: "Cambiar contraseña" del menú y de la barra de arriba llegan acá. */}
+      <div id="contrasena" className="scroll-mt-24">
+        <CambiarContrasena />
+      </div>
     </div>
   );
 }

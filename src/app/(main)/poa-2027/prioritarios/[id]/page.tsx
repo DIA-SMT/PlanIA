@@ -140,7 +140,7 @@ export default async function FichaPrioritariaPage({
                 replace
                 className="text-xs bg-primary text-white rounded-lg px-3 py-1.5 hover:opacity-90"
               >
-                Ver ficha final
+                Ver ficha
               </Link>
               <BorrarPrioritario id={ficha.id} volverA={volver} />
             </>
@@ -167,7 +167,7 @@ export default async function FichaPrioritariaPage({
         {editable && (
           <p className="text-[11px] text-muted mt-2">
             Hacé clic sobre cualquier dato para completarlo. Se guarda al salir del campo. Cuando
-            termines, &ldquo;Ver ficha final&rdquo; muestra cómo queda para imprimir.
+            termines, &ldquo;Finalizar carga&rdquo; (al pie) o &ldquo;Ver ficha&rdquo; muestran cómo queda para imprimir.
           </p>
         )}
       </div>
@@ -553,6 +553,22 @@ export default async function FichaPrioritariaPage({
           {campo("justificacion_tecnica", ficha.justificacion_tecnica, { largo: true })}
         </Dato>
       </Seccion>
+
+      {/* 16.11: "agregar un botón finalizar en la carga de proyectos prioritarios.
+          Abajo, supongo, para seguir el recorrido del ojo en la carga." Todo ya
+          quedó guardado campo por campo: lleva a la ficha completa. */}
+      {editable && (
+        <div className="no-imprimir flex flex-col items-end gap-1 border-t border-border pt-4">
+          <Link
+            href={aqui}
+            replace
+            className="text-sm font-semibold bg-primary text-white rounded-lg px-5 py-2.5 hover:opacity-90"
+          >
+            Finalizar carga
+          </Link>
+          <p className="text-[11px] text-muted">Lo cargado ya está guardado. Te muestra la ficha completa.</p>
+        </div>
+      )}
     </div>
   );
 }
