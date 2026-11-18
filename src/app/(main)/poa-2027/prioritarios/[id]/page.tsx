@@ -52,7 +52,7 @@ export const revalidate = 0;
  * explicación, y justificación técnica en Seguimiento y evolución.
  *
  * Lo que el modelo marca como automático (área, prioridad, horizonte) no se
- * edita. El ámbito y el eje salen del proyecto del POA 2026 que se elige en la
+ * edita. El ámbito y el eje salen del proyecto de la POA 2026 que se elige en la
  * ficha; 05.11: si no hay o no está imputado, se eligen acá.
  *
  * El historial de ejecución, que el modelo pide "enlazar con el portal de
@@ -174,7 +174,7 @@ export default async function FichaPrioritariaPage({
 
       <Seccion numero={1} titulo="Identificación" quien={quien("Director: solo el nombre · lo demás automático")}>
         <Dato rotulo="Nombre del proyecto">{campo("nombre", ficha.nombre, { className: "font-semibold" })}</Dato>
-        <Dato rotulo="Proyecto del POA 2026 al que corresponde">
+        <Dato rotulo="Proyecto de la POA 2026 al que corresponde">
           <SelectorPrioritario
             id={ficha.id}
             campo="proyecto_id"
@@ -214,8 +214,8 @@ export default async function FichaPrioritariaPage({
         <Dato rotulo="Horizonte estratégico">{HORIZONTE_PLAN_RECTOR}</Dato>
         {nota(
           eje?.origen === "proyecto"
-            ? "Área responsable, prioridad, ámbito, eje y horizonte: automáticos en PlanIA. El ámbito y el eje salen del proyecto del POA 2026, por su imputación al Plan Rector."
-            : "Área responsable, prioridad y horizonte: automáticos en PlanIA. Sin un proyecto del POA 2026 imputado al Plan Rector, el eje se elige acá y el ámbito sale del eje."
+            ? "Área responsable, prioridad, ámbito, eje y horizonte: automáticos en PlanIA. El ámbito y el eje salen del proyecto de la POA 2026, por su imputación al Plan Rector."
+            : "Área responsable, prioridad y horizonte: automáticos en PlanIA. Sin un proyecto de la POA 2026 imputado al Plan Rector, el eje se elige acá y el ámbito sale del eje."
         )}
       </Seccion>
 

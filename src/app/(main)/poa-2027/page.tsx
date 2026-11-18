@@ -20,7 +20,7 @@ export const revalidate = 0;
  *
  * 28.09: "en esta pantalla me gustaría que aparezca ya el pdf editable". Antes
  * acá había tres tarjetas y el documento estaba a un clic de distancia, en
- * /poa-2027/exportar. Ahora la pantalla ES el POA: arriba las acciones, abajo el
+ * /poa-2027/exportar. Ahora la pantalla ES la POA: arriba las acciones, abajo el
  * documento con lo propio y lo que mandaron las áreas de abajo.
  *
  * El circuito —quién envió y quién no, y las observaciones— tampoco está en un
@@ -79,7 +79,7 @@ export default async function Poa2027Page() {
 
   // 03.11: "los secretarios (de todas las direcciones) [...] deben poder
   // cargar proyectos en la POA 2027". Las áreas de abajo que el perfil puede
-  // cargar, para entrar a editar el POA de cada una.
+  // cargar, para entrar a editar la POA de cada una.
   const areasACargo =
     puedeCargar && perfil?.unidad_id && !esPlanificacion && circuito
       ? circuito.areasDeAbajo
@@ -95,7 +95,7 @@ export default async function Poa2027Page() {
             <p className="text-sm text-muted mt-1">
               {puedeCargar
                 ? "Este es el documento que se va a enviar. Hacé clic sobre cualquier texto de tus fichas para corregirlo acá mismo."
-                : "El Plan Operativo Anual 2027, armado con las fichas PRISMA de cada área."}
+                : "La Planificación Operativa Anual 2027, armada con las fichas PRISMA de cada área."}
             </p>
           </div>
           {/* 16.11: el instructivo, antes de comenzar la carga. */}
@@ -129,7 +129,7 @@ export default async function Poa2027Page() {
 
         {areasACargo.length > 0 && (
           <div className="rounded-xl border border-border bg-surface p-4 space-y-2">
-            <p className="text-xs font-semibold text-foreground">Editar el POA de un área a tu cargo</p>
+            <p className="text-xs font-semibold text-foreground">Editar la POA de un área a tu cargo</p>
             <div className="flex flex-wrap gap-2">
               {areasACargo.map((a) => (
                 <Link
@@ -188,8 +188,8 @@ export default async function Poa2027Page() {
             <h2 className="text-sm font-bold text-foreground">Todas las áreas</h2>
             <p className="text-xs text-muted mt-1 leading-relaxed">
               {resumen.sinTraer > 0
-                ? `Hay ${resumen.sinTraer} proyectos del 2026 de ${resumen.areasSinTraer} ${resumen.areasSinTraer === 1 ? "área" : "áreas"} que todavía no están en el POA ${ANIO_POA}.`
-                : `Todos los proyectos del 2026 ya están en el POA ${ANIO_POA}, como fichas aceptadas o propuestas.`}{" "}
+                ? `Hay ${resumen.sinTraer} proyectos del 2026 de ${resumen.areasSinTraer} ${resumen.areasSinTraer === 1 ? "área" : "áreas"} que todavía no están en la POA ${ANIO_POA}.`
+                : `Todos los proyectos del 2026 ya están en la POA ${ANIO_POA}, como fichas aceptadas o propuestas.`}{" "}
               Las propuestas no entran en el documento de un área hasta que alguien las acepta.
             </p>
           </div>
@@ -199,7 +199,7 @@ export default async function Poa2027Page() {
       ) : !perfil?.unidad_id ? (
         <div className="rounded-xl border border-border bg-surface p-6 text-center">
           <p className="text-sm text-muted">
-            Tu perfil no tiene un área asignada, así que no hay un POA que mostrar. Escribile a
+            Tu perfil no tiene un área asignada, así que no hay una POA que mostrar. Escribile a
             Planificación Estratégica.
           </p>
         </div>

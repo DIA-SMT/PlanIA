@@ -10,7 +10,7 @@ import { agregarAreaPrioritaria, quitarAreaPrioritaria } from "@/lib/actions-pro
  *
  * 12.11: "aquí se puede poner un buscador por área como está en la POA.
  * Perdemos mucho tiempo buscando abajo así por separado". Busca como la tabla
- * de áreas del POA 2027: sin importar tildes ni mayúsculas.
+ * de áreas de la POA 2027: sin importar tildes ni mayúsculas.
  *
  * 11.11: "crear una herramienta/botón en este tablero para que desde
  * planificación estratégica podamos asignar proyectos prioritarios a nuevas

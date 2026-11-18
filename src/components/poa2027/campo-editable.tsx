@@ -32,7 +32,7 @@ export function CampoEditable({
   className = "",
 }: {
   id: string;
-  /** De qué tabla es el campo: una ficha o un texto del POA (introducción o idea). */
+  /** De qué tabla es el campo: una ficha o un texto de la POA (introducción o idea). */
   de?: "ficha" | "texto";
   campo: string;
   valor: string | null;

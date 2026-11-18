@@ -4,7 +4,7 @@ import { TextosDelArea } from "./textos-del-area";
 import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
 
 /**
- * El POA 2027 como se va a ver el documento — 28.09.
+ * La POA 2027 como se va a ver el documento — 28.09.
  *
  * "Sería piola que se vea el pdf que se va a mandar y poder editar ahí en el
  * previsualizador."
@@ -18,7 +18,7 @@ import { ObservarFicha, ResolverObservacion } from "./circuito-acciones";
  * acá: sale del organigrama, que es de donde tiene que salir.
  *
  * 08.10: cada área abre con sus introducciones y cierra con su banco de ideas,
- * como en el libro del POA.
+ * como en el libro de la POA.
  */
 
 export function DocumentoPoa({
@@ -110,7 +110,7 @@ export function DocumentoPoa({
               {PARRAFOS.map((parrafo) => {
                 const valor = f[parrafo.campo] ?? null;
                 // Un párrafo vacío no se dibuja, salvo que se pueda completar:
-                // en el POA de 2026 solo 1 de cada 6 proyectos tiene hito, y
+                // en la POA de 2026 solo 1 de cada 6 proyectos tiene hito, y
                 // poner "Hito: —" en los otros cinco ensucia el documento.
                 if (!valor?.trim() && !editable) return null;
                 return (

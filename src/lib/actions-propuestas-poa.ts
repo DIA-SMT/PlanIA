@@ -6,7 +6,7 @@ import { getSupabaseServer } from "./supabase/server";
 import { ANIO_POA } from "./poa-2027";
 
 /**
- * Traer los proyectos del POA 2026 como propuestas para el 2027 — 28.09.
+ * Traer los proyectos de la POA 2026 como propuestas para el 2027 — 28.09.
  *
  * "No podemos hacer que se reconozcan automáticamente mis proyectos y en la
  * parte mis fichas yo lo termine de completar con la info y acepte para que vaya
@@ -51,7 +51,7 @@ export async function traerProyectosDe2026(unidadId: string): Promise<ResultadoP
     .order("nombre");
   if (eProy) return { success: false, error: eProy.message };
   if (!proyectos?.length) {
-    return { success: false, error: "Tu área no tiene proyectos cargados en el POA 2026." };
+    return { success: false, error: "Tu área no tiene proyectos cargados en la POA 2026." };
   }
 
   // Las que ya se trajeron antes: el índice único las rechazaría igual, pero así
@@ -87,7 +87,7 @@ export async function traerProyectosDe2026(unidadId: string): Promise<ResultadoP
  * tuviera su copia, el día que se agregue un campo una de las dos lo olvida.
  */
 function fichaPropuestaDe(p: any, unidadId: string, userId: string) {
-  // Lo que el libro del POA trajo de cada proyecto, importado en septiembre.
+  // Lo que el libro de la POA trajo de cada proyecto, importado en septiembre.
   const libro = p.metadata?.libro_poa ?? {};
   return {
     unidad_id: unidadId,
@@ -98,7 +98,7 @@ function fichaPropuestaDe(p: any, unidadId: string, userId: string) {
     programa: p.nombre,
     relevancia: p.descripcion || p.objetivo || null,
     // La meta y la línea de base del libro son texto redactado, que es
-    // exactamente lo que el POA pide.
+    // exactamente lo que la POA pide.
     meta_anual: libro.meta ?? null,
     ancla: libro.linea_base ?? null,
     periodo: libro.periodo ?? periodoDeFechas(p.fecha_inicio, p.fecha_fin),
@@ -274,9 +274,9 @@ export async function volverAPropuesta(id: string): Promise<{ success: boolean; 
  * elementos." Antes abría el formulario PRISMA (/poa-2027/cargar). Ahora crea
  * una ficha vacía, con el nombre que se le pone, como PROPUESTA del área: queda
  * en "Para revisar" con los mismos campos que las que vienen del 2026, se
- * completa ahí mismo y se acepta con "Va al POA 2027".
+ * completa ahí mismo y se acepta con "Va a la POA 2027".
  *
- * Puede crearla quien carga el POA del área (puedeCargarArea): el director, la
+ * Puede crearla quien carga la POA del área (puedeCargarArea): el director, la
  * secretaría sobre sus direcciones y Planificación sobre todas.
  */
 export async function crearFichaNueva(
