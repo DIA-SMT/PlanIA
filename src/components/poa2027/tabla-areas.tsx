@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ResumenAreaPoa } from "@/lib/poa-2027";
 
 /**
- * La tabla de "Todas las áreas" del POA 2027, con buscador y orden — 06.10.
+ * La tabla de "Todas las áreas" de la POA 2027, con buscador y orden — 06.10.
  *
  * "Aquí podríamos poner un buscador y organizar el orden como en los proyectos
  * o bien x orden alfabético." Son 48 áreas: sin buscador, encontrar una es leer
@@ -87,7 +87,7 @@ export function TablaAreasPoa({ areas }: { areas: ResumenAreaPoa[] }) {
           <thead>
             <tr className="border-b border-border bg-surface-hover/40 text-muted">
               <th className="text-left font-medium px-3 py-2">Área</th>
-              <th className="text-right font-medium px-3 py-2" title="Proyectos activos del POA 2026">Proyectos 2026</th>
+              <th className="text-right font-medium px-3 py-2" title="Proyectos activos de la POA 2026">Proyectos 2026</th>
               <th className="text-right font-medium px-3 py-2" title="Entran en el documento">Aceptadas</th>
               <th className="text-right font-medium px-3 py-2" title="Esperando que el área las revise">Propuestas</th>
               <th className="text-right font-medium px-3 py-2" title="Proyectos del 2026 que todavía no se trajeron">Sin traer</th>

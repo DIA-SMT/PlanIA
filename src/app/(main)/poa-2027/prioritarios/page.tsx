@@ -130,7 +130,7 @@ export default async function ProyectosPrioritariosPage({
         <h1 className="text-2xl font-bold text-foreground">Proyectos prioritarios · {area.nombre}</h1>
         <p className="text-sm text-muted mt-1">
           POA {ANIO_POA}. Cada proyecto prioritario lleva su ficha de formulación y seguimiento,
-          además de la ficha del POA {ANIO_POA} del área.
+          además de la ficha de la POA {ANIO_POA} del área.
         </p>
       </div>
 

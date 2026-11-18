@@ -10,13 +10,13 @@ import {
 } from "@/lib/actions-poa-area";
 
 /**
- * Los tres botones del circuito del POA 2027 — 25.09.
+ * Los tres botones del circuito de la POA 2027 — 25.09.
  *
  * Van juntos en un archivo porque son tres cosas chicas del mismo flujo y
  * separarlos en tres archivos de veinte líneas no aclara nada.
  */
 
-/** "Enviar al POA de mi subsecretaría" / "Enviado el… · Reabrir". */
+/** "Enviar a la POA de mi subsecretaría" / "Enviado el… · Reabrir". */
 export function EnviarPoa({
   unidadId,
   destino,
@@ -47,7 +47,7 @@ export function EnviarPoa({
   if (!destino) {
     return (
       <p className="text-xs text-muted">
-        Este es el POA final: acá se consolida lo que mandan las áreas de abajo.
+        Esta es la POA final: acá se consolida lo que mandan las áreas de abajo.
       </p>
     );
   }
@@ -75,7 +75,7 @@ export function EnviarPoa({
           title={sinFichas ? "Cargá al menos una ficha antes de enviar" : undefined}
           className="text-sm bg-primary text-white rounded-lg px-4 py-2 hover:bg-primary/90 disabled:opacity-50"
         >
-          {pendiente ? "Enviando…" : `Enviar al POA de ${destino}`}
+          {pendiente ? "Enviando…" : `Enviar a la POA de ${destino}`}
         </button>
       )}
       {error && <p className="text-xs text-danger">{error}</p>}

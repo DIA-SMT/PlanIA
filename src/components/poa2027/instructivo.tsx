@@ -8,8 +8,9 @@ import { useEffect, useState } from "react";
  * carga."
  *
  * Los pasos son los de las guías rápidas de carga de Planificación
- * Estratégica, con los nombres de los botones tal como están en PlanIA (la
- * guía del POA dice "Va a la POA 2027" y el botón dice "Va al POA 2027").
+ * Estratégica, con los nombres de los botones tal como están en PlanIA.
+ * 18.11: "Tiene que ser a la POA porque es femenino, planificación": la POA
+ * 2027 va en femenino en todo el módulo, empezando por el botón "Va a la POA 2027".
  */
 
 type Paso = { titulo: string; texto: string; opcional?: boolean; nota?: string };
@@ -22,10 +23,10 @@ const GUIAS: Record<"poa" | "prioritarios", { titulo: string; pasos: Paso[] }> =
       {
         titulo: "Releé tus proyectos 2026",
         texto:
-          "En “Editar mi POA”, tocá “Traer mis proyectos del POA 2026”. Si continúan en 2027, editalos; si no, descartalos según corresponda.",
+          "En “Editar mi POA”, tocá “Traer mis proyectos de la POA 2026”. Si continúan en 2027, editalos; si no, descartalos según corresponda.",
       },
       {
-        titulo: "Presioná “Va al POA 2027”",
+        titulo: "Presioná “Va a la POA 2027”",
         texto: "En cada proyecto que sigue, para que quede incluido en el plan.",
       },
       {

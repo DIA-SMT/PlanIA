@@ -47,7 +47,7 @@ export function TraerTodasBoton({
   if (sinTraer === 0 && !ok) {
     return (
       <p className="text-xs text-success">
-        Todas las áreas ya tienen sus proyectos del 2026 traídos al POA 2027.
+        Todas las áreas ya tienen sus proyectos del 2026 traídos a la POA 2027.
       </p>
     );
   }
@@ -74,17 +74,17 @@ export function TraerTodasBoton({
             <strong>
               {areasSinTraer} {areasSinTraer === 1 ? "área" : "áreas"}
             </strong>
-            , una por cada proyecto del POA 2026 que todavía no está en el 2027.
+            , una por cada proyecto de la POA 2026 que todavía no está en el 2027.
           </p>
           <ul className="text-xs text-muted space-y-1 list-disc pl-5 leading-relaxed">
             <li>
               Cada ficha queda en el área de su proyecto, precargada con el nombre, la
-              descripción, la meta y la línea de base que trajo el libro del POA.
+              descripción, la meta y la línea de base que trajo el libro de la POA.
             </li>
             <li>
               <strong className="text-foreground/80">No se acepta ninguna.</strong> Son
               propuestas: no entran en el documento de ningún área hasta que alguien las revise
-              y las acepte. El POA de cada área queda como está.
+              y las acepte. La POA de cada área queda como está.
             </li>
             <li>No se toca nada de lo que ya existe, ni lo traído antes ni lo cargado a mano.</li>
             <li>Apretarlo de nuevo no duplica nada.</li>

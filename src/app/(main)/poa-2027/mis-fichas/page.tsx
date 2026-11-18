@@ -16,14 +16,14 @@ export const revalidate = 0;
  * Editar mi POA — 28.09.
  *
  * Antes esta pantalla era "Mis fichas" y listaba las fichas PRISMA cargadas a
- * mano. Ahora es donde el área arma su parte del POA: trae sus proyectos del
+ * mano. Ahora es donde el área arma su parte de la POA: trae sus proyectos del
  * 2026, los completa y acepta los que van al 2027.
  *
  * "No podemos hacer que se reconozcan automáticamente mis proyectos y en la
  * parte mis fichas yo lo termine de completar con la info y acepte para que vaya
  * a mi poa?"
  *
- * Los campos llevan los nombres del POA y no las letras de PRISMA, que es lo que
+ * Los campos llevan los nombres de la POA y no las letras de PRISMA, que es lo que
  * el director ya conoce de redactarlo en Word y lo que después va a leer en el
  * documento.
  */
@@ -48,14 +48,14 @@ export default async function EditarMiPoaPage({
 
   // 05.10: "la idea es que ustedes carguen y nosotros editamos". Planificación
   // Estratégica no tiene área propia, así que edita la que elija desde la tabla
-  // de todas las áreas del POA 2027.
+  // de todas las áreas de la POA 2027.
   //
   // 03.11: "los secretarios (de todas las direcciones) y la dirección de
   // planificación deben poder cargar proyectos en la POA 2027 [...], ahora solo
   // pueden los directores de cada área". Ahora cualquiera que pueda cargar un
   // área (puedeCargarArea: Planificación todas, una secretaría su árbol) la
   // abre por parámetro. Si no puede, el parámetro se ignora y manda su área:
-  // si no, cualquiera abriría el POA de otra área escribiendo la URL.
+  // si no, cualquiera abriría la POA de otra área escribiendo la URL.
   const esPlanificacion = perfil.rol === "admin_funcional";
   const otraArea =
     params.unidad && params.unidad !== perfil.unidad_id && (await puedeCargarArea(perfil, params.unidad))
@@ -81,7 +81,7 @@ export default async function EditarMiPoaPage({
         <p className="text-sm text-muted">
           Elegí un área desde la tabla de{" "}
           <Link href="/poa-2027" className="text-primary hover:underline">
-            todas las áreas del POA {ANIO_POA}
+            todas las áreas de la POA {ANIO_POA}
           </Link>{" "}
           para ver y editar sus fichas.
         </p>
@@ -94,7 +94,7 @@ export default async function EditarMiPoaPage({
       <div className="space-y-6 max-w-3xl">
         <BackButton fallback="/poa-2027" />
         <p className="text-sm text-muted">
-          Tu perfil no tiene un área asignada, así que no hay un POA que editar.
+          Tu perfil no tiene un área asignada, así que no hay una POA que editar.
         </p>
       </div>
     );
@@ -107,7 +107,7 @@ export default async function EditarMiPoaPage({
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
-  // 08.10: lo que el POA del área lleva además de los proyectos.
+  // 08.10: lo que la POA del área lleva además de los proyectos.
   const textos = await getTextosPoa([unidadId]);
   const introducciones = textos.filter((t) => t.tipo === "introduccion");
   const ideas = textos.filter((t) => t.tipo === "idea");
@@ -137,8 +137,8 @@ export default async function EditarMiPoaPage({
         {otraArea && (
           <p className="text-[11px] text-primary border border-primary/30 bg-primary/5 rounded-lg px-3 py-2 mt-3">
             {esPlanificacion
-              ? "Estás editando el POA de esta área como Planificación Estratégica."
-              : "Estás editando el POA de un área a tu cargo."}{" "}
+              ? "Estás editando la POA de esta área como Planificación Estratégica."
+              : "Estás editando la POA de un área a tu cargo."}{" "}
             Lo que cambies o aceptes lo ve el área, igual que si lo hubiera hecho ella.
           </p>
         )}
@@ -161,7 +161,7 @@ export default async function EditarMiPoaPage({
                 las de abajo, en el área que se está editando (también desde
                 Planificación o desde la secretaría). */}
             <NuevoProyectoPoa unidadId={unidadId} />
-            {/* Planificación no tiene área propia, así que el Word del POA 2027
+            {/* Planificación no tiene área propia, así que el Word de la POA 2027
                 no tenía cómo bajar el de un área: ahora sale de acá (08.10). */}
             {esPlanificacion && (
               <a
@@ -202,7 +202,7 @@ export default async function EditarMiPoaPage({
             <div className="rounded-xl border border-border bg-surface p-6 text-center space-y-1">
               <p className="text-sm text-foreground">Todavía no armaste tu POA {ANIO_POA}.</p>
               <p className="text-xs text-muted">
-                Traé tus proyectos del POA 2026 con el botón de arriba: vienen con lo que ya
+                Traé tus proyectos de la POA 2026 con el botón de arriba: vienen con lo que ya
                 sabemos de cada uno y los completás desde acá. O cargá uno nuevo de cero.
               </p>
             </div>
@@ -215,7 +215,7 @@ export default async function EditarMiPoaPage({
                   Para revisar ({propuestas.length})
                 </h2>
                 <p className="text-xs text-muted mt-0.5">
-                  Salieron de tus proyectos del POA 2026. Completá lo que falte y aceptá los que
+                  Salieron de tus proyectos de la POA 2026. Completá lo que falte y aceptá los que
                   siguen el año que viene. Los que no acepten, no entran.
                 </p>
               </div>
@@ -246,7 +246,7 @@ export default async function EditarMiPoaPage({
               <h2 className="text-sm font-bold text-foreground">Banco de ideas</h2>
               <p className="text-xs text-muted mt-0.5">
                 Va al final del documento del área: iniciativas sujetas a aprobación que no son
-                proyectos de este POA.
+                proyectos de esta POA.
               </p>
             </div>
             <TextosDelArea unidadId={unidadId} tipo="idea" textos={ideas} editable conRotulo={false} />
@@ -281,7 +281,7 @@ function Ficha({ ficha }: { ficha: Awaited<ReturnType<typeof getMisFichas>>[numb
             />
           </h3>
           <p className="text-[11px] text-muted mt-0.5">
-            {ficha.proyecto_origen_id ? "Viene del POA 2026" : "Cargado a mano"}
+            {ficha.proyecto_origen_id ? "Viene de la POA 2026" : "Cargado a mano"}
             {vacios > 0 && ` · le faltan ${vacios} ${vacios === 1 ? "dato" : "datos"}`}
           </p>
         </div>

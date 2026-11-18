@@ -12,7 +12,7 @@ import {
 /**
  * Proyectos prioritarios — corrección del 28.10.
  *
- * La ficha se edita como las del POA 2027 (CampoEditable): se ve como texto, al
+ * La ficha se edita como las de la POA 2027 (CampoEditable): se ve como texto, al
  * hacer clic se abre el cuadro y guarda al salir. Va aparte de CampoEditable
  * porque acá hay números, años, un enlace y listas, y aquel trabaja con texto
  * corrido (renglones, viñetas, mayúsculas) que a un número le haría mal.
@@ -337,7 +337,7 @@ export function NuevoPrioritario({
       {proyectos.length > 0 && (
         <div>
           <label className="text-[11px] text-muted uppercase tracking-wider">
-            Proyecto del POA 2026 al que corresponde (opcional)
+            Proyecto de la POA 2026 al que corresponde (opcional)
           </label>
           <select
             value={proyectoId}
