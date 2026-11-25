@@ -1,0 +1,6 @@
+# Los scripts y configuraciones del servidor van siempre con LF, también en la
+# copia de trabajo de Windows: con CRLF bash y nginx los leen rotos.
+deploy/*.sh   text eol=lf
+deploy/*.conf text eol=lf
+deploy/*.js   text eol=lf
+deploy/env.ejemplo text eol=lf
