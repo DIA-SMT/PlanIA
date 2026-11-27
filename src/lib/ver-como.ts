@@ -91,6 +91,8 @@ export async function aplicarVista(real: PerfilUsuario | null): Promise<PerfilUs
     ...(real as PerfilUsuario),
     rol: vista.rol,
     unidad_id: vista.unidad_id,
+    // 27.11: mirar como un área es mirar SOLO esa área.
+    unidades_extra: [],
     // `acceso_global` da lectura de todo sin importar el rol. Si quedara
     // encendido, mirar como un director mostraría igual todo el municipio y el
     // modo no serviría para nada.

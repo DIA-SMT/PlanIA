@@ -22,6 +22,7 @@ import {
   medidaDe,
   totalDistribucion,
   perfilVeTodo,
+  unidadesDelPerfil,
   type AvanceNivel,
 } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
@@ -69,9 +70,19 @@ export default async function DashboardPage({ searchParams }: Props) {
   };
 
   // Si el usuario tiene área asignada y no es global, forzamos el scope a su unidad
-  const scopeForzado = !esGlobal && perfil?.unidad_id ? perfil.unidad_id : null;
-  const scopeId = scopeForzado ?? params.scope;
-  const scopeUnidadIds = scopeId ? new Set(descendientes(scopeId)) : null;
+  // 27.11: con más de un área a cargo (migración 066), el alcance son todas
+  // juntas, y puede acotarse a una de ellas con ?scope.
+  const mias = esGlobal ? [] : unidadesDelPerfil(perfil);
+  const alcanceMio = mias.length > 0 ? new Set(mias.flatMap((id) => descendientes(id))) : null;
+  const scopeId =
+    mias.length === 1
+      ? mias[0]
+      : mias.length > 1
+        ? params.scope && alcanceMio!.has(params.scope)
+          ? params.scope
+          : undefined
+        : params.scope;
+  const scopeUnidadIds = scopeId ? new Set(descendientes(scopeId)) : alcanceMio;
 
   const proyectosScope = scopeUnidadIds
     ? resumen.proyectos.filter((p) => scopeUnidadIds.has(p.unidad_id))

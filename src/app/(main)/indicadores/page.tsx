@@ -6,10 +6,11 @@ import { getPerfilActual } from "@/lib/auth";
 import {
   coincideBusqueda,
   perfilVeTodo,
+  subtreeDeVarias,
+  unidadesDelPerfil,
   estadoIndicadorEnPlazo,
   indicadorCumplido,
   normalizarBusqueda,
-  subtreeUnidades,
 } from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
@@ -42,7 +43,9 @@ export default async function IndicadoresPage({ searchParams }: Props) {
   ]);
   const unidadesFiltro = perfilVeTodo(perfil)
     ? unidades
-    : subtreeUnidades(unidades, perfil?.unidad_id ?? null);
+    : unidadesDelPerfil(perfil).length > 0
+      ? subtreeDeVarias(unidades, unidadesDelPerfil(perfil))
+      : unidades;
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
   const unidadById = new Map(unidades.map((u) => [u.id, u]));
   const hoy = new Date().toISOString().slice(0, 10);

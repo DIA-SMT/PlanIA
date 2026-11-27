@@ -667,17 +667,34 @@ export function ancestrosUnidades<T extends { id: string; parent_id: string | nu
  * `unidadesQueGestionaAgenda`.
  */
 export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string | null }>(
-  perfil: { rol?: string | null; unidad_id?: string | null } | null | undefined,
+  perfil: PerfilConUnidades | null | undefined,
   unidades: T[]
 ): T[] {
   if (!perfil) return [];
   // Copia, no el array de entrada: quien la reciba puede ordenarla in-place.
   if (perfil.rol === "admin_funcional") return [...unidades];
-  if (!perfil.unidad_id) return [];
   if (["director", "secretario", "subsecretario", "coordinador"].includes(perfil.rol ?? "")) {
-    return subtreeUnidades(unidades, perfil.unidad_id);
+    return subtreeDeVarias(unidades, unidadesDelPerfil(perfil));
   }
   return [];
+}
+
+type PerfilConUnidades = { rol?: string | null; unidad_id?: string | null; unidades_extra?: string[] | null };
+
+/**
+ * Las áreas a cargo del perfil: la principal y las adicionales — 27.11: "el
+ * director del COMM tiene dos direcciones a cargo [...] no estoy pudiendo
+ * asignarle dos direcciones". Espejo de la migración 066.
+ */
+export function unidadesDelPerfil(perfil: PerfilConUnidades | null | undefined): string[] {
+  if (!perfil) return [];
+  return [...new Set([perfil.unidad_id, ...(perfil.unidades_extra ?? [])].filter((id): id is string => !!id))];
+}
+
+/** `subtreeUnidades` de varias raíces, sin repetir. */
+export function subtreeDeVarias<T extends { id: string; parent_id: string | null }>(unidades: T[], raices: string[]): T[] {
+  const vistos = new Set<string>();
+  return raices.flatMap((r) => subtreeUnidades(unidades, r)).filter((u) => !vistos.has(u.id) && !!vistos.add(u.id));
 }
 
 /**
@@ -689,15 +706,15 @@ export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string
  * propósito: un director no edita la agenda de su secretario.
  */
 export function unidadesQueGestionaAgenda<T extends { id: string; parent_id: string | null }>(
-  perfil: { rol?: string | null; unidad_id?: string | null } | null | undefined,
+  perfil: PerfilConUnidades | null | undefined,
   unidades: T[]
 ): T[] {
   if (!perfil) return [];
   if (perfil.rol === "admin_funcional") return [...unidades];
-  if (!perfil.unidad_id) return [];
-  if (perfil.rol === "director") return unidades.filter((u) => u.id === perfil.unidad_id);
+  const mias = unidadesDelPerfil(perfil);
+  if (perfil.rol === "director") return unidades.filter((u) => mias.includes(u.id));
   if (perfil.rol === "secretario" || perfil.rol === "subsecretario" || perfil.rol === "coordinador") {
-    return subtreeUnidades(unidades, perfil.unidad_id);
+    return subtreeDeVarias(unidades, mias);
   }
   return [];
 }

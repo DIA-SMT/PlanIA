@@ -88,6 +88,11 @@ function UsuarioRow({
 }) {
   const [rol, setRol] = useState<RolUsuario>(perfil.rol);
   const [unidadId, setUnidadId] = useState<string | null>(perfil.unidad_id);
+  // 27.11: "el director del COMM tiene dos direcciones a cargo [...] no estoy
+  // pudiendo asignarle dos direcciones: el sistema no me deja ya que es el
+  // mismo mail". Otras áreas a cargo, con el mismo rol (migración 066).
+  const extrasOriginales = perfil.unidades_extra ?? [];
+  const [extras, setExtras] = useState<string[]>(extrasOriginales);
   const [accesoGlobal, setAccesoGlobal] = useState(perfil.acceso_global ?? false);
   const [telefono, setTelefono] = useState(perfil.telefono ?? "");
   const [isPending, startTransition] = useTransition();
@@ -131,6 +136,10 @@ function UsuarioRow({
         unidad_id: requierUnidad ? unidadId : null,
         acceso_global: accesoGlobal,
         telefono,
+        // Solo si cambiaron: así guardar no depende de la migración 066 para nada más.
+        ...(extras.join() !== extrasOriginales.join()
+          ? { unidades_extra: requierUnidad && unidadId ? extras.filter((id) => id !== unidadId) : [] }
+          : {}),
       });
       if (!r.success) setError(r.error ?? "Error al guardar");
       else onCancel();
@@ -177,6 +186,11 @@ function UsuarioRow({
   };
 
   const unidadActual = unidades.find((u) => u.id === perfil.unidad_id);
+  const nombreDe = (id: string) => {
+    const u = unidades.find((x) => x.id === id);
+    return u ? u.nombre_corto ?? u.nombre : "área dada de baja";
+  };
+  const paraAgregar = unidadesParaRol.filter((u) => u.id !== unidadId && !extras.includes(u.id));
 
   return (
     <tr className="border-t border-border">
@@ -258,6 +272,52 @@ function UsuarioRow({
               </span>
             )}
           </>
+        )}
+        {!editing && extrasOriginales.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {extrasOriginales.map((id) => (
+              <span
+                key={id}
+                title="Área adicional a cargo"
+                className="text-[10px] bg-primary/10 text-primary border border-primary/25 rounded px-1.5 py-0.5"
+              >
+                + {nombreDe(id)}
+              </span>
+            ))}
+          </div>
+        )}
+        {editing && requierUnidad && unidadId && (
+          <div className="mt-2 space-y-1">
+            <p className="text-[10px] text-muted">Otras áreas a cargo (mismo usuario):</p>
+            {extras
+              .filter((id) => id !== unidadId)
+              .map((id) => (
+                <div key={id} className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-foreground">+ {nombreDe(id)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setExtras((v) => v.filter((x) => x !== id))}
+                    title="Quitar esta área"
+                    className="text-[10px] text-muted hover:text-danger"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            {paraAgregar.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => e.target.value && setExtras((v) => [...v, e.target.value])}
+                aria-label="Agregar otra área a cargo"
+                className="text-[11px] bg-background border border-dashed border-primary/40 rounded px-2 py-1 text-primary"
+              >
+                <option value="">+ Agregar otra área…</option>
+                {paraAgregar.map((u) => (
+                  <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+                ))}
+              </select>
+            )}
+          </div>
         )}
         {editing && (
           <label className="flex items-center gap-1.5 mt-2 text-[10px] text-muted cursor-pointer">
