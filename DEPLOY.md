@@ -1,8 +1,10 @@
 # Despliegue de PlanIA en la VPS
 
 PlanIA corre en la VPS de la Dirección (195.35.42.168, Ubuntu 24.04) con Node 22,
-pm2 y nginx. **La base sigue en Supabase**: no se migra, así que en el servidor
-no hay PostgreSQL de PlanIA ni respaldo propio (los hace Supabase).
+pm2 y nginx. **Desde el 27.11.2026 la base también está en la VPS**: un Supabase
+propio en Docker (`/srv/plania/supabase`), con respaldo diario en
+`/srv/respaldos/plania`. Cómo está armado y cómo se hizo el cambio:
+[`deploy/migrar-base/MIGRAR-BASE.md`](deploy/migrar-base/MIGRAR-BASE.md).
 
 | Qué | Dónde |
 |---|---|
@@ -11,7 +13,7 @@ no hay PostgreSQL de PlanIA ni respaldo propio (los hace Supabase).
 | Variables | `/srv/plania/compartido/.env` (dueño `plania`, modo 600) — plantilla en [`deploy/env.ejemplo`](deploy/env.ejemplo) |
 | Proceso | pm2 `plania`, `next start -p 3014 -H 127.0.0.1`, levantado por systemd (`pm2-plania`) |
 | Sitio | nginx `/etc/nginx/sites-available/plania`, HTTPS con certbot |
-| Dominio | `plania.195-35-42-168.sslip.io` hasta que Sistemas delegue el definitivo |
+| Dominio | `plania.195-35-42-168.sslip.io` y `plania-195-35-42-168.nip.io` (algunas redes no resuelven sslip.io), los dos en el mismo certificado, hasta que Sistemas delegue el definitivo |
 | Logs | `/srv/plania/registros/{salida,error}.log`, `/var/log/nginx/plania.*.log` |
 
 Todo lo que sigue se corre **como root por SSH**. Desde PowerShell no mandes

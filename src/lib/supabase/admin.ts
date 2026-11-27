@@ -11,7 +11,10 @@ import { createClient } from "@supabase/supabase-js";
  *   - Operaciones masivas (scripts de seed)
  */
 export function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // 27.11: con Supabase en la misma VPS, el sitio público de la API bloquea
+  // /auth/v1/admin. El servidor entra por la dirección interna, que además se
+  // ahorra nginx y TLS. Sin la variable, sigue usando la pública.
+  const url = process.env.SUPABASE_URL_INTERNA || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(

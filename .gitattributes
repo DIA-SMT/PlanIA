@@ -4,3 +4,6 @@ deploy/*.sh   text eol=lf
 deploy/*.conf text eol=lf
 deploy/*.js   text eol=lf
 deploy/env.ejemplo text eol=lf
+deploy/**/*.sh  text eol=lf
+deploy/**/*.sql text eol=lf
+deploy/**/*.mjs text eol=lf
