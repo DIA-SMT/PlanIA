@@ -8,10 +8,8 @@ import { numeroArg } from "@/lib/proyectos-prioritarios-comun";
 import { promedioDeProyectos, type DistribucionEstados } from "@/lib/utils";
 import { GaugeCumplimiento } from "@/components/ui/gauge-cumplimiento";
 import { EstadoProyectos } from "@/components/dashboard/estado-proyectos";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BuscadorAreas } from "@/components/dashboard/buscador-areas";
+import { ListaPrioritarios, type AreaPrioritarios } from "@/components/dashboard/lista-prioritarios";
 import { BotonInstructivo } from "@/components/poa2027/instructivo";
 
 export const revalidate = 0;
@@ -66,6 +64,26 @@ export default async function ProyectosPrioritariosVistaPage() {
     porArea.get(f.unidad_nombre)!.push(f);
   }
   const areas = [...porArea.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
+  const listado: AreaPrioritarios[] = areas.map(([area, suyas]) => ({
+    id: area,
+    nombre: area,
+    fichas: suyas.map((f) => {
+      const py = f.proyecto_id ? proyectos.get(f.proyecto_id) : undefined;
+      const av = f.proyecto_id ? avance.get(f.proyecto_id) : undefined;
+      const conDatos = !!py && !!av && av.conDatos > 0;
+      return {
+        id: f.id,
+        nombre: f.nombre,
+        proyecto: py?.nombre ?? null,
+        estado: conDatos ? av!.estado : "sin_datos",
+        pct: conDatos ? (av!.pct ?? 0) : null,
+        meta:
+          f.meta_anual !== null
+            ? `Meta 2027: ${numeroArg(f.meta_anual)} ${f.unidad_medida ?? ""}`.trim()
+            : "Sin meta 2027",
+      };
+    }),
+  }));
 
   return (
     <div className="space-y-8 max-w-7xl">
@@ -155,62 +173,8 @@ export default async function ProyectosPrioritariosVistaPage() {
             </div>
           )}
 
-          {/* 12.11: buscador por área, como en el POA 2027. */}
-          <BuscadorAreas
-            secciones={areas.map(([area, suyas]) => ({
-              clave: area,
-              texto: [area, ...suyas.map((f) => f.nombre)].join(" "),
-              contenido: (
-                <section>
-                  <h2 className="text-sm font-semibold text-foreground mb-3">
-                    {area} <span className="text-xs text-muted font-normal">— {suyas.length}</span>
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {suyas.map((f) => {
-                      const py = f.proyecto_id ? proyectos.get(f.proyecto_id) : undefined;
-                      const av = f.proyecto_id ? avance.get(f.proyecto_id) : undefined;
-                      const conDatos = !!av && av.conDatos > 0;
-                      return (
-                        <Link
-                          key={f.id}
-                          href={`/poa-2027/prioritarios/${f.id}`}
-                          className="block rounded-xl border border-border bg-surface p-4 hover:bg-surface-hover hover:border-primary/30 transition-all group"
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/30 rounded px-1.5 py-0.5">
-                              ★ Prioritario
-                            </span>
-                            {py && <StatusBadge estado={conDatos ? av!.estado : "sin_datos"} />}
-                          </div>
-                          <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
-                            {f.nombre}
-                          </h3>
-                          <p className="text-xs text-muted mt-0.5 line-clamp-1">
-                            {py ? `POA ${anio}: ${py.nombre}` : "Sin proyecto del POA vinculado"}
-                          </p>
-                          <div className="mt-2">
-                            {conDatos ? (
-                              <ProgressBar value={av!.pct ?? 0} estado={av!.estado} size="sm" />
-                            ) : (
-                              <div className="h-2 rounded-full bg-border/30" />
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between mt-2 text-xs text-muted">
-                            <span>
-                              {f.meta_anual !== null
-                                ? `Meta 2027: ${numeroArg(f.meta_anual)} ${f.unidad_medida ?? ""}`
-                                : "Sin meta 2027"}
-                            </span>
-                            <span className="tabular-nums">{conDatos ? `${av!.pct}%` : "Sin seguimiento"}</span>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </section>
-              ),
-            }))}
-          />
+          {/* 27.11: como el POA Operativo, con buscador, filtros y una fila plegada por área. */}
+          <ListaPrioritarios areas={listado} anio={anio} />
         </>
       )}
     </div>

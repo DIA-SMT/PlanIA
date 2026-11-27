@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getPerfilActual } from "@/lib/auth";
 import { getPoaDelArea, PARRAFOS_POA, ANIO_POA, type AreaDelPoa, type TextoPoa } from "@/lib/poa-2027";
 import { partirEnItems, conMayusculas } from "@/lib/items-texto";
+import { unidadesDelPerfil } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,11 @@ export async function GET(req: NextRequest) {
   if (!perfil) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const pedida = req.nextUrl.searchParams.get("unidad");
-  const unidadId = perfil.rol === "admin_funcional" ? pedida : perfil.unidad_id;
+  // 27.11: quien tiene más de un área a cargo pide la otra con ?unidad=.
+  const unidadId =
+    perfil.rol === "admin_funcional" || (pedida && unidadesDelPerfil(perfil).includes(pedida))
+      ? pedida
+      : perfil.unidad_id;
   if (!unidadId) {
     return NextResponse.json({ error: "Elegí un área para descargar su POA." }, { status: 400 });
   }

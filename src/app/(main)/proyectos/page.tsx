@@ -13,8 +13,9 @@ import {
   calcularPorcentajeMeta,
   coincideBusqueda,
   perfilVeTodo,
+  subtreeDeVarias,
+  unidadesDelPerfil,
   normalizarBusqueda,
-  subtreeUnidades,
   unidadesQuePuedeCargar,
   type AvanceNivel,
 } from "@/lib/utils";
@@ -250,7 +251,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
         <Suspense>
           <ProyectosSearch
             unidades={
-              perfilVeTodo(perfil) ? unidades : subtreeUnidades(unidades, perfil?.unidad_id ?? null)
+              perfilVeTodo(perfil) || unidadesDelPerfil(perfil).length === 0
+                ? unidades
+                : subtreeDeVarias(unidades, unidadesDelPerfil(perfil))
             }
           />
         </Suspense>

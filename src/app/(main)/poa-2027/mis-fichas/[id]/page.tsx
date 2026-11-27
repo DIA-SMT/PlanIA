@@ -1,4 +1,5 @@
 import { getPerfilActual } from "@/lib/auth";
+import { unidadesDelPerfil } from "@/lib/utils";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { BackButton } from "@/components/layout/back-button";
 import { FichaForm } from "@/components/prisma/ficha-form";
@@ -29,7 +30,7 @@ export default async function EditarFichaPage({
 
   const puedeEditar =
     perfil.rol === "admin_funcional" ||
-    (perfil.rol === "director" && perfil.unidad_id === ficha.unidad_id);
+    (perfil.rol === "director" && unidadesDelPerfil(perfil).includes(ficha.unidad_id));
 
   if (!puedeEditar) {
     return (

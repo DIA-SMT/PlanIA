@@ -343,6 +343,8 @@ export async function actualizarPerfil(input: {
    * vacía borra el teléfono. (24.08)
    */
   telefono?: string | null;
+  /** 27.11: otras áreas a cargo, además de la principal (migración 066). */
+  unidades_extra?: string[];
 }) {
   try {
     await requireRol("admin_funcional", "admin_tecnico");
@@ -355,11 +357,18 @@ export async function actualizarPerfil(input: {
     unidad_id: string | null;
     acceso_global?: boolean;
     telefono?: string | null;
+    unidades_extra?: string[];
   } = {
     rol: input.rol,
     unidad_id: input.unidad_id,
   };
   if (input.acceso_global !== undefined) update.acceso_global = input.acceso_global;
+  if (input.unidades_extra !== undefined) {
+    // Sin la principal ni repetidas; sin unidad principal, no hay adicionales.
+    update.unidades_extra = input.unidad_id
+      ? [...new Set(input.unidades_extra)].filter((id) => id && id !== input.unidad_id)
+      : [];
+  }
   if (input.telefono !== undefined) {
     const tel = normalizarTelefono(input.telefono);
     if (!tel.ok) return { success: false, error: tel.error };

@@ -12,6 +12,8 @@ import { DocumentoPoa } from "@/components/poa2027/documento-poa";
 import { BotonInstructivo } from "@/components/poa2027/instructivo";
 import { EnviarPoa } from "@/components/poa2027/circuito-acciones";
 import { getAreasPrioritariosACargo } from "@/lib/proyectos-prioritarios";
+import { getUnidades } from "@/lib/queries";
+import { subtreeDeVarias } from "@/lib/utils";
 
 export const revalidate = 0;
 
@@ -80,10 +82,18 @@ export default async function Poa2027Page() {
   // 03.11: "los secretarios (de todas las direcciones) [...] deben poder
   // cargar proyectos en la POA 2027". Las áreas de abajo que el perfil puede
   // cargar, para entrar a editar la POA de cada una.
-  const areasACargo =
-    puedeCargar && perfil?.unidad_id && !esPlanificacion && circuito
-      ? circuito.areasDeAbajo
+  //
+  // 27.11: también las otras áreas a cargo del perfil (migración 066), como el
+  // director del COMM, que tiene además la PPC, con lo que cuelga de ellas.
+  const extras = (perfil?.unidades_extra ?? []).filter((id) => id !== perfil?.unidad_id);
+  const areasExtra =
+    puedeCargar && !esPlanificacion && extras.length > 0
+      ? subtreeDeVarias(await getUnidades(), extras).map((u) => ({ id: u.id, nombre: u.nombre_corto ?? u.nombre }))
       : [];
+  const areasACargo = [
+    ...(puedeCargar && perfil?.unidad_id && !esPlanificacion && circuito ? circuito.areasDeAbajo : []),
+    ...areasExtra,
+  ].filter((a, i, todas) => todas.findIndex((b) => b.id === a.id) === i);
 
   const propia = circuito?.propia;
   return (

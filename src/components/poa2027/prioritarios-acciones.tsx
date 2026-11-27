@@ -155,7 +155,7 @@ export function CampoPrioritario({
       <span className="block text-[10px] text-muted/70 mt-0.5">
         {pendiente ? "Guardando…" : "Se guarda al salir del campo · Escape para cancelar"}
       </span>
-      {error && <span className="block text-[11px] text-danger">{error}</span>}
+      {error && <span className="block text-xs font-medium text-danger">{error}</span>}
     </span>
   );
 }
@@ -247,16 +247,20 @@ export function CeldaHistorial({
 
   if (!editable) return <>{mostrar}</>;
   if (!editando) {
+    // 27.11: "no se pueden editar los historiales? todo lo demás sí pero eso
+    // no". La celda se veía como texto suelto; ahora se ve como un campo.
     return (
       <button
+        type="button"
         onClick={() => {
           setTexto(inicial);
           setEditando(true);
         }}
         title="Hacé clic para editar"
-        className="rounded px-0.5 hover:bg-primary/10"
+        className="inline-flex min-w-28 items-center justify-end gap-1.5 rounded border border-dashed border-primary/40 px-2 py-0.5 cursor-text hover:bg-primary/10 hover:border-primary"
       >
         {mostrar}
+        <span aria-hidden className="text-[10px] text-primary/70">✎</span>
       </button>
     );
   }

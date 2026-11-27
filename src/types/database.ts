@@ -162,6 +162,11 @@ export interface PerfilUsuario {
   telefono: string | null;
   rol: RolUsuario;
   unidad_id: string | null;
+  /**
+   * Otras áreas a cargo además de `unidad_id` (27.11, migración 066), con el
+   * mismo rol y el mismo alcance. Usar `unidadesDelPerfil`, que las junta.
+   */
+  unidades_extra?: string[] | null;
   activo: boolean;
   /**
    * Ve TODAS las unidades sin importar rol/unidad (solo lectura). No amplía

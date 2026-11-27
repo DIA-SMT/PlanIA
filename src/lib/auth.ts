@@ -1,6 +1,24 @@
 import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
 import type { PerfilUsuario, RolUsuario } from "@/types/database";
+import { unidadesDelPerfil } from "./utils";
+
+/**
+ * La unidad y lo que cuelga de ella, de cada área a cargo del perfil — 27.11:
+ * un director puede tener más de una dirección (migración 066).
+ */
+async function descendientesDelPerfil(perfil: PerfilUsuario): Promise<string[]> {
+  const mias = unidadesDelPerfil(perfil);
+  if (mias.length === 0) return [];
+  const supabase = await getSupabaseServer();
+  const listas = await Promise.all(
+    mias.map(async (id) => {
+      const { data } = await supabase.rpc("unidades_descendientes", { p_unidad_id: id });
+      return ((data ?? []) as { id: string }[]).map((row) => row.id);
+    })
+  );
+  return [...new Set(listas.flat())];
+}
 
 /**
  * Devuelve el perfil del usuario autenticado actual (o null si no hay sesión).
@@ -83,13 +101,8 @@ export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]>
     return (data ?? []).map((u) => (u as { id: string }).id);
   }
 
-  if (!perfil.unidad_id) return [];
-
-  // `unidades_descendientes` incluye la propia unidad.
-  const { data } = await supabase.rpc("unidades_descendientes", {
-    p_unidad_id: perfil.unidad_id,
-  });
-  return ((data ?? []) as { id: string }[]).map((row) => row.id);
+  // `unidades_descendientes` incluye la propia unidad. 27.11: de cada área a cargo.
+  return descendientesDelPerfil(perfil);
 }
 
 /**
@@ -132,14 +145,12 @@ export async function getScopeReporte(perfil: PerfilUsuario): Promise<string[]> 
   }
 
   const porUnidad: RolUsuario[] = ["secretario", "subsecretario", "director", "coordinador"];
-  if (!porUnidad.includes(perfil.rol) || !perfil.unidad_id) return [];
+  if (!porUnidad.includes(perfil.rol)) return [];
 
   // `unidades_descendientes` ya incluye la propia unidad y es recursiva
   // (010_rbac.sql:60), así que un secretario recibe su secretaría completa.
-  const { data } = await supabase.rpc("unidades_descendientes", {
-    p_unidad_id: perfil.unidad_id,
-  });
-  return ((data ?? []) as { id: string }[]).map((row) => row.id);
+  // 27.11: de cada área a cargo.
+  return descendientesDelPerfil(perfil);
 }
 
 /**
@@ -181,7 +192,7 @@ export async function requireCargaSobreUnidad(unidadId: string): Promise<PerfilU
   const perfil = await getPerfilActual();
   if (!perfil) throw new Error("No autenticado");
   if (perfil.rol === "admin_funcional") return perfil;
-  if (perfil.rol === "director" && perfil.unidad_id === unidadId) return perfil;
+  if (perfil.rol === "director" && unidadesDelPerfil(perfil).includes(unidadId)) return perfil;
   throw new Error("Permisos insuficientes para cargar sobre esta unidad");
 }
 
@@ -193,13 +204,8 @@ export async function requireValidacionSobreUnidad(unidadId: string): Promise<Pe
   const perfil = await getPerfilActual();
   if (!perfil) throw new Error("No autenticado");
   if (perfil.rol === "admin_funcional") return perfil;
-  if (perfil.rol === "subsecretario" && perfil.unidad_id) {
-    const supabase = await getSupabaseServer();
-    const { data } = await supabase.rpc("unidades_descendientes", {
-      p_unidad_id: perfil.unidad_id,
-    });
-    const ids = (data ?? []).map((r: { id: string }) => r.id);
-    if (ids.includes(unidadId)) return perfil;
+  if (perfil.rol === "subsecretario" && (await descendientesDelPerfil(perfil)).includes(unidadId)) {
+    return perfil;
   }
   throw new Error("Permisos insuficientes para validar avances de esta unidad");
 }

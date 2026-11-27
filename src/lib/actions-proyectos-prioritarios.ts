@@ -181,8 +181,9 @@ export async function editarHistorialPrioritario(
   valor: string
 ): Promise<Resultado> {
   if (!ANIOS_CARGABLES.includes(anio)) return { success: false, error: "Ese año no va en el historial" };
-  const n = leerNumero(valor.trim());
-  if (n === "invalido") return { success: false, error: "Escribí un número, sin letras" };
+  // 27.11: "123 cuadras" vale 123: la unidad ya está en el encabezado.
+  const n = leerNumero(valor.trim().replace(/^([\d.,]+)\s*[^\d.,\s][\s\S]*$/, "$1"));
+  if (n === "invalido") return { success: false, error: "Escribí solo la cantidad, por ejemplo 123" };
   return cambiarMetas(id, (metas) => {
     if (!metas.some((m) => m.id === metaId)) return "No se encontró la meta";
     return metas.map((m) =>

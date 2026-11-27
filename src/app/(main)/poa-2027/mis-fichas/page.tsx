@@ -162,8 +162,9 @@ export default async function EditarMiPoaPage({
                 Planificación o desde la secretaría). */}
             <NuevoProyectoPoa unidadId={unidadId} />
             {/* Planificación no tiene área propia, así que el Word de la POA 2027
-                no tenía cómo bajar el de un área: ahora sale de acá (08.10). */}
-            {esPlanificacion && (
+                no tenía cómo bajar el de un área: ahora sale de acá (08.10).
+                27.11: también quien tiene esta como área adicional. */}
+            {(esPlanificacion || (perfil.unidades_extra ?? []).includes(unidadId)) && (
               <a
                 href={`/api/poa-2027/exportar?unidad=${unidadId}`}
                 className="text-sm border border-border rounded-lg px-4 py-2 hover:bg-surface-hover"

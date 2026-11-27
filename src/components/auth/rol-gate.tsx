@@ -1,4 +1,5 @@
 import { getPerfilActual } from "@/lib/auth";
+import { unidadesDelPerfil } from "@/lib/utils";
 import type { RolUsuario } from "@/types/database";
 import type { ReactNode } from "react";
 
@@ -24,7 +25,7 @@ export async function RolGate({ allow, unidadId, children, fallback = null }: Pr
   if (!allow.includes(perfil.rol)) return <>{fallback}</>;
 
   // Si requiere scope adicional (Director solo sobre su unidad)
-  if (unidadId && perfil.rol === "director" && perfil.unidad_id !== unidadId) {
+  if (unidadId && perfil.rol === "director" && !unidadesDelPerfil(perfil).includes(unidadId)) {
     return <>{fallback}</>;
   }
 
